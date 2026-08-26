@@ -1,0 +1,28 @@
+# Local development / smoke-test docker-compose for the Sakina MCP
+# Server (WO#105). Use Fly.io (`fly.toml`) for production deployment.
+#
+# Run:    docker compose up --build
+# Health: curl http://localhost:3030/health
+# Stop:   docker compose down
+
+services:
+  sakina-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sakina-mcp:local
+    ports:
+      - "3030:3030"
+    environment:
+      NODE_ENV: production
+      # Set these to enable Upstash distributed rate limiting. If
+      # omitted, the in-memory limiter is used (per-process).
+      # UPSTASH_REDIS_REST_URL: ""
+      # UPSTASH_REDIS_REST_TOKEN: ""
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3030/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

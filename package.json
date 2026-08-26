@@ -1,0 +1,70 @@
+{
+  "name": "@asksakina/islamic-knowledge-mcp",
+  "version": "1.3.0",
+  "private": false,
+  "description": "Verified Islamic knowledge MCP server — Quranic verses, authenticated du'as, and the 99 Names of Allah. Scholar-reviewed across mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali). Provides three lookup tools to AI agents over the Model Context Protocol.",
+  "mcpName": "com.asksakina/islamic-knowledge",
+  "main": "dist/server.js",
+  "bin": {
+    "sakina-mcp": "dist/server.js"
+  },
+  "files": [
+    "dist/",
+    "data/",
+    "README.md",
+    "LICENSE",
+    ".mcp/server.json"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "bundle-data": "tsx scripts/bundle-data.ts",
+    "update-geoip": "node node_modules/geoip-lite/scripts/updatedb.js",
+    "prebuild": "npm run bundle-data",
+    "build": "tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
+    "prepublishOnly": "npm run bundle-data && npm run build && npm run test:tools && npm run test:analytics && npm run test:http",
+    "start": "tsx src/server.ts",
+    "start:dist": "node dist/server.js",
+    "test:tools": "tsx scripts/test-tools.ts",
+    "test:analytics": "tsx scripts/test-analytics.ts",
+    "test:http": "tsx scripts/test-http-smoke.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "geoip-lite": "^1.4.10",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/geoip-lite": "^1.4.4",
+    "@types/node": "^22.7.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yserrag/asksakina-mcp"
+  },
+  "homepage": "https://www.asksakina.com",
+  "bugs": {
+    "url": "https://github.com/yserrag/asksakina-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "islam",
+    "islamic",
+    "quran",
+    "dua",
+    "supplication",
+    "hadith",
+    "asma-ul-husna",
+    "99-names-of-allah",
+    "spiritual",
+    "ai-agent",
+    "claude",
+    "sakina"
+  ],
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "node": ">=20"
+  }
+}

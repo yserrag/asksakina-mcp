@@ -1,0 +1,49 @@
+# Sakina Islamic Knowledge MCP — Fly.io deployment config (WO#105).
+#
+# Deploy:           fly deploy
+# Set secrets:      fly secrets set UPSTASH_REDIS_REST_URL=... UPSTASH_REDIS_REST_TOKEN=...
+# Tail logs:        fly logs
+# Health check:     curl https://<app>.fly.dev/health
+
+app = "sakina-mcp"
+primary_region = "lhr"  # London Heathrow — closest to the Architect
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3030"
+  LOG_DIR = "/data/logs"
+
+# WO#137 — persistent volume for JSONL analytics logs. One-time setup
+# on a new machine:
+#     fly volumes create mcp_logs --region lhr --size 1
+# After that, every deploy auto-mounts. Set the stats Bearer token via
+#     fly secrets set MCP_STATS_TOKEN=<long random string>
+# Read stats:
+#     curl -H "Authorization: Bearer $MCP_STATS_TOKEN" https://sakina-mcp.fly.dev/stats
+[mounts]
+  source = "mcp_logs"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3030
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0  # cold-start tolerable for a low-traffic v1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    type = "http"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

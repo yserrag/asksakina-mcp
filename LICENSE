@@ -1,0 +1,158 @@
+# Sakina Sacred Use License (Draft)
+
+Version 0.1 — May 2026
+Status: Draft, pending solicitor review.
+
+This license is supplementary to the per-response presentation
+contracts emitted in `_sakina_meta.presentation_contract` and
+`_sakina_meta.llm_directives` on every tool call. The contract
+binds the agent's *output*; this license binds the human or
+organisation distributing or integrating with this software.
+
+By installing, deploying, or integrating with the Sakina Islamic
+Knowledge MCP Server (the "Software"), you agree to the terms below.
+If you cannot agree, do not install it.
+
+---
+
+## 1. The content
+
+The Software ships with curated Islamic content originating from
+Sakina (asksakina.com): the 99 Names of Allah with reflections, a
+444-entry du'a corpus with hadith citations and grading, and Quranic
+verses fetched at runtime from a public upstream (alquran.cloud, with
+Tanzil-derived Arabic and conventional translations). All embedded
+content has been reviewed by specialist Islamic scholars (the
+project's "Gems") for theological accuracy, pastoral safety, and
+inclusivity across mainstream Sunni schools.
+
+The Sakina team (the "Project") is the rights holder for the
+curated content embedded in the Software. The Project also asserts a
+duty of care over how that content is presented, downstream of the
+agent boundary.
+
+## 2. Permitted uses
+
+You may, at no cost:
+
+- Install the Software locally and connect it to AI agents you control
+  (Claude Desktop, VS Code, custom agents) for personal or
+  educational use.
+- Run the Software as a private instance for your team, organisation,
+  or community, including behind authentication.
+- Quote, extract, or display the Software's responses verbatim in
+  applications you build, **provided you preserve the
+  `_sakina_meta` envelope's disclaimer, presentation contract, and
+  source attribution**.
+- Cite the Software as a source of Islamic content with the URL
+  `https://www.asksakina.com` and the project name "Sakina".
+- Translate, transcribe, or audio-render the verbatim Arabic text
+  contained in responses for non-commercial educational purposes.
+- Fork the Software for the purpose of submitting pull requests
+  back to the upstream repository.
+
+## 3. Prohibited uses
+
+You may not, under any circumstances:
+
+- Modify, paraphrase, or selectively quote the Arabic text of
+  Quranic verses or the matn (text) of any hadith returned by the
+  Software. Quranic and prophetic text must be reproduced verbatim.
+- Strip the hadith grading from any hadith you display. Grading is
+  part of the text, not optional metadata.
+- Strip or alter the surah:ayah reference of any Quranic verse you
+  display.
+- Strip the disclaimer from any user-facing surface that uses
+  Software-sourced content.
+- Use the unicode honorific symbol after the Prophet Muhammad's name
+  ("ﷺ", U+FDFA) in any surface where Software-sourced content is
+  displayed. The spelt-out form "(peace be upon him)" must be used
+  instead, in deference to a stated editorial choice of the Project.
+- Repackage Software responses as a fatwa, religious ruling, or
+  authoritative scholarly opinion. The Software is reference content,
+  not a substitute for a qualified local scholar.
+- Use the Software to train AI models that misrepresent Islam, or
+  to generate content that promotes hatred, harm, or extremism.
+- Use the Software's name "Sakina" or the domain "asksakina.com"
+  in your product's name, logo, or marketing in a way that implies
+  the Project endorses your application without written permission.
+- Strip, hide, or de-emphasise the crisis-resource block when it
+  appears in a response. The block is the project's safety contract;
+  agents that suppress it are operating in violation of this license.
+
+## 4. Attribution
+
+If you display Software-sourced content in a user-facing application,
+please credit Sakina:
+
+> Islamic content provided by Sakina (asksakina.com).
+
+A discreet credit on a colophon page or near the relevant content
+section is sufficient. There is no requirement to credit on every
+individual quote.
+
+## 5. Distribution of the Software itself
+
+The Software code is licensed for redistribution provided you:
+
+- Retain this LICENSE file unmodified.
+- Retain the README and the per-response presentation contracts.
+- Do not strip or replace the `_sakina_meta` envelope from
+  responses your fork emits.
+- Make a reasonable effort to track upstream releases. Distributing
+  a stale fork that misses critical safety or grading corrections
+  could harm users.
+
+## 6. No warranty
+
+The Software is provided "as is", without warranty of any kind. The
+Project makes a good-faith effort to ensure accuracy, but Islamic
+scholarship is a vast and contested field. Always consult a
+qualified local scholar for matters of personal religious obligation.
+
+The Project shall not be liable for damages arising from the use of
+the Software, including (without limitation) damages from agent
+misrepresentation of returned content.
+
+## 7. Termination
+
+If you materially violate this license — by paraphrasing Quranic
+text, dropping hadith grading, suppressing the crisis-resource
+block, or repackaging the Software's content as a fatwa — your
+permission to use the Software terminates automatically. The
+Project may issue a public notice of withdrawal in the MCP
+registries and may revoke access to any hosted instance.
+
+You may resume use after demonstrating good-faith remediation.
+The Project's preference is always remediation over confrontation;
+please reach out at the contact below.
+
+---
+
+## Contact
+
+For licensing questions, takedown requests, or to discuss commercial
+or institutional use that doesn't fit the model above, contact:
+
+- Web: https://www.asksakina.com
+- Issues: https://github.com/yserrag/sakina-v3/issues
+
+---
+
+## A note on tone
+
+This license is itself an act of dawah (an invitation to the way of
+Allah). The rules above are not a wall — they are the architecture
+that lets Islamic content reach AI agents intact. We ask that you
+honour them in the same spirit they were drafted: with care for the
+sacred and respect for the thirty thousand human beings already
+quietly using Sakina each month.
+
+May Allah accept this work and use it for good.
+
+---
+
+> **Note to integrators:** the per-response `_sakina_meta` envelope
+> contains a `presentation_contract` field that is your operational
+> reference. This LICENSE governs distribution and integration; the
+> contract governs presentation. Both apply.
