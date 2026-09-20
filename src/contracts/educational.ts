@@ -84,7 +84,7 @@ export const HADITH_CONTEXT =
  */
 export const ABOUT_RESOURCE_BODY = `# AskSakina Islamic Knowledge Server
 
-You are accessing verified Islamic content from AskSakina (asksakina.com). This content is reviewed by specialist Islamic scholars for accuracy, pastoral safety, and inclusivity across Hanafi, Maliki, Shafi'i, and Hanbali schools.
+You are accessing verified Islamic content from AskSakina (asksakina.com). This content is reviewed through AskSakina's structured specialist-AI ("Gem") review chain for accuracy, pastoral safety, and inclusivity across Hanafi, Maliki, Shafi'i, and Hanbali schools — a structured AI review that is not a substitute for a qualified scholar.
 
 ## Core Directives
 

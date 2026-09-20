@@ -44,17 +44,12 @@ import {
 import { serialiseResponse, type SakinaResponse } from './meta/response-builder.js'
 import { logRequest, type ToolName, type RequestStatus } from './logging/request-logger.js'
 import { handleStatsRequest } from './logging/stats.js'
-import {
-  runWithRequestContext,
-  type RequestContext,
-} from './logging/request-context.js'
-import { extractClientIp, lookupGeo } from './logging/geo.js'
-import { classifyClient, sanitiseUserAgent } from './logging/client-detection.js'
+import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
 const SERVER_VERSION = '1.3.0'
 const SERVER_DESCRIPTION =
-  "Verified Islamic knowledge from Sakina (asksakina.com). Provides Quranic verses, authenticated du'as (supplications), and the 99 Names of Allah. All content is reviewed by Islamic scholars for theological accuracy across mainstream Sunni schools."
+  "Verified Islamic knowledge from Sakina (asksakina.com). Provides Quranic verses, authenticated du'as (supplications), and the 99 Names of Allah. All content is reviewed through AskSakina's structured specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
 // WO#129 Task 1 — Smithery server-card.json. Mirrors the MCP registry
 // entry at `.mcp/server.json` but adds JSON-Schema-shaped descriptors
@@ -164,16 +159,17 @@ const SERVER_CARD = {
       tracking: 'none',
       analytics: 'aggregate-only',
       logging:
-        'tool-call-only — { tool, params, status, duration_ms, country_code, region, client } per call. No raw IPs, no client identifiers, no response payloads.',
+        'in-memory aggregate counters only — per-tool call + status totals. No per-request records, no IPs, no client identifiers, no user-agents, no geolocation, no params, no response payloads. Counters reset on restart.',
     },
   },
 } as const
 
 /**
- * Wrap a tool handler so every call records a JSONL analytics entry
- * (WO#137). Captures start time, status (ok / not_found / error),
- * and wall-clock duration. Re-throws errors after logging so the
- * transport's existing error path still runs.
+ * Wrap a tool handler so every call bumps the in-memory aggregate
+ * counters (WO#360). Captures start time, status (ok / not_found /
+ * error), and wall-clock duration only — no params, no per-request
+ * record. Re-throws errors after counting so the transport's existing
+ * error path still runs.
  */
 function withLogging<Args extends Record<string, unknown>>(
   tool: ToolName,
@@ -182,7 +178,6 @@ function withLogging<Args extends Record<string, unknown>>(
   return async (args) => {
     const start = performance.now()
     let status: RequestStatus = 'ok'
-    let errorType: string | undefined
     try {
       const response = await handler(args)
       if (response._sakina_meta?.content_type === 'not_found') {
@@ -191,19 +186,9 @@ function withLogging<Args extends Record<string, unknown>>(
       return { content: [{ type: 'text', text: serialiseResponse(response) }] }
     } catch (err) {
       status = 'error'
-      // Short stable bucket for the error_type field — class name when
-      // the throw is an Error subtype, otherwise `unknown_error`. The
-      // raw message is intentionally NOT logged (may contain user input).
-      errorType = err instanceof Error ? err.constructor.name : 'unknown_error'
       throw err
     } finally {
-      logRequest({
-        tool,
-        params: args as Record<string, unknown>,
-        status,
-        duration_ms: performance.now() - start,
-        error_type: errorType,
-      })
+      logRequest({ tool, status, duration_ms: performance.now() - start })
     }
   }
 }
@@ -292,24 +277,12 @@ async function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
 }
 
 /**
- * Build the per-request analytics context. The raw IP is resolved
- * here and used for (a) rate-limit keying and (b) one geoip lookup,
- * then discarded — only the derived country / region survive.
+ * Resolve the client IP for the rate limiter. The IP is used only for
+ * the per-IP rate decision and geoip is no longer consulted (WO#360 —
+ * geolocation collection removed); nothing derived from it is stored.
  */
-function buildRequestContext(req: http.IncomingMessage): {
-  ip: string
-  context: RequestContext
-} {
-  const ip = extractClientIp(req) ?? 'unknown'
-  const ua = sanitiseUserAgent(req.headers['user-agent'] as string | undefined)
-  const geo = lookupGeo(ip)
-  const context: RequestContext = {
-    client: classifyClient(ua),
-  }
-  if (ua) context.user_agent = ua
-  if (geo.country_code) context.country_code = geo.country_code
-  if (geo.region) context.region = geo.region
-  return { ip, context }
+function resolveClientIp(req: http.IncomingMessage): string {
+  return extractClientIp(req) ?? 'unknown'
 }
 
 /**
@@ -353,7 +326,7 @@ export async function startHttpServer(port: number = Number(process.env.PORT ?? 
       return
     }
 
-    const { ip, context: requestContext } = buildRequestContext(req)
+    const ip = resolveClientIp(req)
     // Defence in depth (WO#250): a limiter that throws must NEVER crash the
     // server. Fail open — the request proceeds without a rate decision. The
     // limiter impls already fail open internally; this is the last backstop.
@@ -395,37 +368,35 @@ export async function startHttpServer(port: number = Number(process.env.PORT ?? 
       }
     }
 
-    // WO#140 — propagate the request context (country/client/UA, NO IP)
-    // through AsyncLocalStorage so the per-tool logger can merge it
-    // into the JSONL entry. The raw IP is intentionally not part of
-    // the context — it has already been consumed for geoip + rate limit.
-    await runWithRequestContext(requestContext, async () => {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined, // stateless
-        enableJsonResponse: true,
-      })
-      const mcp = createMcpServer()
-      res.on('close', () => {
-        transport.close().catch(() => {})
-      })
-      try {
-        await mcp.connect(transport)
-        // The transport's `req` parameter requires an optional AuthInfo
-        // shape on `auth`. v1 ships unauthenticated; cast through unknown
-        // to satisfy the SDK's typing without inventing an AuthInfo.
-        await transport.handleRequest(
-          req as unknown as Parameters<typeof transport.handleRequest>[0],
-          res,
-          body,
-        )
-      } catch (err) {
-        console.error('[mcp] handler error:', err)
-        if (!res.headersSent) {
-          res.writeHead(500, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ error: { code: -32603, message: 'Internal server error' } }))
-        }
-      }
+    // WO#360 — the per-request AsyncLocalStorage context (country / client
+    // / UA) that WO#140 propagated here fed the JSONL logger, which has
+    // been removed. The transport is now invoked directly; the IP was
+    // already consumed for the rate-limit decision and is not retained.
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined, // stateless
+      enableJsonResponse: true,
     })
+    const mcp = createMcpServer()
+    res.on('close', () => {
+      transport.close().catch(() => {})
+    })
+    try {
+      await mcp.connect(transport)
+      // The transport's `req` parameter requires an optional AuthInfo
+      // shape on `auth`. v1 ships unauthenticated; cast through unknown
+      // to satisfy the SDK's typing without inventing an AuthInfo.
+      await transport.handleRequest(
+        req as unknown as Parameters<typeof transport.handleRequest>[0],
+        res,
+        body,
+      )
+    } catch (err) {
+      console.error('[mcp] handler error:', err)
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: { code: -32603, message: 'Internal server error' } }))
+      }
+    }
   })
 
   return new Promise((resolve) => {

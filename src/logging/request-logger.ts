@@ -1,165 +1,93 @@
-// Request logger for the Sakina MCP server (WO#137 + WO#140).
+// Request analytics for the Sakina MCP server.
 //
-// Privacy-first analytics:
-//   - No IP addresses, no client identifiers (cookies/tokens), no
-//     response payloads, no free-form user narrative.
-//   - The HTTP dispatcher resolves the client IP once to (a) check
-//     the rate-limit and (b) look up country/region via the embedded
-//     MaxMind database — the IP itself is discarded immediately.
-//   - The `context` parameter on get_dua is a category keyword
-//     ("anxiety", "morning", "grief") per the tool contract; it is
-//     logged so we can answer "which life situations do agents query
-//     most" without ever associating it with a person.
-//   - User-Agent is logged truncated so the Architect can spot a new
-//     MCP client and extend the matcher list; the classified `client`
-//     bucket is what /stats actually aggregates.
+// Privacy-first, MINIMAL DATA (WO#360):
+//   - In-memory AGGREGATE COUNTERS ONLY. We keep a running tally of how
+//     many times each tool was called and how those calls resolved
+//     (ok / not_found / error), plus the summed handler duration so
+//     `/stats` can report an average response time.
+//   - NO per-request records are written anywhere. Nothing is persisted
+//     to disk. Nothing survives a process restart.
+//   - NO IP addresses, NO user-agents, NO client identifiers, NO
+//     geolocation, NO request params, NO response payloads. None of it
+//     is collected — so the "minimal data" claim is literally true.
 //
-// Storage:
-//   - Append-only JSONL, one line per request.
-//   - Daily rotation: requests-YYYY-MM-DD.jsonl.
-//   - Default directory `${LOG_DIR}` (env var) or `/data/logs` (Fly
-//     volume mount). Falls back to ./logs/ for local dev.
-//   - Writes are fire-and-forget — a slow disk must not bleed into
-//     tool response latency. Write failures log to stderr and are
-//     dropped.
-
-import { promises as fs } from 'node:fs'
-import path from 'node:path'
-
-import { getRequestContext } from './request-context.js'
+// Prior versions (WO#137 / WO#140) appended a JSONL row per request that
+// carried country / region / client / user-agent context. That surface —
+// the per-request log files and the AsyncLocalStorage context that fed
+// them — was removed in WO#360, so the privacy claim now holds without
+// qualification.
 
 export type ToolName = 'get_quran_verse' | 'get_dua' | 'get_name_of_allah'
 export type RequestStatus = 'ok' | 'not_found' | 'error'
 
-export interface RequestLogEntry {
-  ts: string
-  tool: ToolName
-  params: Record<string, unknown>
-  status: RequestStatus
-  /** Wall-clock duration of the tool handler. Kept for back-compat with
-   *  WO#137 logs; `response_time_ms` is the new canonical name. */
-  duration_ms: number
-  response_time_ms: number
-  /** Convenience boolean for dashboards — true iff status === 'error'. */
-  error: boolean
-  /** Optional short error classifier (e.g. 'timeout', 'upstream_404'). */
-  error_type?: string
-  // WO#140 — request context (populated when AsyncLocalStorage carries it)
-  country_code?: string
-  region?: string
-  client?: string
-  user_agent?: string
+export interface ToolCounter {
+  ok: number
+  not_found: number
+  error: number
+  total: number
+  /** Summed handler wall-clock ms across all calls — divide by `total`
+   *  for a mean. Aggregate only; never associated with a single call. */
+  duration_ms_sum: number
 }
 
-const DEFAULT_LOG_DIR = '/data/logs'
-const FALLBACK_LOG_DIR = './logs'
-const MAX_CONTEXT_CHARS = 200
+export interface AggregateSnapshot {
+  /** When the counters were last (re)set — i.e. process start. */
+  since: string
+  perTool: Record<ToolName, ToolCounter>
+  total: number
+}
 
-let cachedLogDir: string | null = null
-let ensureDirPromise: Promise<void> | null = null
+const TOOLS: readonly ToolName[] = ['get_quran_verse', 'get_dua', 'get_name_of_allah']
 
-export function getLogDir(): string {
-  if (cachedLogDir) return cachedLogDir
-  const envDir = process.env.LOG_DIR?.trim()
-  if (envDir) {
-    cachedLogDir = envDir
-  } else if (process.env.NODE_ENV === 'production') {
-    cachedLogDir = DEFAULT_LOG_DIR
-  } else {
-    cachedLogDir = FALLBACK_LOG_DIR
+function emptyCounter(): ToolCounter {
+  return { ok: 0, not_found: 0, error: 0, total: 0, duration_ms_sum: 0 }
+}
+
+function emptyCounters(): Record<ToolName, ToolCounter> {
+  return {
+    get_quran_verse: emptyCounter(),
+    get_dua: emptyCounter(),
+    get_name_of_allah: emptyCounter(),
   }
-  return cachedLogDir
 }
 
-function ensureLogDir(dir: string): Promise<void> {
-  if (!ensureDirPromise) {
-    ensureDirPromise = fs.mkdir(dir, { recursive: true }).then(
-      () => {},
-      (err) => {
-        ensureDirPromise = null
-        throw err
-      },
-    )
-  }
-  return ensureDirPromise
-}
-
-function dailyFilename(ts: Date): string {
-  const yyyy = ts.getUTCFullYear()
-  const mm = String(ts.getUTCMonth() + 1).padStart(2, '0')
-  const dd = String(ts.getUTCDate()).padStart(2, '0')
-  return `requests-${yyyy}-${mm}-${dd}.jsonl`
-}
-
-/**
- * Strip parameters down to what is safe + useful for analytics.
- * Keeps the integer/short-string keys; truncates the free-form
- * `context` defensively in case an agent ever sends a long string.
- */
-export function sanitiseParams(
-  tool: ToolName,
-  params: Record<string, unknown>,
-): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(params)) {
-    if (typeof v === 'string') {
-      out[k] = k === 'context' ? v.slice(0, MAX_CONTEXT_CHARS) : v
-    } else if (typeof v === 'number' || typeof v === 'boolean' || v === null) {
-      out[k] = v
-    }
-  }
-  void tool
-  return out
-}
+let counters = emptyCounters()
+let startedAt = new Date()
 
 export interface LogRequestInput {
   tool: ToolName
-  params: Record<string, unknown>
   status: RequestStatus
   duration_ms: number
-  error_type?: string
 }
 
 /**
- * Append a single request log entry. Fire-and-forget — never throws,
- * never blocks the caller. Write errors go to stderr.
- *
- * Pulls per-request context (country, client, UA) from
- * AsyncLocalStorage so callers do not have to thread it through.
+ * Record one tool call in the in-memory aggregate. Never throws, never
+ * blocks, never persists. Only the per-tool call / status / duration
+ * tallies change — no request-specific data is retained.
  */
 export function logRequest(entry: LogRequestInput): void {
-  const ts = new Date()
-  const ctx = getRequestContext()
-  const ms = Math.round(entry.duration_ms)
-
-  const record: RequestLogEntry = {
-    ts: ts.toISOString(),
-    tool: entry.tool,
-    params: sanitiseParams(entry.tool, entry.params),
-    status: entry.status,
-    duration_ms: ms,
-    response_time_ms: ms,
-    error: entry.status === 'error',
-  }
-  if (entry.error_type) record.error_type = entry.error_type
-  if (ctx?.country_code) record.country_code = ctx.country_code
-  if (ctx?.region) record.region = ctx.region
-  if (ctx?.client) record.client = ctx.client
-  if (ctx?.user_agent) record.user_agent = ctx.user_agent
-
-  const line = JSON.stringify(record) + '\n'
-  const dir = getLogDir()
-  const file = path.join(dir, dailyFilename(ts))
-
-  void ensureLogDir(dir)
-    .then(() => fs.appendFile(file, line, 'utf8'))
-    .catch((err) => {
-      console.error('[request-logger] write failed:', (err as Error).message)
-    })
+  const c = counters[entry.tool]
+  if (!c) return
+  c.total += 1
+  c.duration_ms_sum += Math.max(0, Math.round(entry.duration_ms))
+  if (entry.status === 'ok') c.ok += 1
+  else if (entry.status === 'not_found') c.not_found += 1
+  else c.error += 1
 }
 
-/** Exposed for tests — reset the cached log directory + mkdir promise. */
+/** Read-only snapshot for the `/stats` endpoint. */
+export function getAggregateSnapshot(): AggregateSnapshot {
+  let total = 0
+  const perTool = {} as Record<ToolName, ToolCounter>
+  for (const t of TOOLS) {
+    perTool[t] = { ...counters[t] }
+    total += counters[t].total
+  }
+  return { since: startedAt.toISOString(), perTool, total }
+}
+
+/** Exposed for tests — reset the in-memory counters. */
 export function resetLoggerForTests(): void {
-  cachedLogDir = null
-  ensureDirPromise = null
+  counters = emptyCounters()
+  startedAt = new Date()
 }

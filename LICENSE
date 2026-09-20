@@ -22,9 +22,11 @@ Sakina (asksakina.com): the 99 Names of Allah with reflections, a
 444-entry du'a corpus with hadith citations and grading, and Quranic
 verses fetched at runtime from a public upstream (alquran.cloud, with
 Tanzil-derived Arabic and conventional translations). All embedded
-content has been reviewed by specialist Islamic scholars (the
-project's "Gems") for theological accuracy, pastoral safety, and
-inclusivity across mainstream Sunni schools.
+content has been reviewed through the project's structured
+specialist-AI review chain (the "Gems") for theological accuracy,
+pastoral safety, and inclusivity across mainstream Sunni schools. This
+structured AI review is not performed by human scholars and is not a
+substitute for a qualified scholar.
 
 The Sakina team (the "Project") is the rights holder for the
 curated content embedded in the Software. The Project also asserts a
@@ -135,7 +137,7 @@ For licensing questions, takedown requests, or to discuss commercial
 or institutional use that doesn't fit the model above, contact:
 
 - Web: https://www.asksakina.com
-- Issues: https://github.com/yserrag/sakina-v3/issues
+- Issues: https://github.com/yserrag/asksakina-mcp/issues
 
 ---
 

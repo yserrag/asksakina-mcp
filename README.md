@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-Sacred%20Use-8B6A42.svg?style=flat-square)](./LICENSE)
 [![MCP Registry](https://img.shields.io/badge/MCP-com.asksakina%2Fislamic--knowledge-4A6B4A.svg?style=flat-square)](https://registry.modelcontextprotocol.io/v0/servers?search=com.asksakina)
 
-> **Scholar-reviewed Islamic knowledge for AI agents.** Quranic verses, authenticated du'as, and the 99 Names of Allah — verified across the four mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali). Every response is wrapped in a presentation contract so agents cannot silently misrepresent the content.
+> **Specialist-AI-reviewed Islamic knowledge for AI agents.** Quranic verses, authenticated du'as, and the 99 Names of Allah — reviewed across the four mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali) through AskSakina's structured specialist-AI review chain, which is not a substitute for a qualified scholar. Every response is wrapped in a presentation contract so agents cannot silently misrepresent the content.
 
 **Architectural posture:** *"AskSakina ships records, agents ship answers."* The server is a reference library, not an advisor. Each response includes a `_sakina_meta` envelope with disclaimer, LLM directives, presentation contract, and educational context. What the calling agent does with the record is its responsibility — but every response arms the agent with enough structural context to make mishandling difficult and trackable.
 
@@ -35,7 +35,7 @@ Verbatim Quranic verse lookup by surah:ayah. Returns the canonical AskSakina env
 |---|---|---|---|
 | `surah` | `1`..`114` | yes | Surah number |
 | `ayah` | `1`..`286` | yes | Ayah within the surah |
-| `locale` | `'en'` \| `'id'` \| `'ur'` | no, defaults `en` | Translation language |
+| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` | no, defaults `en` | Translation language (`ar` returns the Arabic original with the Pickthall English alongside) |
 
 **Example response (truncated)**
 
@@ -420,8 +420,6 @@ Per the Phase 3 planning doc:
 
 Self-contained at publish time — `npm run bundle-data` snapshots the du'a corpus, the 99 Names, and the canonical safety modules from the main AskSakina monorepo into `data/` and `src/safety/_synced/`. The compiled `dist/` plus the bundled `data/` directory have no runtime dependency on the main app.
 
-> **This public repo ships source only.** The bundled `data/*.json` are build artifacts generated at release time (`npm run bundle-data` on publish); they are not committed here.
-
 `bundle-data` runs automatically via a `prebuild` script (WO#138), so `npm run build` is self-contained on a fresh checkout — no manual bundling step required. The `src/safety/_synced/` directory IS committed to git so any drift from the main-app safety modules shows up in `git diff` between commits.
 
 `docker build` does NOT run `prebuild` (it only copies the `mcp-server/` directory, not the monorepo). Run `npm run bundle-data` on the host before `docker build` so `data/` is populated. The same applies if you build from a fresh clone — `npm install && npm run bundle-data` before `docker build`.
@@ -558,5 +556,5 @@ Smithery auto-scans `/.well-known/mcp/server-card.json` and re-indexes within a 
 - **MCP showcase:** [asksakina.com/en/mcp](https://www.asksakina.com/en/mcp)
 - **MCP registry:** [registry.modelcontextprotocol.io — com.asksakina/islamic-knowledge](https://registry.modelcontextprotocol.io/v0/servers?search=com.asksakina)
 - **npm:** [npmjs.com/@asksakina/islamic-knowledge-mcp](https://www.npmjs.com/package/@asksakina/islamic-knowledge-mcp)
-- **Source:** [github.com/yserrag/asksakina-mcp](https://github.com/yserrag/asksakina-mcp)
+- **Source:** [github.com/yserrag/asksakina-mcp](https://github.com/yserrag/asksakina-mcp) (mirror of `mcp-server/` in the main repository)
 - **Issues / questions:** [github.com/yserrag/asksakina-mcp/issues](https://github.com/yserrag/asksakina-mcp/issues)
