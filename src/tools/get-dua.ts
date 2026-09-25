@@ -16,6 +16,7 @@ import {
   evaluateDistress,
 } from '../safety/crisis-keywords.js'
 import { buildResponse, type SakinaResponse } from '../meta/response-builder.js'
+import { HADITH_CONTRACT, UNRECORDED_GRADING_DIRECTIVE } from '../contracts/presentation.js'
 
 export const getDuaShape = {
   context: z
@@ -64,13 +65,30 @@ export async function getDuaHandler(
     })
   }
 
+  // WO#377 addendum: the envelope reports what the records hold. If any
+  // record has no recorded grading, require_grading becomes 'per_record'
+  // and the agent reads each record's grading_status.
+  const unrecorded = result.duas.filter((d) => d.grading_status === 'not_recorded').length
+  const contractOverride = unrecorded
+    ? { hadith: { ...HADITH_CONTRACT, require_grading: 'per_record' as const } }
+    : undefined
+  const extraDirectives =
+    unrecorded && UNRECORDED_GRADING_DIRECTIVE ? [UNRECORDED_GRADING_DIRECTIVE] : undefined
+
   return buildResponse({
     contentType: 'dua_collection',
     content: {
       context: result.resolvedCategory,
       duas: result.duas,
       total_results: result.duas.length,
+      grading_summary: {
+        quranic: result.duas.filter((d) => d.grading_status === 'quranic').length,
+        graded: result.duas.filter((d) => d.grading_status === 'graded').length,
+        not_recorded: unrecorded,
+      },
     },
     extras,
+    contractOverride,
+    extraDirectives,
   })
 }

@@ -36,14 +36,46 @@ function failOpen(): RateLimitResult {
   return { allowed: true, remaining: DEFAULT_LIMIT, resetAt: Date.now() + WINDOW_MS }
 }
 
-class InMemoryRateLimiter implements RateLimiter {
+/**
+ * In-memory fixed window keyed by client IP.
+ *
+ * Privacy (Gem 8, 1.4.0): an IP is held only for its rate-limit window.
+ * Expired buckets are swept on every check and by a background timer, so an
+ * IP is discarded at most `sweepMs` after its window ends, whether or not
+ * that client returns. Before this, a bucket was only overwritten when the
+ * same IP came back, so every IP stayed in memory until the process
+ * restarted. The timer is unref'd and never keeps the process alive.
+ */
+export class InMemoryRateLimiter implements RateLimiter {
   private buckets = new Map<string, { count: number; resetAt: number }>()
+  private lastSweep = 0
+
+  constructor(
+    private readonly windowMs: number = WINDOW_MS,
+    private readonly sweepMs: number = 1_000,
+  ) {
+    const timer = setInterval(() => this.sweep(Date.now()), this.sweepMs)
+    timer.unref?.()
+  }
+
+  private sweep(now: number): void {
+    this.lastSweep = now
+    for (const [key, bucket] of this.buckets) {
+      if (bucket.resetAt <= now) this.buckets.delete(key)
+    }
+  }
+
+  /** Number of IPs currently held. Exposed for tests. */
+  size(): number {
+    return this.buckets.size
+  }
 
   async check(key: string): Promise<RateLimitResult> {
     const now = Date.now()
+    if (now - this.lastSweep >= this.sweepMs) this.sweep(now)
     const existing = this.buckets.get(key)
     if (!existing || existing.resetAt <= now) {
-      const resetAt = now + WINDOW_MS
+      const resetAt = now + this.windowMs
       this.buckets.set(key, { count: 1, resetAt })
       return { allowed: true, remaining: DEFAULT_LIMIT - 1, resetAt }
     }

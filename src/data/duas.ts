@@ -9,6 +9,7 @@
  */
 
 import { readFileSync } from 'node:fs'
+import { UNRECORDED_GRADING_DIRECTIVE } from '../contracts/presentation.js'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -31,6 +32,10 @@ interface BundledDua {
   grading?: string
   contextNote?: string
   verified?: boolean
+  /** Set at bundle time for Gem-2-verified Quranic du'as (WO#377 addendum). */
+  origin?: 'quran'
+  /** "surah:ayah" or "surah:ayah-ayah"; present iff origin === 'quran'. */
+  quran_ref?: string
 }
 
 interface BundledDuaCategory {
@@ -53,6 +58,17 @@ const DUA_CATEGORIES = JSON.parse(readFileSync(path.join(DATA_DIR, 'dua-categori
 
 const PROPHET_SALUTATION_PROCESSED = ' (peace be upon him)'
 
+/**
+ * Per-record grading status (WO#377 addendum). The envelope reports what
+ * the data holds, record by record:
+ *   - 'quranic'       the text is a Quranic verse or clause (origin quran,
+ *                     or a source citing the Quran)
+ *   - 'graded'        a hadith grading is recorded or inferable from the
+ *                     source (Bukhari, Muslim)
+ *   - 'not_recorded'  the corpus records no grading for this du'a
+ */
+export type GradingStatus = 'quranic' | 'graded' | 'not_recorded'
+
 export interface DuaRecord {
   /**
    * Pre-formatted, inseparable display block (Gem 10 fix 3,
@@ -68,6 +84,15 @@ export interface DuaRecord {
   translation: string
   source: string
   grading: string
+  grading_status: GradingStatus
+  /** Present only on Gem-2-verified Quranic du'as. */
+  origin?: 'quran'
+  /** "Quran s:a" citation; present iff origin === 'quran'. */
+  quran_citation?: string
+  /** Present on every record with grading_status 'not_recorded' (Gem 10
+   *  interim directive, 1.4.0). Not part of dua_block: it instructs the
+   *  agent and is not for display. */
+  grading_directive?: string
   context_tags: string[]
 }
 
@@ -139,9 +164,16 @@ function inferGradingFromSource(source?: string): string {
 }
 
 function toRecord(dua: BundledDua): DuaRecord {
-  const grading = (dua.grading ?? inferGradingFromSource(dua.source)) || 'Not graded in AskSakina corpus'
+  const isQuran = dua.origin === 'quran' && !!dua.quran_ref
+  const quranCitation = isQuran ? `Quran ${dua.quran_ref}` : undefined
+  const recordedGrading = dua.grading ?? inferGradingFromSource(dua.source)
+  const grading = recordedGrading || (isQuran ? 'Quranic' : 'Not graded in AskSakina corpus')
+  const grading_status: GradingStatus =
+    isQuran || grading === 'Quranic' ? 'quranic' : recordedGrading ? 'graded' : 'not_recorded'
+
   const sourceParts: string[] = []
   if (dua.source) sourceParts.push(dua.source)
+  else if (quranCitation) sourceParts.push(quranCitation)
   if (!sourceParts.length && dua.countSource) sourceParts.push(dua.countSource)
   const source = sourceParts.join(', ') || 'Source not recorded in AskSakina corpus'
 
@@ -153,13 +185,14 @@ function toRecord(dua: BundledDua): DuaRecord {
     `Arabic: ${arabic}`,
     transliteration ? `Transliteration: ${transliteration}` : null,
     `Translation: ${translation}`,
+    quranCitation ? `Origin: ${quranCitation}` : null,
     `Source: ${source}`,
     `Grading: ${grading}`,
   ]
     .filter(Boolean)
     .join('\n')
 
-  return {
+  const record: DuaRecord = {
     dua_block,
     title: sanitise(dua.name),
     arabic,
@@ -167,8 +200,17 @@ function toRecord(dua: BundledDua): DuaRecord {
     translation,
     source,
     grading,
+    grading_status,
     context_tags: [dua.category],
   }
+  if (quranCitation) {
+    record.origin = 'quran'
+    record.quran_citation = quranCitation
+  }
+  if (grading_status === 'not_recorded' && UNRECORDED_GRADING_DIRECTIVE) {
+    record.grading_directive = UNRECORDED_GRADING_DIRECTIVE
+  }
+  return record
 }
 
 export function resolveCategorySlug(input: string): string | null {

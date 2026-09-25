@@ -77,22 +77,43 @@ Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). C
 
 ```jsonc
 {
-  "_sakina_meta": { "content_type": "dua_collection" /* … */ },
+  "_sakina_meta": {
+    "content_type": "dua_collection",
+    "presentation_contract": {
+      "hadith": { "require_grading": "per_record" /* true when every record is graded */ }
+    }
+    /* … */
+  },
   "content": {
-    "category": "anxiety",
+    "context": "stress-anxiety",
     "duas": [
       {
-        "arabic": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ وَالْحَزَنِ …",
-        "transliteration": "Allahumma inni a'udhu bika minal-hammi wal-hazan …",
-        "translation": "O Allah, I seek refuge in You from grief and sadness …",
-        "source": "Sahih al-Bukhari 2893"
+        "dua_block": "Arabic: …\nTransliteration: …\nTranslation: …\nOrigin: Quran 21:87\nSource: Quran 21:87\nGrading: Quranic",
+        "title": "Dua to Deal with Distress & Depression",
+        "arabic": "وَذَا ٱلنُّونِ إِذ ذَّهَبَ …",
+        "source": "Quran 21:87",
+        "grading": "Quranic",
+        "grading_status": "quranic",
+        "origin": "quran",
+        "quran_citation": "Quran 21:87"
+      },
+      {
+        "title": "Dua to Remove Sorrow & Grief:",
+        "source": "Source not recorded in AskSakina corpus",
+        "grading": "Not graded in AskSakina corpus",
+        "grading_status": "not_recorded"
+        /* … */
       }
       /* … */
-    ]
+    ],
+    "total_results": 12,
+    "grading_summary": { "quranic": 2, "graded": 0, "not_recorded": 10 }
   }
   // crisis_resource block added if context triggers the crisis keyword list
 }
 ```
+
+**Grading status.** Every du'a record carries `grading_status`: `quranic` (the text is a Quranic verse or clause), `graded` (a hadith grading is recorded), or `not_recorded` (the AskSakina corpus holds no grading for it). Most of the corpus is `not_recorded` today; the `Source` and `Grading` lines say so rather than implying a grading exists. Du'as whose Quranic reference has been verified carry `origin: "quran"` and a `quran_citation`, and their Arabic is the Tanzil Uthmani text resolved from AskSakina's scripture module at bundle time.
 
 ### `get_name_of_allah`
 
@@ -262,12 +283,12 @@ Every piece of content surfaced by this server has been reviewed by AskSakina's 
 Architectural guarantees enforced in code:
 
 - The Unicode prophet salutation (U+FDFA, ﷺ) is replaced with `(peace be upon him)` at every data-loader boundary. The response builder rejects any output containing the symbol.
-- Hadith grading is paired with each du'a record; the `hadith` presentation contract asserts `require_grading: true`.
+- Each du'a record carries a `grading_status` (`quranic`, `graded`, `not_recorded`). The `hadith` presentation contract sets `require_grading: true` only when every returned record is graded or Quranic, and `"per_record"` otherwise, so the envelope never claims a grading the data does not hold.
 - Crisis keyword detection runs on every `get_dua` request — the same keyword list used by the main app's safety gate.
 
 **Sacred Use License.** This server is distributed under a Sacred Use License (see [LICENSE](./LICENSE)). Permitted uses centre on dawah, education, personal worship, and respectful integration into Muslim-serving applications. The license forbids monetisation that frames Islamic knowledge as scarce or paywalled. A public summary of the license terms lives at `https://www.asksakina.com/en/mcp`.
 
-**Privacy.** No tracking. No analytics. No request logging beyond rate-limit counters. The server records the IP for the rate-limit window only; nothing else is persisted.
+**Privacy.** See [Privacy & Analytics](#privacy--analytics).
 
 ---
 
@@ -301,42 +322,16 @@ Responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Res
 
 v1 ships unauthenticated. An optional `X-Sakina-App-Id` header is accepted but not enforced or logged in v1. This becomes required in v2.
 
-## Analytics (1.2.0)
+## Privacy & Analytics
 
-Every tool call is logged as a single JSONL line:
+This service operates with an aggregate-only, memory-bound data model (implemented in WO#360). For each tool, the server maintains a running count of calls by outcome (`ok`, `not_found`, `error`) and the summed handler time to report operational averages via the `/stats` endpoint.
 
-```jsonc
-{
-  "ts": "2026-05-17T11:00:00.000Z",
-  "tool": "get_dua",
-  "params": { "context": "anxiety", "locale": "en" },
-  "status": "ok",
-  "duration_ms": 42,
-  "response_time_ms": 42,
-  "error": false,
-  "country_code": "GB",        // ISO 3166-1 alpha-2, from geoip-lite
-  "region": "England",         // when MaxMind has it
-  "client": "claude-desktop",  // classified bucket
-  "user_agent": "Claude-Desktop/1.2.3"  // truncated, 200 char cap
-}
-```
+- **No persistent tracking:** No per-request logs or client identifiers are written to disk or any database by the application.
+- **Ephemeral IP handling:** Client IP addresses are used only to enforce the rate limit. Each is held as a rate-limit key in Upstash Redis for the rate-limit window (60 seconds), then expired. Raw IP addresses are never persisted by the application.
+- **No payload logging:** Request parameters (such as `context` values or verse references) and response payloads are never captured or logged.
+- **Memory-only retention:** All aggregate counters exist only in RAM and are reset when the server process restarts.
 
-**No raw IP addresses are ever persisted.** The client IP is resolved once per request to (a) key the rate-limiter and (b) look up country / region via the embedded MaxMind GeoLite2 database, then discarded. The full User-Agent is stored (truncated) so we can spot a new MCP client and extend the classifier; the `client` bucket is what `/stats` aggregates.
-
-The `context` parameter on `get_dua` is a category keyword per tool contract ("anxiety", "morning", "grief") and is logged (200-char cap) so we can answer "which life situations do agents query most" without ever associating it with a person.
-
-Logs land in `LOG_DIR` (default `/data/logs`, persisted on a Fly volume). One file per UTC day: `requests-YYYY-MM-DD.jsonl`. Writes are fire-and-forget — disk slowness never bleeds into tool response latency.
-
-### Updating the GeoIP database
-
-`geoip-lite` ships an embedded MaxMind GeoLite2 snapshot. Geography drifts, so refresh monthly:
-
-```bash
-cd mcp-server
-MAXMIND_LICENSE_KEY=<key> npm run update-geoip
-```
-
-A free MaxMind license key is required (sign up at maxmind.com/en/geolite2/signup). After running, rebuild + redeploy so the new DB ships with the container. The bundled DB at install time is sufficient for an initial launch.
+*Regulatory Note (UK GDPR): Because nothing identifiable is held beyond the rate-limit window, there are no records that could be accessed or erased. Note that while the application itself does not persist personal data, our infrastructure provider (Fly.io) transiently processes IP addresses at the edge layer for standard network routing and platform security.*
 
 ### `/stats` endpoint
 
@@ -346,61 +341,41 @@ Authenticated summary endpoint:
 curl -H "Authorization: Bearer $MCP_STATS_TOKEN" https://sakina-mcp.fly.dev/stats
 ```
 
-Requires the `MCP_STATS_TOKEN` env var to be set (otherwise the endpoint returns 503 — refuses to serve unauthenticated). Token comparison is constant-time.
+Requires the `MCP_STATS_TOKEN` env var to be set (otherwise the endpoint returns 503 and refuses to serve unauthenticated). Token comparison is constant-time.
 
 Payload shape:
 
 ```json
 {
-  "generated_at": "2026-05-17T...",
-  "log_dir": "/data/logs",
-  "totals":   { "all_time": N, "last_7d": N, "last_24h": N },
-  "by_tool":  { "get_quran_verse": {...}, "get_dua": {...}, "get_name_of_allah": {...} },
-  "by_status": { "ok": N, "not_found": N, "error": N },
-  "error_rate": { "all_time": 0.0, "last_7d": 0.0, "last_24h": 0.0 },
-  "avg_response_time_ms": {
-    "all_time": 42.1, "last_7d": 41.8, "last_24h": 39.5,
-    "by_tool": { "get_quran_verse": {...}, "get_dua": {...}, "get_name_of_allah": {...} }
-  },
-  "top_contexts": [{ "context": "anxiety", "count": N }, ...],
-  "top_verses":   [{ "ref": "2:255",      "count": N }, ...],
-  "by_country": {
-    "last_7d":  [{ "country_code": "GB", "count": N }, ...],
-    "all_time": [{ "country_code": "GB", "count": N }, ...]
-  },
-  "by_client": {
-    "last_7d":  { "claude-desktop": N, "cursor": N, ... },
-    "all_time": { "claude-desktop": N, "cursor": N, ... }
-  },
-  "popular_topics": [
-    { "kind": "dua_context", "key": "anxiety", "count": N },
-    { "kind": "quran_verse", "key": "2:255", "count": N },
-    ...
-  ],
-  "oldest_entry": "...",
-  "newest_entry": "..."
+  "privacy": "aggregate-only in-memory counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; resets on restart",
+  "since": "2026-09-25T…",
+  "total_requests": N,
+  "by_tool": {
+    "get_quran_verse":   { "total": N, "ok": N, "not_found": N, "error": N, "avg_response_ms": N },
+    "get_dua":           { "total": N, "ok": N, "not_found": N, "error": N, "avg_response_ms": N },
+    "get_name_of_allah": { "total": N, "ok": N, "not_found": N, "error": N, "avg_response_ms": N }
+  }
 }
 ```
 
 ### One-time setup on Fly
 
 ```bash
-fly volumes create mcp_logs --region lhr --size 1
 fly secrets set MCP_STATS_TOKEN=$(openssl rand -hex 32)
 fly deploy
 ```
 
-The volume auto-mounts at `/data` on every subsequent deploy (see `fly.toml [mounts]`).
+The server no longer writes to the `/data` volume that `fly.toml` mounts; it was the log volume before WO#360.
 
 ## Data sources
 
 | Tool | Source |
 |---|---|
-| `get_quran_verse` | `alquran.cloud` (Tanzil-derived Uthmani Arabic + Saheeh International / Jalandhri / Indonesian MoRA translations). Same upstream the main AskSakina app uses. Cached in process for 24 h per verse + edition. |
-| `get_dua` | Direct import of AskSakina's 444-entry du'a corpus from `../src/data/duas`. |
-| `get_name_of_allah` | Direct import of AskSakina's 99 Names from `../src/lib/data/99-names`. |
+| `get_quran_verse` | `alquran.cloud`, fetched at runtime: Tanzil-derived Uthmani Arabic plus the translation for the locale: `en` and `ar` Pickthall (`en.pickthall`), `ur` Jalandhri, `id` Indonesian Ministry of Religious Affairs. Saheeh International is not served (removed in 1.2.0, WO#245). Cached in process for 24 h per verse + edition. |
+| `get_dua` | AskSakina's du'a corpus (445 entries at 1.4.0), snapshotted from `../src/data/duas` into `data/duas.json` by `npm run bundle-data`. Du'as with a verified Quranic reference take their Arabic from the scripture module (`../src/lib/scripture`, Tanzil Uthmani) at the same step. |
+| `get_name_of_allah` | AskSakina's 99 Names, snapshotted from `../src/lib/data/99-names` by `npm run bundle-data`. |
 
-The two direct-imported sources mean the MCP server cannot drift from what the AskSakina app surfaces. Any update to the main repo's data files automatically lands here on the next `npm run bundle-data`.
+The du'a and Names data are snapshots of the main app's data files, so any update to them lands here on the next `npm run bundle-data` (the deploy workflow runs it). A published package carries the snapshot taken when it was built.
 
 ---
 
