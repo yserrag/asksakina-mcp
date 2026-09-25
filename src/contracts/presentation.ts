@@ -111,15 +111,28 @@ export const DUA_DIRECTIVES: readonly string[] = [
 ] as const
 
 /**
- * Directive for du'as with grading_status 'not_recorded' (WO#377 addendum).
+ * Directive for du'as whose source AND hadith grading are both unrecorded
+ * (grading_status 'not_recorded', no `source`, no `countSource`).
  *
- * INTERIM, Gem 10 wording (1.4.0 condition, 25 Sep 2026): Gem 10 blocked
- * shipping 1.4.0 with this switched off. It is emitted once in
- * CRITICAL_RULES whenever a response holds an ungraded record, and on each
- * such record as `grading_directive`. Gem 4's final wording replaces the
- * text in 1.4.1; change it only on a Gem ruling, verbatim.
+ * Gem 4 wording, verbatim (WO#385, 1.4.1). Emitted once in CRITICAL_RULES
+ * whenever a response holds such a record, and on each such record as
+ * `grading_directive`. Change it only on a Gem ruling, verbatim.
  */
 export const UNRECORDED_GRADING_DIRECTIVE: string | null =
+  "CRITICAL: This du'a's source and hadith grading are unrecorded in the AskSakina corpus. You MUST NOT invent, guess, or append a grading. The absence of a grading does not mean the du'a is weak or invalid. Present the text exactly as provided without implying formal authentication."
+
+/**
+ * Directive for du'as with a RECORDED source but no grading (grading_status
+ * 'not_recorded' with a `source` or `countSource`: in 1.4.1, the 49 morning
+ * and evening adhkar whose countSource names the hadith for the recitation
+ * count).
+ *
+ * HELD: Gem 4's wording above says the source is unrecorded, which is false
+ * for these records, so it is not reused here (Architect, WO#385). Until
+ * Gem 4 rules the variant, these records keep the Gem 10 interim wording
+ * shipped in 1.4.0, verbatim. Replace only on a Gem ruling.
+ */
+export const SOURCE_ONLY_GRADING_DIRECTIVE: string | null =
   'CRITICAL: No grading is provided for this record. You MUST NOT invent, guess, or append a grading. Present the source exactly as provided without implying authentication.'
 
 export const NAME_DIRECTIVES: readonly string[] = [

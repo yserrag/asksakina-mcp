@@ -9,11 +9,11 @@
  *
  * A record is listed ONLY when Gem 2 has ruled on that record's own Quran
  * ref (WO#305). A skeleton match against a clause Gem 2 approved on another
- * surface is evidence, not a ruling (Architect, 25 Sep 2026): the six such
- * records are the fast-track batch at the top of
- * docs/wo377-gem2-parked-quranic.md, and join this list only on a ruling.
+ * surface is evidence, not a ruling (Architect, 25 Sep 2026). Six of the
+ * seven fast-track records joined on Gem 2's ruling of 25 Sep 2026
+ * (FASTTRACK_RATIFIED below); D00091 is held pending its title.
  *
- * Everything else, including the fast-track batch and the candidates from
+ * Everything else, the remaining candidates from
  * docs/wo305-batch1-quranic-candidates.json, is untouched and parked for
  * Gem 2 (see docs/wo377-sg-report.md, addendum).
  *
@@ -32,6 +32,14 @@ export interface QuranicLabel {
   resolve: () => string
   /** Where the Gem 2 verification is recorded. */
   ratification: string
+  /**
+   * Gem 2's ruled first and last words of a clause, as bare consonants. The
+   * bundle step checks the resolved clause's first and last words against
+   * them by skeleton, so a shift in the module's word indexes (for example a
+   * fix to the U+08F0 + space split, which sits before the 3:173 clause)
+   * fails the bundle instead of moving the clause. Never used for output.
+   */
+  anchors?: readonly [first: string, last: string]
 }
 
 export const RECORD_RATIFIED: QuranicLabel[] = [
@@ -57,7 +65,33 @@ export const RECORD_RATIFIED: QuranicLabel[] = [
   },
 ]
 
-export const QURANIC_LABELS: QuranicLabel[] = [...RECORD_RATIFIED]
+/**
+ * WO#377 fast-track batch, ruled by Gem 2 on 25 Sep 2026: all seven are
+ * Quranic CLAUSES running to the end of the ayah. Six are labelled here;
+ * D00091 is held (see the note at the end of the list). Word indexes are the
+ * module's (0-based, split on U+0020): 3:173 from word 14 (the U+08F0 +
+ * space split at words 11-12 counts as an extra word), 7:23 from word 1
+ * (after qala), 9:129 from word 3, 25:74 from word 2. Arabic is resolved
+ * from the scripture module; the corpus is not edited. D00154 and D00179
+ * keep their hadith reference (countSource, Sunan Abi Dawud 5081) visible
+ * beside the Quran citation (labelling rule).
+ */
+const FASTTRACK_RULING = 'Gem 2, WO#377 fast-track batch ruling (25 Sep 2026), docs/wo377-gem2-fasttrack-batch.md'
+export const FASTTRACK_RATIFIED: QuranicLabel[] = [
+  { id: 'D00003', ref: '3:173', resolve: () => getVerseClause('3:173', 14), ratification: FASTTRACK_RULING, anchors: ['حسبنا', 'الوكيل'] },
+  { id: 'D00504', ref: '3:173', resolve: () => getVerseClause('3:173', 14), ratification: FASTTRACK_RULING, anchors: ['حسبنا', 'الوكيل'] },
+  { id: 'D00330', ref: '7:23', resolve: () => getVerseClause('7:23', 1), ratification: FASTTRACK_RULING, anchors: ['ربنا', 'الخاسرين'] },
+  { id: 'D00154', ref: '9:129', resolve: () => getVerseClause('9:129', 3), ratification: FASTTRACK_RULING, anchors: ['حسبي', 'العظيم'] },
+  { id: 'D00179', ref: '9:129', resolve: () => getVerseClause('9:129', 3), ratification: FASTTRACK_RULING, anchors: ['حسبي', 'العظيم'] },
+  { id: 'D00308', ref: '25:74', resolve: () => getVerseClause('25:74', 2), ratification: FASTTRACK_RULING, anchors: ['ربنا', 'اماما'] },
+  // D00091 (also ruled 25:74, words 2 to the end) is HELD, unlabelled
+  // (Architect, 25 Sep 2026): its corpus title says Al 'Imran 38, and D00092
+  // carries its title in reverse. It is labelled only after the collection
+  // owner rules on the title swap (docs/TECHNICAL_DEBT.md). The MCP output
+  // never overrides a corpus title.
+]
+
+export const QURANIC_LABELS: QuranicLabel[] = [...RECORD_RATIFIED, ...FASTTRACK_RATIFIED]
 
 // ─── Skeleton comparison (verification only; never used for output) ─────
 // Same normaliser as scripts/wo305-quranic-insert-detector.py, plus a

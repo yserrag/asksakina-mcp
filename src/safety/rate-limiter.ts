@@ -3,19 +3,23 @@
  *
  * Two implementations under one interface:
  *
- *   - In-memory token bucket — used when Upstash is not configured.
- *     Fine for development and small deployments. Each process keeps
- *     its own buckets, so behind a load balancer the effective limit
- *     is N × the configured limit.
+ *   - In-memory fixed window — used when Upstash is not configured
+ *     (state: memory), and as the fallback whenever an Upstash call fails
+ *     (state: degraded). Each process keeps its own buckets, so behind a
+ *     load balancer the effective limit is N × the configured limit.
  *   - Upstash Redis fixed window — used when both
- *     `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set.
- *     Distributed; suitable for production.
+ *     `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set
+ *     (state: upstash). Distributed; suitable for production.
+ *
+ * WO#385: an Upstash failure never allows all traffic. It is logged and the
+ * request is decided by the in-memory fallback.
  *
  * Default budget: 60 requests per minute per IP (WO#102 spec).
  */
 
 const WINDOW_MS = 60_000
 const DEFAULT_LIMIT = 60
+const UPSTASH_TIMEOUT_MS = 2_000
 
 export interface RateLimitResult {
   allowed: boolean
@@ -25,15 +29,6 @@ export interface RateLimitResult {
 
 interface RateLimiter {
   check(key: string): Promise<RateLimitResult>
-}
-
-/**
- * The fail-open result: allow the request. A rate limiter must NEVER take the
- * server down (WO#250) — on any config or runtime failure we let traffic
- * through rather than crash or block.
- */
-function failOpen(): RateLimitResult {
-  return { allowed: true, remaining: DEFAULT_LIMIT, resetAt: Date.now() + WINDOW_MS }
 }
 
 /**
@@ -91,46 +86,162 @@ export class InMemoryRateLimiter implements RateLimiter {
   }
 }
 
-class UpstashRateLimiter implements RateLimiter {
+/**
+ * Limiter state, exposed in /stats (WO#385).
+ *   upstash   Upstash configured and the last Upstash call succeeded.
+ *   degraded  Upstash configured, but the last call failed: requests are
+ *             being limited by the in-memory fallback, NOT allowed through.
+ *   memory    Upstash not configured: in-memory limiting by design.
+ */
+export type LimiterState = 'upstash' | 'memory' | 'degraded'
+
+export interface LimiterStatus {
+  state: LimiterState
+  upstash_configured: boolean
+  /** Upstash failures since start (non-2xx, per-command error, bad body, network). */
+  upstash_failures: number
+  last_failure: string | null
+  last_failure_at: string | null
+  last_success_at: string | null
+  /** Result of the startup reachability check (PING), or null before it runs. */
+  startup_check: string | null
+}
+
+/**
+ * Upstash Redis fixed window with an in-memory fallback (WO#385).
+ *
+ * Before WO#385 every Upstash failure failed OPEN: a 401 (bad token), 404
+ * (database deleted) or per-command error allowed every request and logged
+ * nothing. Now any failure is logged (status and reason, never the client IP
+ * or the Redis key, which contains it) and the request is decided by the
+ * in-memory limiter instead, so the budget still holds per process.
+ */
+export class UpstashRateLimiter implements RateLimiter {
+  private readonly fallback: InMemoryRateLimiter
+  private readonly status: LimiterStatus = {
+    state: 'upstash',
+    upstash_configured: true,
+    upstash_failures: 0,
+    last_failure: null,
+    last_failure_at: null,
+    last_success_at: null,
+    startup_check: null,
+  }
+
   constructor(
     private readonly url: string,
     private readonly token: string,
-  ) {}
+    fallback?: InMemoryRateLimiter,
+  ) {
+    this.fallback = fallback ?? new InMemoryRateLimiter()
+  }
+
+  getStatus(): LimiterStatus {
+    return { ...this.status }
+  }
+
+  private fail(reason: string): void {
+    this.status.state = 'degraded'
+    this.status.upstash_failures += 1
+    this.status.last_failure = reason
+    this.status.last_failure_at = new Date().toISOString()
+    console.error(`[rate-limiter] Upstash failure (${reason}); using in-memory fallback (state: degraded)`)
+  }
+
+  private succeed(): void {
+    if (this.status.state === 'degraded') {
+      console.log('[rate-limiter] Upstash recovered (state: upstash)')
+    }
+    this.status.state = 'upstash'
+    this.status.last_success_at = new Date().toISOString()
+  }
+
+  /** Short, IP-free description of a response body for logs. */
+  private static brief(text: string): string {
+    return text.replace(/\s+/g, ' ').slice(0, 120)
+  }
+
+  private async pipeline(commands: unknown[]): Promise<{ ok: true; data: Array<{ result?: unknown; error?: string }> } | { ok: false; reason: string }> {
+    let res: Response
+    try {
+      res = await fetch(`${this.url}/pipeline`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(commands),
+        // A hanging Upstash must not hang every request: 2 s, then fallback.
+        signal: AbortSignal.timeout(UPSTASH_TIMEOUT_MS),
+      })
+    } catch (err) {
+      return { ok: false, reason: `unreachable: ${err instanceof Error ? err.message : String(err)}` }
+    }
+    const text = await res.text().catch(() => '')
+    if (!res.ok) {
+      return { ok: false, reason: `HTTP ${res.status}${text ? `: ${UpstashRateLimiter.brief(text)}` : ''}` }
+    }
+    let data: unknown
+    try {
+      data = JSON.parse(text)
+    } catch {
+      return { ok: false, reason: `HTTP ${res.status} with a non-JSON body` }
+    }
+    if (!Array.isArray(data) || data.length !== commands.length) {
+      return { ok: false, reason: `HTTP ${res.status} with an unexpected body shape` }
+    }
+    const errors = (data as Array<{ error?: string }>)
+      .map((r, i) => (r && typeof r.error === 'string' ? `command ${i + 1}: ${UpstashRateLimiter.brief(r.error)}` : null))
+      .filter(Boolean)
+    if (errors.length) return { ok: false, reason: `per-command error (${errors.join('; ')})` }
+    return { ok: true, data: data as Array<{ result?: unknown }> }
+  }
+
+  /** Startup reachability check: a real PING, not "secrets are set". */
+  async probe(): Promise<string> {
+    const started = Date.now()
+    const r = await this.pipeline([['PING']])
+    let line: string
+    if (r.ok && String(r.data[0]?.result).toUpperCase() === 'PONG') {
+      this.succeed()
+      line = `Upstash reachable (PING ok, ${Date.now() - started} ms); state: upstash`
+      console.log(`[rate-limiter] ${line}`)
+    } else {
+      const reason = r.ok ? `PING returned ${JSON.stringify(r.data[0]?.result)}` : r.reason
+      this.fail(`startup check: ${reason}`)
+      line = `Upstash configured but NOT reachable at startup (${reason}); in-memory fallback active; state: degraded`
+      console.error(`[rate-limiter] ${line}`)
+    }
+    this.status.startup_check = line
+    return line
+  }
 
   async check(key: string): Promise<RateLimitResult> {
     try {
       const window = Math.floor(Date.now() / WINDOW_MS)
       const redisKey = `mcp:rl:${key}:${window}`
-
-      // INCR + EXPIRE in a single pipelined call
-      const res = await fetch(`${this.url}/pipeline`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify([
-          ['INCR', redisKey],
-          ['PEXPIRE', redisKey, String(WINDOW_MS)],
-        ]),
-      })
-      if (!res.ok) return failOpen() // do not block on an Upstash HTTP error
-      const data = (await res.json()) as Array<{ result: number | string }>
-      const count = Number(data[0]?.result ?? 0)
+      // INCR + PEXPIRE in a single pipelined call
+      const r = await this.pipeline([
+        ['INCR', redisKey],
+        ['PEXPIRE', redisKey, String(WINDOW_MS)],
+      ])
+      if (!r.ok) {
+        this.fail(r.reason)
+        return this.fallback.check(key)
+      }
+      const count = Number(r.data[0]?.result)
+      if (!Number.isFinite(count) || count < 1) {
+        this.fail(`INCR returned ${JSON.stringify(r.data[0]?.result)}`)
+        return this.fallback.check(key)
+      }
+      this.succeed()
       const resetAt = (window + 1) * WINDOW_MS
       if (count > DEFAULT_LIMIT) {
         return { allowed: false, remaining: 0, resetAt }
       }
       return { allowed: true, remaining: DEFAULT_LIMIT - count, resetAt }
     } catch (err) {
-      // Fail open on ANY runtime error — invalid URL (ERR_INVALID_URL), DNS,
-      // network, JSON parse. WO#250: this unhandled throw was crashing the
-      // process on every /mcp POST (Fly 502 restart loop).
-      console.error(
-        '[rate-limiter] Upstash check failed, failing open:',
-        err instanceof Error ? err.message : String(err),
-      )
-      return failOpen()
+      // Defence in depth: nothing above should throw, but a limiter must never
+      // take the server down (WO#250) and must never allow-all (WO#385).
+      this.fail(`unexpected: ${err instanceof Error ? err.message : String(err)}`)
+      return this.fallback.check(key)
     }
   }
 }
@@ -152,14 +263,17 @@ function isValidUpstashUrl(url: string | undefined, token: string | undefined): 
 }
 
 let cached: RateLimiter | null = null
+let memoryStatus: LimiterStatus | null = null
 
 export function getRateLimiter(): RateLimiter {
   if (cached) return cached
   const url = process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
-  // Startup env validation: log clearly which limiter is active (WO#250).
   if (isValidUpstashUrl(url, token)) {
-    console.log('[rate-limiter] Upstash Redis configured — distributed rate limiting active.')
+    // WO#385: no "configured, distributed rate limiting active" line here.
+    // Configuration is not reachability; startHttpServer runs probe() and
+    // logs the real result.
+    console.log('[rate-limiter] Upstash configured; checking reachability at startup.')
     cached = new UpstashRateLimiter(url, token as string)
   } else {
     const reason =
@@ -169,12 +283,35 @@ export function getRateLimiter(): RateLimiter {
           ? 'incomplete Upstash env (need both UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN)'
           : 'invalid UPSTASH_REDIS_REST_URL (not a valid http/https URL)'
     console.warn(
-      `[rate-limiter] ${reason} — using in-memory rate limiting (per-process, safe fallback). ` +
+      `[rate-limiter] ${reason} — using in-memory rate limiting (per-process, safe fallback; state: memory). ` +
         'Set a valid UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN for distributed limiting.',
     )
     cached = new InMemoryRateLimiter()
+    memoryStatus = {
+      state: 'memory',
+      upstash_configured: false,
+      upstash_failures: 0,
+      last_failure: null,
+      last_failure_at: null,
+      last_success_at: null,
+      startup_check: `no Upstash: ${reason}`,
+    }
   }
   return cached
+}
+
+/** Current limiter state for /stats (WO#385). */
+export function getLimiterStatus(): LimiterStatus {
+  const lim = getRateLimiter()
+  if (lim instanceof UpstashRateLimiter) return lim.getStatus()
+  return { ...(memoryStatus as LimiterStatus) }
+}
+
+/** Startup reachability check; a no-op for the in-memory limiter. */
+export async function probeRateLimiter(): Promise<string> {
+  const lim = getRateLimiter()
+  if (lim instanceof UpstashRateLimiter) return lim.probe()
+  return getLimiterStatus().startup_check ?? 'in-memory'
 }
 
 export class RateLimitExceededError extends Error {

@@ -98,6 +98,28 @@ async function main(): Promise<void> {
       card.description ?? '',
     )
     check('server card functional name unchanged', card.name === 'com.asksakina/islamic-knowledge', `got ${card.name}`)
+
+    // WO#385: /stats reports which limiter is enforcing the budget. This
+    // smoke test runs with an invalid Upstash URL, so the state is memory.
+    process.env.MCP_STATS_TOKEN = 'smoke-stats-token'
+    const statsRes = await fetch(`http://localhost:${PORT}/stats`, {
+      headers: { Authorization: 'Bearer smoke-stats-token' },
+    })
+    const stats = (await statsRes.json().catch(() => ({}))) as {
+      rate_limiter?: { state?: string; upstash_configured?: boolean; startup_check?: string }
+      basmala_prefix_mismatch?: number
+    }
+    check('/stats 200 with the token', statsRes.status === 200, `got ${statsRes.status}`)
+    check(
+      '/stats rate_limiter.state is memory (no valid Upstash here)',
+      stats.rate_limiter?.state === 'memory' && stats.rate_limiter?.upstash_configured === false,
+      JSON.stringify(stats.rate_limiter),
+    )
+    check(
+      '/stats basmala_prefix_mismatch is an aggregate count (0 here)',
+      stats.basmala_prefix_mismatch === 0,
+      JSON.stringify(stats.basmala_prefix_mismatch),
+    )
   } catch (err) {
     check('server survived the /mcp POST (no crash)', false, err instanceof Error ? err.message : String(err))
   } finally {

@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-Sacred%20Use-8B6A42.svg?style=flat-square)](./LICENSE)
 [![MCP Registry](https://img.shields.io/badge/MCP-com.asksakina%2Fislamic--knowledge-4A6B4A.svg?style=flat-square)](https://registry.modelcontextprotocol.io/v0/servers?search=com.asksakina)
 
-> **Specialist-AI-reviewed Islamic knowledge for AI agents.** Quranic verses, authenticated du'as, and the 99 Names of Allah — reviewed across the four mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali) through AskSakina's structured specialist-AI review chain, which is not a substitute for a qualified scholar. Every response is wrapped in a presentation contract so agents cannot silently misrepresent the content.
+> **Specialist-AI-reviewed Islamic knowledge for AI agents.** Quranic verses, a curated du'a collection, and the 99 Names of Allah — reviewed across the four mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali) through AskSakina's structured specialist-AI review chain, which is not a substitute for a qualified scholar. Every response is wrapped in a presentation contract so agents cannot silently misrepresent the content.
 
 **Architectural posture:** *"AskSakina ships records, agents ship answers."* The server is a reference library, not an advisor. Each response includes a `_sakina_meta` envelope with disclaimer, LLM directives, presentation contract, and educational context. What the calling agent does with the record is its responsibility — but every response arms the agent with enough structural context to make mishandling difficult and trackable.
 
@@ -17,7 +17,7 @@ Three lookup tools and one canonical resource over the Model Context Protocol. E
 | Tool | What it does |
 |---|---|
 | `get_quran_verse` | Verbatim Quranic verse lookup by surah:ayah |
-| `get_dua` | Authenticated du'a lookup by life context (anxiety, grief, morning, travel, ...) |
+| `get_dua` | Curated du'a collection lookup by life context (anxiety, grief, morning, travel, ...) |
 | `get_name_of_allah` | One of the 99 Names by number (1–99) or string |
 | `sakina://about` (resource) | Read-once briefing — seven core directives plus three Gem-cleared dawah texts (Quran preservation, hadith grading, madhab attribution) |
 
@@ -35,7 +35,7 @@ Verbatim Quranic verse lookup by surah:ayah. Returns the canonical AskSakina env
 |---|---|---|---|
 | `surah` | `1`..`114` | yes | Surah number |
 | `ayah` | `1`..`286` | yes | Ayah within the surah |
-| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` | no, defaults `en` | Translation language (`ar` returns the Arabic original with the Pickthall English alongside) |
+| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` | no, defaults `en` | Translation language. `ar` returns the Arabic original with the Pickthall English alongside. Urdu and Indonesian translations are not yet available (pending licences): `ur` and `id` return Pickthall English, `translation_language: "en"` and a `translation_note` saying so |
 
 **Example response (truncated)**
 
@@ -64,7 +64,7 @@ Verbatim Quranic verse lookup by surah:ayah. Returns the canonical AskSakina env
 
 ### `get_dua`
 
-Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). Context is resolved against canonical category slugs, an alias map, and tag dimensions. **If the context contains a crisis keyword (matched against the main app's `detectCrisis` keyword list), the response includes a mandatory `crisis_resource` block** with the appropriate hotline and prosocial directive.
+Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). Context is resolved against canonical category slugs, an alias map, and tag dimensions. A natural phrase ("grief after losing my mother") also resolves: the server normalises it and matches known category, alias, tag and synonym words and a few multi-word phrases inside it, deterministically and without AI. `content.matched_by` says how it resolved. Crisis detection runs first, on the full raw input. Self-harm and abuse get separate blocks (`crisis_type`): the abuse block carries domestic-abuse lines and an abuse-specific directive. **On an abuse disclosure no du'as are returned**: `content_type` is `crisis_resource_only` and the crisis resource is the whole response. Each block lists 24/7 lines first and states the hours of any limited-hours line. **If the context contains a crisis keyword (matched against the main app's `detectCrisis` keyword list), the response includes a mandatory `crisis_resource` block** with the appropriate hotline and prosocial directive.
 
 **Parameters**
 
@@ -159,8 +159,8 @@ Every tool returns the same shape:
   "_sakina_meta": {
     "version": "1.0",
     "source": "AskSakina Islamic Knowledge Server (asksakina.com)",
-    "content_type": "quran_verse" | "dua_collection" | "name_of_allah" | "not_found",
-    "disclaimer": "AskSakina provides verified Islamic reference content for educational purposes. …",
+    "content_type": "quran_verse" | "dua_collection" | "name_of_allah" | "not_found" | "crisis_resource_only",
+    "disclaimer": "AskSakina provides curated Islamic reference content for educational purposes. …",
     "llm_directives": { "CRITICAL_RULES": ["…"] },
     "presentation_contract": {
       "quran":         { "no_paraphrase": true, "require_citation": "surah:ayah" /* … */ },
@@ -171,7 +171,7 @@ Every tool returns the same shape:
   },
   "content": { /* tool-specific record */ },
   // get_dua only, when crisis keywords detected:
-  "crisis_resource": { "directive": "…", "text": "…" }
+  "crisis_resource": { "level": "hard" | "soft", "crisis_type": "self-harm" | "abuse", "locale": "…", "directive": "…", "text": "…" }
 }
 ```
 
@@ -327,7 +327,7 @@ v1 ships unauthenticated. An optional `X-Sakina-App-Id` header is accepted but n
 This service operates with an aggregate-only, memory-bound data model (implemented in WO#360). For each tool, the server maintains a running count of calls by outcome (`ok`, `not_found`, `error`) and the summed handler time to report operational averages via the `/stats` endpoint.
 
 - **No persistent tracking:** No per-request logs or client identifiers are written to disk or any database by the application.
-- **Ephemeral IP handling:** Client IP addresses are used only to enforce the rate limit. Each is held as a rate-limit key in Upstash Redis for the rate-limit window (60 seconds), then expired. Raw IP addresses are never persisted by the application.
+- **Ephemeral IP handling:** Client IP addresses are used only to enforce the rate limit. Each is held as a rate-limit key in Upstash Redis for the rate-limit window (60 seconds), then expired. If Upstash is unavailable, the in-memory fallback holds it in process memory for the same window, then discards it. Raw IP addresses are never persisted by the application, and never written to logs.
 - **No payload logging:** Request parameters (such as `context` values or verse references) and response payloads are never captured or logged.
 - **Memory-only retention:** All aggregate counters exist only in RAM and are reset when the server process restarts.
 
@@ -354,9 +354,21 @@ Payload shape:
     "get_quran_verse":   { "total": N, "ok": N, "not_found": N, "error": N, "avg_response_ms": N },
     "get_dua":           { "total": N, "ok": N, "not_found": N, "error": N, "avg_response_ms": N },
     "get_name_of_allah": { "total": N, "ok": N, "not_found": N, "error": N, "avg_response_ms": N }
-  }
+  },
+  "rate_limiter": {
+    "state": "upstash",
+    "upstash_configured": true,
+    "upstash_failures": 0,
+    "last_failure": null,
+    "last_failure_at": null,
+    "last_success_at": "2026-09-25T…",
+    "startup_check": "Upstash reachable (PING ok, 12 ms); state: upstash"
+  },
+  "basmala_prefix_mismatch": 0
 }
 ```
+
+`rate_limiter.state` is `upstash` (Upstash answering), `degraded` (Upstash configured but failing: requests are limited by the in-memory fallback, never allowed through) or `memory` (Upstash not configured). Failure reasons carry the HTTP status or error, never a client IP. `basmala_prefix_mismatch` counts ayah-1 texts from the upstream that started with neither recorded basmala form and were served unchanged. It is an aggregate count only; the log line for it carries no verse reference.
 
 ### One-time setup on Fly
 
@@ -371,7 +383,7 @@ The server no longer writes to the `/data` volume that `fly.toml` mounts; it was
 
 | Tool | Source |
 |---|---|
-| `get_quran_verse` | `alquran.cloud`, fetched at runtime: Tanzil-derived Uthmani Arabic plus the translation for the locale: `en` and `ar` Pickthall (`en.pickthall`), `ur` Jalandhri, `id` Indonesian Ministry of Religious Affairs. Saheeh International is not served (removed in 1.2.0, WO#245). Cached in process for 24 h per verse + edition. |
+| `get_quran_verse` | `alquran.cloud`, fetched at runtime: Tanzil-derived Uthmani Arabic plus the translation for the locale: `en` and `ar` Pickthall (`en.pickthall`), `ur` and `id` also Pickthall, with a note (their translations are parked pending licences; 1.4.1). A leading byte-order mark is removed. The upstream also prefixes the basmala to ayah 1 of each surah except 1 and 9. Per Gem 2 (the basmala is part of ayah 1 only at 1:1), that exact prefix is removed from ayah 1 of surahs 2–8 and 10–114, matched against the two byte forms the upstream sends. The rest of the ayah is served byte for byte. An unrecognised start is served unchanged and counted in `/stats` (`basmala_prefix_mismatch`). Everything is fetched verse by verse (`/ayah/{surah}:{ayah}`). Saheeh International is not served (removed in 1.2.0, WO#245). Cached in process for 24 h per verse + edition. |
 | `get_dua` | AskSakina's du'a corpus (445 entries at 1.4.0), snapshotted from `../src/data/duas` into `data/duas.json` by `npm run bundle-data`. Du'as with a verified Quranic reference take their Arabic from the scripture module (`../src/lib/scripture`, Tanzil Uthmani) at the same step. |
 | `get_name_of_allah` | AskSakina's 99 Names, snapshotted from `../src/lib/data/99-names` by `npm run bundle-data`. |
 
@@ -494,13 +506,15 @@ Verify the published tarball with `npm pack --dry-run` first to see what would s
 - Package: `@asksakina/islamic-knowledge-mcp` (npm, stdio transport)
 - Remote: `https://sakina-mcp.fly.dev/mcp` (Streamable HTTP)
 
-Publishing flow:
+Publishing flow: the **MCP Registry Publish** GitHub Actions workflow (`.github/workflows/mcp-registry-publish.yml` in the main repository, manual dispatch). It checks that `server.json`, `package.json` and npm agree, then runs:
 
 ```bash
-mcp-publisher login http --domain asksakina.com --private-key <KEY>
+mcp-publisher login dns --domain asksakina.com --private-key <KEY>   # or: login http
 mcp-publisher publish .mcp/server.json
 curl "https://registry.modelcontextprotocol.io/v0/servers?search=com.asksakina"
 ```
+
+Domain proof for `com.asksakina` is an Ed25519 key: the public half in a DNS TXT record on `asksakina.com` (`v=MCPv1; k=ed25519; p=<base64>`, since May 2026) or at `https://asksakina.com/.well-known/mcp-registry-auth`; the private half in the repository secret `MCP_REGISTRY_PRIVATE_KEY`.
 
 ### Smithery re-publish (after a version bump)
 

@@ -16,6 +16,8 @@ import http from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 
 import { getAggregateSnapshot, type ToolName } from './request-logger.js'
+import { getLimiterStatus, type LimiterStatus } from '../safety/rate-limiter.js'
+import { getBasmalaPrefixMismatchCount } from '../data/quran.js'
 
 const ALL_TOOLS: readonly ToolName[] = [
   'get_quran_verse',
@@ -50,6 +52,11 @@ interface StatsPayload {
   since: string
   total_requests: number
   by_tool: Record<string, ToolStatsPayload>
+  /** WO#385: which limiter is enforcing the budget, and Upstash health. */
+  rate_limiter: LimiterStatus
+  /** WO#385: ayah-1 texts that started with neither recorded basmala
+   *  prefix and were served unchanged. Aggregate only; no verse references. */
+  basmala_prefix_mismatch: number
 }
 
 function buildPayload(): StatsPayload {
@@ -71,6 +78,8 @@ function buildPayload(): StatsPayload {
     since: snap.since,
     total_requests: snap.total,
     by_tool,
+    rate_limiter: getLimiterStatus(),
+    basmala_prefix_mismatch: getBasmalaPrefixMismatchCount(),
   }
 }
 

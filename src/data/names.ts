@@ -108,7 +108,8 @@ export function findNameByString(input: string, locale: SupportedLocale): NameRe
     if (stripDiacritics(name.transliteration).toLowerCase() === normalised) {
       return toRecord(name, locale)
     }
-    if (name.arabic === input.trim()) return toRecord(name, locale)
+    // WO#385: Arabic compared without harakat, so "الحكم" finds "الْحَكَم".
+    if (stripDiacritics(name.arabic) === stripDiacritics(input.trim())) return toRecord(name, locale)
   }
 
   for (const name of namesOfAllah) {

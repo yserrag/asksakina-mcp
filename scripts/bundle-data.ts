@@ -81,6 +81,14 @@ function labelQuranicDuas() {
     if (!label) return dua
     seen.add(dua.id)
     const arabic = label.resolve()
+    if (label.anchors) {
+      const w = arabic.split(' ')
+      if (skeleton(w[0]) !== skeleton(label.anchors[0]) || skeleton(w[w.length - 1]) !== skeleton(label.anchors[1])) {
+        throw new Error(
+          `quranic label ${dua.id}: resolved Quran ${label.ref} clause no longer starts/ends at Gem 2's ruled words; re-check the word index`,
+        )
+      }
+    }
     if (skeleton(arabic) !== skeleton(dua.arabic)) {
       throw new Error(
         `quranic label ${dua.id}: corpus Arabic no longer matches Quran ${label.ref}; re-verify with Gem 2 before labelling`,

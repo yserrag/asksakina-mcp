@@ -2,6 +2,105 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 1.4.1
+
+WO#385: hardening after the 1.4.0 publish.
+
+### Fixed
+
+- **Rate limiter no longer fails open.** Before, any Upstash failure
+  allowed every request: HTTP 401 (bad or rotated token), 404 (database
+  deleted), a per-command error, or Upstash unreachable. For HTTP errors it
+  logged nothing. Now every failure is logged with its status or error
+  (never the client IP), and the request is decided by the in-memory
+  limiter, so the 60-per-minute budget holds. Upstash calls time out after
+  2 seconds. The limiter returns to Upstash as soon as it answers again.
+- **Startup reachability check.** The server PINGs Upstash at startup and
+  logs the real result ("reachable" or "NOT reachable ... state:
+  degraded") instead of "configured" because the secrets are set.
+- **Urdu and Indonesian verses no longer serve a wrong or unlicensed
+  translation.** `get_quran_verse` with `locale: "ur"` returned Arabic Quran
+  text in `translation`, labelled "Jalandhri (Urdu)". `ur` and `id` now
+  return Pickthall English with `translation_language: "en"`, a
+  `translation_note` that a licensed translation in that language is not yet
+  available, and a directive not to translate it.
+- **Ayah 1 no longer carries the upstream's basmala** (Gem 2 ruling: the
+  basmala is part of ayah 1 only at 1:1). alquran.cloud prefixes it to
+  ayah 1 of every surah except 1 and 9. It is removed from ayah 1 of
+  surahs 2-8 and 10-114 by an exact match against the two byte forms
+  recorded from the upstream (110 surahs plain, 2 with shadda on the ba).
+  Nothing is split by word count. An unrecognised start is served
+  unchanged, logged with a generic line (no verse reference), and counted
+  in `/stats` as `basmala_prefix_mismatch`. 1:1 keeps its basmala. A leading BOM (sent on 1:1)
+  is removed.
+- **Abuse gets its own crisis block.** An abuse input used to receive the
+  self-harm block ("having thoughts of harming yourself"). It now gets an
+  abuse block (`crisis_type: "abuse"`). The block has an abuse-specific
+  directive (no confrontation advice, no "just leave", no couples
+  counselling, no endurance or sabr framing). It lists only the
+  Founder-verified domestic-abuse lines from the app's helplines data. Its
+  opening sentence is Gem 3's final wording ("What you are experiencing is
+  oppression (dhulm), and you are not to blame. ..."). **No du'as are returned on an abuse
+  disclosure**: the new `content_type` `crisis_resource_only` carries the
+  crisis resource alone (Gem 3 ruling: a du'a there risks spiritual
+  bypassing). An allowlist (`ABUSE_SAFE_DUAS`, empty in 1.4.1) can later
+  add du'as after the block, under an ordering directive; sabr/endurance
+  du'as are dropped from it in code. The publish guards now fail on any
+  pending-wording marker in a crisis block.
+- **Crisis numbers.** Befrienders Cairo (762 2381, unverified) is removed;
+  Egypt is served by the IASP directory. 988 (US/Canada) is held behind
+  `US_988_FOUNDER_VERIFIED` until the Founder verifies it, and is not served
+  meanwhile. Every block lists 24/7 lines first and states the hours of
+  each limited-hours line.
+- **Names by Arabic without harakat.** `get_name_of_allah` with "الحكم"
+  returned not_found; Arabic input is now compared without diacritics.
+
+### Added
+
+- **Six more du'as labelled Quranic** (WO#377 fast-track; Gem 2 ruling,
+  25 Sep 2026). All six are clauses running to the end of the ayah: D00003
+  and D00504 (3:173), D00330 (7:23), D00154 and D00179 (9:129), and D00308
+  (25:74). As with the three 1.4.0 labels, their Arabic is resolved from the
+  scripture module at bundle time (`origin: "quran"`, `quran_citation`), and
+  the corpus is not edited. The bundle step now also checks that each
+  resolved clause starts and ends at Gem 2's ruled words. D00091, also ruled
+  25:74, is held unlabelled until its title is corrected.
+- **A Quranic label no longer hides a hadith reference.** A labelled record
+  that carries a hadith reference keeps it: `hadith_source`, with
+  `hadith_grading_status: "not_recorded"`, and a `Source:` line in
+  `dua_block` beside `Origin:`. The Grading line says the hadith's grading
+  is not recorded. This applies to D00154 and D00179 (Sunan Abi Dawud 5081).
+- **Natural-language contexts for `get_dua`.** Deterministic, no AI: after
+  the existing single-term match, the input is normalised and any known
+  category, alias, tag or synonym word (or one of a few phrases) inside it
+  resolves the category; `content.matched_by` reports how. Crisis detection
+  still runs first on the full raw input.
+- **Agent evals.** `evals/agent-queries.json` (33 cases) and `npm run eval`
+  (in-process, `--fixture`, or `--live <url>`); mcp-deploy runs it against
+  the live server after deploy as a warn-only summary.
+
+### Changed
+
+- **`/stats` reports the limiter:** `rate_limiter.state`
+  (`upstash` | `degraded` | `memory`), failure count, last failure,
+  last success, and the startup check result.
+- **Grading directive, Gem 4 wording.** Records whose source and hadith
+  grading are both unrecorded (389) carry Gem 4's directive, in
+  `grading_directive` and in CRITICAL_RULES. Records with a recorded
+  source but no grading (49 adhkar with a recitation-count hadith) keep
+  the 1.4.0 interim wording until Gem 4 rules their variant.
+- **"authenticated du'as" is now "curated du'a collection"** (Gem 4) in the
+  server description, the server card's `get_dua` description, the
+  `get_dua` tool description, the README (2) and `package.json`.
+- **Disclaimer** reads "AskSakina provides curated Islamic reference
+  content" (was "verified"; Gem 4).
+- **Server card publisher name** is "AskSakina". The functional `name`,
+  `SERVER_NAME` and `X-Sakina-App-Id` are unchanged.
+- **CI:** workflows moved from Node 20 actions to `actions/checkout@v7` and
+  `actions/setup-node@v7`. Dependency caching is off in the two jobs that
+  hold secrets (npm publish, registry publish). New `test:ratelimit` runs
+  in `prepublishOnly` and `mcp-deploy`.
+
 ## 1.4.0
 
 Supersedes 1.3.0 on npm and Fly (published 10 July 2026). 1.3.0 has no entry

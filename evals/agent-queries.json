@@ -1,0 +1,847 @@
+{
+  "_about": "WO#385 item 6: agent-style queries with expected behaviour. Run: npm run eval (in-process), npm run eval -- --fixture (alquran upstream from evals/fixtures), npm run eval -- --live <mcp-url>. crisis_level is read from crisis_resource.level ('none' when absent). must_contain / must_not_contain are matched against the whole JSON response; field_checks against one field (equals, matches, not_matches, absent).",
+  "cases": [
+    {
+      "id": "quran-2-286-en",
+      "description": "Baseline English verse",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 2,
+        "ayah": 286,
+        "locale": "en"
+      },
+      "expect": {
+        "content_type": "quran_verse",
+        "must_contain": [
+          "tasketh not a soul beyond its scope"
+        ],
+        "field_checks": [
+          {
+            "path": "content.translation_source",
+            "equals": "Pickthall"
+          }
+        ]
+      }
+    },
+    {
+      "id": "quran-2-286-ur",
+      "description": "Urdu: parked; Pickthall with a note, never Arabic as the translation",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 2,
+        "ayah": 286,
+        "locale": "ur"
+      },
+      "expect": {
+        "content_type": "quran_verse",
+        "must_not_contain": [
+          "Jalandhri"
+        ],
+        "field_checks": [
+          {
+            "path": "content.translation",
+            "not_matches": "[\\u0600-\\u06FF]"
+          },
+          {
+            "path": "content.translation_source",
+            "equals": "Pickthall"
+          },
+          {
+            "path": "content.translation_note",
+            "matches": "licensed Urdu translation is not yet available"
+          }
+        ]
+      }
+    },
+    {
+      "id": "quran-2-286-id",
+      "description": "Indonesian: parked; Pickthall with a note",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 2,
+        "ayah": 286,
+        "locale": "id"
+      },
+      "expect": {
+        "content_type": "quran_verse",
+        "must_not_contain": [
+          "Ministry of Religious Affairs"
+        ],
+        "field_checks": [
+          {
+            "path": "content.translation",
+            "not_matches": "[\\u0600-\\u06FF]"
+          },
+          {
+            "path": "content.translation_source",
+            "equals": "Pickthall"
+          },
+          {
+            "path": "content.translation_note",
+            "matches": "licensed Indonesian translation is not yet available"
+          }
+        ]
+      }
+    },
+    {
+      "id": "quran-2-286-ar",
+      "description": "Arabic locale: original Arabic plus Pickthall, no parked note",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 2,
+        "ayah": 286,
+        "locale": "ar"
+      },
+      "expect": {
+        "content_type": "quran_verse",
+        "field_checks": [
+          {
+            "path": "content.translation_source",
+            "equals": "Pickthall"
+          },
+          {
+            "path": "content.translation",
+            "not_matches": "[\\u0600-\\u06FF]"
+          },
+          {
+            "path": "content.translation_note",
+            "absent": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "quran-97-1-en",
+      "description": "97:1 begins إِنَّآ: the upstream-prefixed basmala is removed (Gem 2 ruling)",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 97,
+        "ayah": 1,
+        "locale": "en"
+      },
+      "expect": {
+        "content_type": "quran_verse",
+        "must_contain": [
+          "Night of Predestination"
+        ],
+        "field_checks": [
+          {
+            "path": "content.arabic_text",
+            "matches": "^\\u0625\\u0650\\u0646\\u0651\\u064E\\u0627\\u0653"
+          }
+        ]
+      }
+    },
+    {
+      "id": "quran-97-1-ur",
+      "description": "97:1 in Urdu: parked note, and the ayah begins إِنَّآ (basmala removed)",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 97,
+        "ayah": 1,
+        "locale": "ur"
+      },
+      "expect": {
+        "content_type": "quran_verse",
+        "field_checks": [
+          {
+            "path": "content.translation",
+            "not_matches": "[\\u0600-\\u06FF]"
+          },
+          {
+            "path": "content.translation_source",
+            "equals": "Pickthall"
+          },
+          {
+            "path": "content.translation_note",
+            "matches": "licensed Urdu translation is not yet available"
+          },
+          {
+            "path": "content.arabic_text",
+            "matches": "^\\u0625\\u0650\\u0646\\u0651\\u064E\\u0627\\u0653"
+          }
+        ]
+      }
+    },
+    {
+      "id": "quran-2-1-en",
+      "description": "2:1 begins الٓمٓ: the upstream-prefixed basmala is removed (Gem 2 ruling)",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 2,
+        "ayah": 1,
+        "locale": "en"
+      },
+      "expect": {
+        "content_type": "quran_verse",
+        "field_checks": [
+          {
+            "path": "content.arabic_text",
+            "matches": "^\\u0627\\u0644\\u0653\\u0645\\u0653"
+          }
+        ]
+      }
+    },
+    {
+      "id": "quran-10-1-en",
+      "description": "10:1 begins الٓر: the upstream-prefixed basmala is removed (Gem 2 ruling)",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 10,
+        "ayah": 1,
+        "locale": "en"
+      },
+      "expect": {
+        "content_type": "quran_verse",
+        "field_checks": [
+          {
+            "path": "content.arabic_text",
+            "matches": "^\\u0627\\u0644\\u0653\\u0631"
+          }
+        ]
+      }
+    },
+    {
+      "id": "quran-1-1-en",
+      "description": "1:1 is the basmala (it is the ayah), exactly as recorded upstream, with no BOM",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 1,
+        "ayah": 1,
+        "locale": "en"
+      },
+      "expect": {
+        "content_type": "quran_verse",
+        "must_contain": [
+          "In the name of Allah"
+        ],
+        "field_checks": [
+          {
+            "path": "content.arabic_text",
+            "equals": "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"
+          },
+          {
+            "path": "content.arabic_text",
+            "not_matches": "^\\uFEFF"
+          }
+        ]
+      }
+    },
+    {
+      "id": "quran-1-1-id",
+      "description": "1:1 Indonesian: parked",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 1,
+        "ayah": 1,
+        "locale": "id"
+      },
+      "expect": {
+        "content_type": "quran_verse",
+        "field_checks": [
+          {
+            "path": "content.translation",
+            "not_matches": "[\\u0600-\\u06FF]"
+          },
+          {
+            "path": "content.translation_source",
+            "equals": "Pickthall"
+          },
+          {
+            "path": "content.translation_note",
+            "matches": "licensed Indonesian translation is not yet available"
+          }
+        ]
+      }
+    },
+    {
+      "id": "quran-1-8-missing",
+      "description": "Al-Fatiha has 7 ayat: 1:8 must be not_found, never a fabricated verse",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 1,
+        "ayah": 8,
+        "locale": "en"
+      },
+      "expect": {
+        "content_type": "not_found"
+      }
+    },
+    {
+      "id": "dua-phrase-grief-mother",
+      "description": "Natural phrase: grief outranks the relation word",
+      "tool": "get_dua",
+      "args": {
+        "context": "grief after losing my mother"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "deceased",
+        "crisis_level": "soft"
+      }
+    },
+    {
+      "id": "dua-phrase-passed-away",
+      "description": "Multi-word synonym",
+      "tool": "get_dua",
+      "args": {
+        "context": "my mother passed away"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "deceased",
+        "crisis_level": "none"
+      }
+    },
+    {
+      "id": "dua-phrase-lost-job",
+      "description": "Phrase beats the bereavement reading of 'lost'",
+      "tool": "get_dua",
+      "args": {
+        "context": "I lost my job"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "work-success",
+        "crisis_level": "none"
+      }
+    },
+    {
+      "id": "dua-phrase-exam",
+      "description": "Exam phrase",
+      "tool": "get_dua",
+      "args": {
+        "context": "I have an exam tomorrow"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "exams-study"
+      }
+    },
+    {
+      "id": "dua-phrase-sleep",
+      "description": "Contraction normalised",
+      "tool": "get_dua",
+      "args": {
+        "context": "I can't sleep"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "before-sleep",
+        "crisis_level": "none"
+      }
+    },
+    {
+      "id": "dua-phrase-sick",
+      "description": "Illness phrase",
+      "tool": "get_dua",
+      "args": {
+        "context": "feeling sick today"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "health-healing"
+      }
+    },
+    {
+      "id": "dua-phrase-qadr",
+      "description": "Seasonal phrase",
+      "tool": "get_dua",
+      "args": {
+        "context": "what should I say on laylat al qadr"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "laylat-al-qadr"
+      }
+    },
+    {
+      "id": "dua-term-anxiety",
+      "description": "Single term; soft distress block",
+      "tool": "get_dua",
+      "args": {
+        "context": "anxiety"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "stress-anxiety",
+        "crisis_level": "soft",
+        "must_contain": [
+          "support is available"
+        ]
+      }
+    },
+    {
+      "id": "dua-term-morning",
+      "description": "Single term; per-record grading",
+      "tool": "get_dua",
+      "args": {
+        "context": "morning"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "morning-adhkar",
+        "crisis_level": "none",
+        "must_contain": [
+          "grading_status"
+        ]
+      }
+    },
+    {
+      "id": "dua-label-3-173",
+      "description": "WO#377 fast-track: the work du'a D00003 is labelled Quran 3:173 (clause)",
+      "tool": "get_dua",
+      "args": {
+        "context": "work"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "work-success",
+        "must_contain": [
+          "\"quran_citation\":\"Quran 3:173\"",
+          "Origin: Quran 3:173"
+        ]
+      }
+    },
+    {
+      "id": "dua-label-9-129-hadith",
+      "description": "WO#377 fast-track: D00154 is labelled Quran 9:129 and keeps Sunan Abi Dawud 5081 as its Source (labelling rule)",
+      "tool": "get_dua",
+      "args": {
+        "context": "morning"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "morning-adhkar",
+        "must_contain": [
+          "Origin: Quran 9:129\\nSource: Sunan Abī Dāwūd 5081",
+          "\"hadith_source\":\"Sunan Abī Dāwūd 5081\""
+        ]
+      }
+    },
+    {
+      "id": "dua-label-7-23-25-74",
+      "description": "WO#377 fast-track: rabana du'as D00330 and D00308 are labelled Quran 7:23 and Quran 25:74 (clauses)",
+      "tool": "get_dua",
+      "args": {
+        "context": "rabana-duas"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "rabana-duas",
+        "must_contain": [
+          "Origin: Quran 7:23",
+          "Origin: Quran 25:74"
+        ]
+      }
+    },
+    {
+      "id": "dua-anxiety-id",
+      "description": "Indonesian request locale",
+      "tool": "get_dua",
+      "args": {
+        "context": "anxiety",
+        "locale": "id"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "crisis_level": "soft"
+      }
+    },
+    {
+      "id": "dua-anxiety-ur",
+      "description": "Urdu request locale",
+      "tool": "get_dua",
+      "args": {
+        "context": "anxiety",
+        "locale": "ur"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "crisis_level": "soft"
+      }
+    },
+    {
+      "id": "dua-unknown",
+      "description": "Unknown input: not_found, no invented du'a",
+      "tool": "get_dua",
+      "args": {
+        "context": "xyzzy blorp"
+      },
+      "expect": {
+        "content_type": "not_found",
+        "crisis_level": "none",
+        "must_contain": [
+          "Do not fabricate a substitute"
+        ]
+      }
+    },
+    {
+      "id": "crisis-selfharm-en",
+      "description": "Hard crisis, English",
+      "tool": "get_dua",
+      "args": {
+        "context": "I want to kill myself",
+        "locale": "en"
+      },
+      "expect": {
+        "crisis_level": "hard",
+        "must_contain": [
+          "116 123",
+          "iasp.info"
+        ],
+        "must_not_contain": [
+          "\"182\"",
+          "762 2381"
+        ],
+        "field_checks": [
+          {
+            "path": "crisis_resource.crisis_type",
+            "equals": "self-harm"
+          }
+        ]
+      }
+    },
+    {
+      "id": "crisis-selfharm-id",
+      "description": "Hard crisis, Indonesian phrase and locale: in-country lines only",
+      "tool": "get_dua",
+      "args": {
+        "context": "ingin bunuh diri",
+        "locale": "id"
+      },
+      "expect": {
+        "crisis_level": "hard",
+        "must_contain": [
+          "1500-567"
+        ],
+        "must_not_contain": [
+          "116 123",
+          "988",
+          "762 2381"
+        ],
+        "field_checks": [
+          {
+            "path": "crisis_resource.crisis_type",
+            "equals": "self-harm"
+          }
+        ]
+      }
+    },
+    {
+      "id": "crisis-selfharm-ur",
+      "description": "Hard crisis, Roman Urdu phrase and locale",
+      "tool": "get_dua",
+      "args": {
+        "context": "mujhe khudkushi karni hai",
+        "locale": "ur"
+      },
+      "expect": {
+        "crisis_level": "hard",
+        "must_contain": [
+          "0311-7786264"
+        ],
+        "must_not_contain": [
+          "116 123",
+          "988",
+          "762 2381"
+        ],
+        "field_checks": [
+          {
+            "path": "crisis_resource.crisis_type",
+            "equals": "self-harm"
+          }
+        ]
+      }
+    },
+    {
+      "id": "crisis-selfharm-ar",
+      "description": "Hard crisis, Arabic locale",
+      "tool": "get_dua",
+      "args": {
+        "context": "I want to end my life",
+        "locale": "ar"
+      },
+      "expect": {
+        "crisis_level": "hard",
+        "must_contain": [
+          "920033360"
+        ],
+        "must_not_contain": [
+          "116 123",
+          "988",
+          "762 2381"
+        ],
+        "field_checks": [
+          {
+            "path": "crisis_resource.crisis_type",
+            "equals": "self-harm"
+          }
+        ]
+      }
+    },
+    {
+      "id": "crisis-abuse-husband-en",
+      "description": "Abuse: the abuse block (not self-harm), verified DV line, no du'as at all (Gem 3 ruling)",
+      "tool": "get_dua",
+      "args": {
+        "context": "my husband hits me",
+        "locale": "en"
+      },
+      "expect": {
+        "content_type": "crisis_resource_only",
+        "crisis_level": "hard",
+        "must_contain": [
+          "What you are experiencing is oppression (dhulm), and you are not to blame. Your first duty is to protect your safety, not to endure harm. Professional support is available to help you navigate this safely.",
+          "0808 2000 247"
+        ],
+        "must_not_contain": [
+          "harming yourself",
+          "762 2381",
+          "\"context\":\"marriage\"",
+          "\"duas\"",
+          "rephrase"
+        ],
+        "field_checks": [
+          {
+            "path": "crisis_resource.crisis_type",
+            "equals": "abuse"
+          },
+          {
+            "path": "content.duas",
+            "absent": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "crisis-abuse-beats-en",
+      "description": "Abuse, second phrasing",
+      "tool": "get_dua",
+      "args": {
+        "context": "he beats me"
+      },
+      "expect": {
+        "content_type": "crisis_resource_only",
+        "crisis_level": "hard",
+        "must_contain": [
+          "What you are experiencing is oppression (dhulm), and you are not to blame. Your first duty is to protect your safety, not to endure harm. Professional support is available to help you navigate this safely.",
+          "0808 2000 247"
+        ],
+        "must_not_contain": [
+          "harming yourself",
+          "762 2381",
+          "\"context\":\"marriage\"",
+          "\"duas\"",
+          "rephrase"
+        ],
+        "field_checks": [
+          {
+            "path": "crisis_resource.crisis_type",
+            "equals": "abuse"
+          },
+          {
+            "path": "content.duas",
+            "absent": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "crisis-abuse-id",
+      "description": "Abuse, Indonesian locale: in-country DV lines",
+      "tool": "get_dua",
+      "args": {
+        "context": "my husband hits me",
+        "locale": "id"
+      },
+      "expect": {
+        "content_type": "crisis_resource_only",
+        "crisis_level": "hard",
+        "must_contain": [
+          "What you are experiencing is oppression (dhulm), and you are not to blame. Your first duty is to protect your safety, not to endure harm. Professional support is available to help you navigate this safely.",
+          "SAPA 129",
+          "021-3903963"
+        ],
+        "must_not_contain": [
+          "harming yourself",
+          "762 2381",
+          "\"context\":\"marriage\"",
+          "\"duas\"",
+          "rephrase"
+        ],
+        "field_checks": [
+          {
+            "path": "crisis_resource.crisis_type",
+            "equals": "abuse"
+          },
+          {
+            "path": "content.duas",
+            "absent": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "crisis-abuse-ur",
+      "description": "Abuse, Roman Urdu phrase and locale",
+      "tool": "get_dua",
+      "args": {
+        "context": "mera shohar mujhe marta hai",
+        "locale": "ur"
+      },
+      "expect": {
+        "content_type": "crisis_resource_only",
+        "crisis_level": "hard",
+        "must_contain": [
+          "What you are experiencing is oppression (dhulm), and you are not to blame. Your first duty is to protect your safety, not to endure harm. Professional support is available to help you navigate this safely.",
+          "1098",
+          "0800-22444"
+        ],
+        "must_not_contain": [
+          "harming yourself",
+          "762 2381",
+          "\"context\":\"marriage\"",
+          "\"duas\"",
+          "rephrase"
+        ],
+        "field_checks": [
+          {
+            "path": "crisis_resource.crisis_type",
+            "equals": "abuse"
+          },
+          {
+            "path": "content.duas",
+            "absent": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "crisis-abuse-ar",
+      "description": "Abuse, Arabic locale",
+      "tool": "get_dua",
+      "args": {
+        "context": "my husband hits me",
+        "locale": "ar"
+      },
+      "expect": {
+        "content_type": "crisis_resource_only",
+        "crisis_level": "hard",
+        "must_contain": [
+          "What you are experiencing is oppression (dhulm), and you are not to blame. Your first duty is to protect your safety, not to endure harm. Professional support is available to help you navigate this safely.",
+          "1919",
+          "15115"
+        ],
+        "must_not_contain": [
+          "harming yourself",
+          "762 2381",
+          "\"context\":\"marriage\"",
+          "\"duas\"",
+          "rephrase"
+        ],
+        "field_checks": [
+          {
+            "path": "crisis_resource.crisis_type",
+            "equals": "abuse"
+          },
+          {
+            "path": "content.duas",
+            "absent": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "crisis-in-phrase",
+      "description": "Crisis keyword inside a longer phrase: detected on the full raw input; no du'a list is inferred from a crisis message",
+      "tool": "get_dua",
+      "args": {
+        "context": "grief after losing my mother and I want to kill myself"
+      },
+      "expect": {
+        "crisis_level": "hard",
+        "content_type": "not_found"
+      }
+    },
+    {
+      "id": "name-number-1",
+      "description": "Name by number",
+      "tool": "get_name_of_allah",
+      "args": {
+        "number": 1
+      },
+      "expect": {
+        "content_type": "name_of_allah",
+        "must_contain": [
+          "Rahman"
+        ]
+      }
+    },
+    {
+      "id": "name-english",
+      "description": "Name by English meaning",
+      "tool": "get_name_of_allah",
+      "args": {
+        "name": "The Judge"
+      },
+      "expect": {
+        "content_type": "name_of_allah",
+        "must_contain": [
+          "Hakam"
+        ]
+      }
+    },
+    {
+      "id": "name-arabic",
+      "description": "Name by Arabic",
+      "tool": "get_name_of_allah",
+      "args": {
+        "name": "الحكم"
+      },
+      "expect": {
+        "content_type": "name_of_allah",
+        "must_contain": [
+          "Hakam"
+        ]
+      }
+    },
+    {
+      "id": "name-translit",
+      "description": "Name by transliteration",
+      "tool": "get_name_of_allah",
+      "args": {
+        "name": "Al-Wadud"
+      },
+      "expect": {
+        "content_type": "name_of_allah",
+        "must_contain": [
+          "Wadud"
+        ]
+      }
+    },
+    {
+      "id": "name-ur",
+      "description": "Name with Urdu locale",
+      "tool": "get_name_of_allah",
+      "args": {
+        "number": 99,
+        "locale": "ur"
+      },
+      "expect": {
+        "content_type": "name_of_allah"
+      }
+    },
+    {
+      "id": "name-unknown",
+      "description": "Unknown Name: not_found",
+      "tool": "get_name_of_allah",
+      "args": {
+        "name": "Zorblax"
+      },
+      "expect": {
+        "content_type": "not_found"
+      }
+    }
+  ]
+}
