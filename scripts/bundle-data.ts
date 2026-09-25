@@ -8,7 +8,7 @@
  * own `data/` and `src/safety/_synced/` directories.
  *
  * Outputs:
- *   - `mcp-server/data/duas.json`            — 444 du'as with all fields
+ *   - `mcp-server/data/duas.json`            — the du'a corpus, Gem-2-verified Quranic entries labelled (quranic-labels.ts)
  *   - `mcp-server/data/names.json`           — 99 Names of Allah
  *   - `mcp-server/data/dua-categories.json`  — DUA_CATEGORIES metadata
  *   - `mcp-server/src/safety/_synced/crisis-detection.ts`
@@ -32,6 +32,7 @@ import { fileURLToPath } from 'node:url'
 
 import { ALL_DUAS, DUA_CATEGORIES } from '../../src/data/duas/index.js'
 import { namesOfAllah } from '../../src/lib/data/99-names.js'
+import { QURANIC_LABELS, skeleton } from './quranic-labels.js'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(SCRIPT_DIR, '..')
@@ -70,9 +71,32 @@ async function copySyncedTypeScript(srcRel: string, dest: string, rewrites: Arra
   console.log(`  synced ${path.relative(ROOT, dest)}`)
 }
 
+// WO#377 addendum: label Gem-2-verified Quranic du'as and resolve their
+// Arabic from the scripture module. Output only; the corpus is not edited.
+function labelQuranicDuas() {
+  const byId = new Map(QURANIC_LABELS.map((l) => [l.id, l]))
+  const seen = new Set<string>()
+  const out = ALL_DUAS.map((dua) => {
+    const label = byId.get(dua.id)
+    if (!label) return dua
+    seen.add(dua.id)
+    const arabic = label.resolve()
+    if (skeleton(arabic) !== skeleton(dua.arabic)) {
+      throw new Error(
+        `quranic label ${dua.id}: corpus Arabic no longer matches Quran ${label.ref}; re-verify with Gem 2 before labelling`,
+      )
+    }
+    return { ...dua, arabic, origin: 'quran' as const, quran_ref: label.ref }
+  })
+  const missing = QURANIC_LABELS.filter((l) => !seen.has(l.id)).map((l) => l.id)
+  if (missing.length) throw new Error(`quranic labels for unknown du'a ids: ${missing.join(', ')}`)
+  console.log(`  labelled ${seen.size} du'as origin=quran (scripture module Arabic)`)
+  return out
+}
+
 async function bundleDuas() {
   console.log(`bundling du'as (${ALL_DUAS.length} entries, ${DUA_CATEGORIES.length} categories)`)
-  await writeJson(path.join(OUT_DATA_DIR, 'duas.json'), ALL_DUAS)
+  await writeJson(path.join(OUT_DATA_DIR, 'duas.json'), labelQuranicDuas())
   await writeJson(path.join(OUT_DATA_DIR, 'dua-categories.json'), DUA_CATEGORIES)
 }
 

@@ -2,6 +2,58 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 1.4.0
+
+Supersedes 1.3.0 on npm and Fly (published 10 July 2026). 1.3.0 has no entry
+of its own in this file; the list below is everything that changed in
+`mcp-server/` since that publish, not only the WO#377 work.
+
+### Fixed
+
+- **P0: corrupted Quranic verse in `get_dua`.** The Dhun-Nun du'a (D00068,
+  Quran 21:87) was served by 1.3.0 with the word عَلَيْهِ duplicated. The app
+  fixed it in July (WO#305, PR #361, Arabic resolved from Tanzil) but the MCP
+  was never rebundled. The 1.4.0 bundle carries the fix, and `test:tools` now
+  fails if the verse holds more than one عليه (skeleton comparison) in the
+  record, its `dua_block` or the bundle.
+- **D00043 restored in the `fasting` category** (WO#305 Phase A-2), with both
+  Sunan Abi Dawud wordings (2357 Hasan, 2358 Da'if). Du'a count 443 to 445;
+  categories 29 to 30.
+
+### Changed
+
+- **Quranic du'as labelled (WO#377 addendum).** Du'as whose Quranic reference
+  Gem 2 has verified (WO#305) take their Arabic from the scripture module at
+  bundle time (Tanzil Uthmani, bytes unchanged) and carry `origin: "quran"`,
+  `quran_citation` and an `Origin:` line in `dua_block`. 3 records in 1.4.0
+  (D00068, D00060, D00271): those where Gem 2 ruled on the record's own ref.
+  The source corpus is not edited.
+- **Grading honesty.** Every du'a record carries `grading_status`
+  (`quranic`, `graded`, `not_recorded`), and `content.grading_summary` counts
+  them. The `hadith` presentation contract's `require_grading` is `true` only
+  when every returned record is graded or Quranic, and `"per_record"`
+  otherwise. It no longer claims a grading the data does not hold.
+- **Aggregate-only analytics (WO#360).** Per-request JSONL logging (country,
+  region, client, user-agent, params) is removed. The server keeps in-memory
+  per-tool counters only, and `/stats` reports those. The server card declares
+  `analytics: "aggregate-only"`.
+- **Review claims (WO#360).** Descriptions and the LICENSE describe the Gem
+  chain as structured specialist-AI review, not a substitute for a scholar.
+- **Crisis keyword coverage (WO#308)** via the synced `crisis-detection.ts`.
+- **Repository pointers (WO#377).** `package.json`, `server.json`, the server
+  card, README and LICENSE point at `github.com/yserrag/asksakina-mcp`;
+  `server.json` gains `websiteUrl`.
+- **README.** AskSakina rebrand (WO#342). Data sources name Pickthall, not
+  Saheeh International. Privacy and Analytics sections describe the
+  aggregate-only counters. The `get_dua` example shows the real shape.
+- `@modelcontextprotocol/sdk` ^1.29.0 to ^1.30.1.
+- `tsconfig.build.json`: `removeComments: true` (WO#343 log); `dist/` is
+  about 15% smaller.
+
+### Notes
+
+- No new tools. `get_dua` records gain fields; none are removed or renamed.
+
 ## 1.2.0
 
 Version already staged in-repo prior to this release; npm/Fly remained on

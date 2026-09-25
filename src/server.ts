@@ -47,7 +47,7 @@ import { handleStatsRequest } from './logging/stats.js'
 import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
-const SERVER_VERSION = '1.3.0'
+const SERVER_VERSION = '1.4.0'
 const SERVER_DESCRIPTION =
   "Verified Islamic knowledge from Sakina (asksakina.com). Provides Quranic verses, authenticated du'as (supplications), and the 99 Names of Allah. All content is reviewed through AskSakina's structured specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 

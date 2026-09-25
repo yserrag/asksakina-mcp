@@ -22,6 +22,13 @@ import { getDuaHandler } from '../src/tools/get-dua.js'
 import { getNameOfAllahHandler } from '../src/tools/get-name-of-allah.js'
 import { TOTAL_DUAS } from '../src/data/duas.js'
 import { TOTAL_NAMES } from '../src/data/names.js'
+import { readFileSync } from 'node:fs'
+import { getVerseArabic } from '../../src/lib/scripture/index.js'
+import { skeleton } from './quranic-labels.js'
+
+const BUNDLED_DUAS = JSON.parse(
+  readFileSync(new URL('../data/duas.json', import.meta.url), 'utf-8'),
+) as Array<{ id: string; arabic: string }>
 
 interface TestResult {
   label: string
@@ -157,6 +164,68 @@ async function testDuaAnxiety() {
     allHaveBlocks
       ? pass('dua records carry dua_block with Arabic/Source/Grading lines')
       : fail('dua records dua_block', 'one or more records missing dua_block or its required lines'),
+  )
+
+  // WO#377 addendum P0 — the Dhun-Nun du'a (D00068, Quran 21:87) must not
+  // carry the duplicated عليه that shipped in 1.3.0. Compared on the bare
+  // skeleton so a diacritic variant of the duplicate is caught too.
+  const recs = (content.duas ?? []) as Array<{
+    dua_block?: string
+    arabic?: string
+    origin?: string
+    quran_citation?: string
+    grading_status?: string
+  }>
+  const dhunNun = recs.find((d) => d.quran_citation === 'Quran 21:87')
+  const alayhi = (s: string) => (skeleton(s).match(/عليه/g) ?? []).length
+  const bundled = BUNDLED_DUAS.find((d) => d.id === 'D00068')
+  if (!dhunNun || !bundled) {
+    results.push(fail('dhun-nun present', `D00068 missing (response=${!!dhunNun}, bundle=${!!bundled})`))
+  } else {
+    const counts = [alayhi(dhunNun.arabic ?? ''), alayhi(dhunNun.dua_block ?? ''), alayhi(bundled.arabic)]
+    results.push(
+      counts.every((n) => n === 1)
+        ? pass('dhun-nun (21:87) has exactly one عليه in arabic, dua_block and bundle')
+        : fail('dhun-nun duplicated عليه', `counts arabic/dua_block/bundle = ${counts.join('/')}`),
+    )
+    results.push(
+      dhunNun.arabic === getVerseArabic('21:87')
+        ? pass('dhun-nun Arabic is Tanzil 21:87 byte-for-byte')
+        : fail('dhun-nun Tanzil bytes', 'Arabic differs from the scripture module')
+    )
+    results.push(
+      dhunNun.origin === 'quran' && dhunNun.dua_block?.includes('Origin: Quran 21:87')
+        ? pass('dhun-nun labelled origin quran with citation in dua_block')
+        : fail('dhun-nun origin label', `origin=${dhunNun.origin}`),
+    )
+  }
+
+  // WO#377 addendum item 3 — the envelope matches the data.
+  const statuses = recs.map((d) => d.grading_status)
+  const validStatus = statuses.every((s) => s === 'quranic' || s === 'graded' || s === 'not_recorded')
+  results.push(
+    validStatus
+      ? pass('every dua record carries a grading_status')
+      : fail('grading_status', `got ${JSON.stringify(statuses)}`),
+  )
+  const hadith = (response._sakina_meta.presentation_contract as { hadith?: { require_grading?: unknown } }).hadith
+  const expected = statuses.includes('not_recorded') ? 'per_record' : true
+  results.push(
+    hadith?.require_grading === expected
+      ? pass(`hadith contract require_grading=${JSON.stringify(expected)} matches the records`)
+      : fail('require_grading matches data', `expected ${JSON.stringify(expected)}, got ${JSON.stringify(hadith?.require_grading)}`),
+  )
+  const summary = (content as { grading_summary?: Record<string, number> }).grading_summary
+  results.push(
+    summary && summary.quranic + summary.graded + summary.not_recorded === recs.length
+      ? pass('grading_summary counts add up to total_results')
+      : fail('grading_summary', JSON.stringify(summary)),
+  )
+  const quranLabelled = recs.filter((d) => d.origin === 'quran')
+  results.push(
+    quranLabelled.length > 0 && quranLabelled.every((d) => d.grading_status === 'quranic' && /^Quran \d+:\d+(-\d+)?$/.test(d.quran_citation ?? ''))
+      ? pass(`origin=quran records carry a surah:ayah citation (${quranLabelled.length})`)
+      : fail('origin=quran citation', JSON.stringify(quranLabelled.map((d) => d.quran_citation))),
   )
 
   // Gem 10 fix 4 — soft distress block expected on "anxiety".

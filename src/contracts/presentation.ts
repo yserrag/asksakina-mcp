@@ -18,7 +18,13 @@ export interface QuranContract {
 export interface HadithContract {
   paraphrase_allowed: false
   require_source_collection: true
-  require_grading: true
+  /**
+   * true when every record in the response carries a grading (hadith
+   * grading, or Quranic). 'per_record' when at least one record has
+   * grading_status 'not_recorded': the agent reads each record's
+   * grading_status instead of assuming a grading exists (WO#377 addendum).
+   */
+  require_grading: true | 'per_record'
   prefer_dua_block: true
 }
 
@@ -103,6 +109,16 @@ export const DUA_DIRECTIVES: readonly string[] = [
   VOICE_2_RULE,
   'Include the disclaimer provided in _sakina_meta.',
 ] as const
+
+/**
+ * Directive for responses that include du'as with grading_status
+ * 'not_recorded' (WO#377 addendum). PENDING GEM 4: the wording is Gem 4's
+ * to supply. While this is null no directive is emitted; the per-record
+ * grading_status and the 'per_record' contract value still ship. The
+ * Builder's draft for Gem 4 is in docs/wo377-sg-report.md (addendum,
+ * item 3). Do not replace null with unreviewed wording.
+ */
+export const UNRECORDED_GRADING_DIRECTIVE: string | null = null
 
 export const NAME_DIRECTIVES: readonly string[] = [
   'You MUST present the Arabic text exactly as provided.',

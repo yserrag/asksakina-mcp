@@ -42,6 +42,11 @@ interface BuilderInput<TContent> {
   content: TContent
   /** Extra top-level fields (e.g. crisis_resource on get_dua). */
   extras?: Record<string, unknown>
+  /** Merged over the content type's presentation contract (WO#377 addendum:
+   *  get_dua sets hadith.require_grading from the records it returns). */
+  contractOverride?: Record<string, unknown>
+  /** Appended to the content type's CRITICAL_RULES. */
+  extraDirectives?: readonly string[]
 }
 
 export interface SakinaResponse<TContent> {
@@ -119,14 +124,20 @@ export function buildResponse<TContent>(
   input: BuilderInput<TContent>,
 ): SakinaResponse<TContent> {
   const meta = metaForType(input.contentType)
+  const directives = input.extraDirectives?.length
+    ? [...meta.directives, ...input.extraDirectives]
+    : meta.directives
+  const contract = input.contractOverride
+    ? { ...meta.contract, ...input.contractOverride }
+    : meta.contract
   const response: SakinaResponse<TContent> = {
     _sakina_meta: {
       version: VERSION,
       source: SOURCE,
       content_type: input.contentType,
       disclaimer: meta.disclaimer,
-      llm_directives: { CRITICAL_RULES: meta.directives },
-      presentation_contract: meta.contract,
+      llm_directives: { CRITICAL_RULES: directives },
+      presentation_contract: contract,
       educational_context: meta.educational,
     },
     content: input.content,
