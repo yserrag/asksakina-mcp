@@ -18,7 +18,13 @@ export interface QuranContract {
 export interface HadithContract {
   paraphrase_allowed: false
   require_source_collection: true
-  require_grading: true
+  /**
+   * true when every record in the response carries a grading (hadith
+   * grading, or Quranic). 'per_record' when at least one record has
+   * grading_status 'not_recorded': the agent reads each record's
+   * grading_status instead of assuming a grading exists (WO#377 addendum).
+   */
+  require_grading: true | 'per_record'
   prefer_dua_block: true
 }
 
@@ -103,6 +109,18 @@ export const DUA_DIRECTIVES: readonly string[] = [
   VOICE_2_RULE,
   'Include the disclaimer provided in _sakina_meta.',
 ] as const
+
+/**
+ * Directive for du'as with grading_status 'not_recorded' (WO#377 addendum).
+ *
+ * INTERIM, Gem 10 wording (1.4.0 condition, 25 Sep 2026): Gem 10 blocked
+ * shipping 1.4.0 with this switched off. It is emitted once in
+ * CRITICAL_RULES whenever a response holds an ungraded record, and on each
+ * such record as `grading_directive`. Gem 4's final wording replaces the
+ * text in 1.4.1; change it only on a Gem ruling, verbatim.
+ */
+export const UNRECORDED_GRADING_DIRECTIVE: string | null =
+  'CRITICAL: No grading is provided for this record. You MUST NOT invent, guess, or append a grading. Present the source exactly as provided without implying authentication.'
 
 export const NAME_DIRECTIVES: readonly string[] = [
   'You MUST present the Arabic text exactly as provided.',

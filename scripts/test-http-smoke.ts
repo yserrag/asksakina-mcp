@@ -23,6 +23,7 @@ process.env.UPSTASH_REDIS_REST_TOKEN = 'paste-token'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { startHttpServer } from '../src/server.js'
+import { InMemoryRateLimiter } from '../src/safety/rate-limiter.js'
 
 interface Envelope {
   _sakina_meta?: { content_type?: string }
@@ -37,6 +38,19 @@ function check(label: string, ok: boolean, detail = ''): void {
 
 async function main(): Promise<void> {
   console.log('MCP HTTP-transport smoke test (WO#250) — invalid Upstash URL, expecting fail-open')
+
+  // Gem 8 (1.4.0): the in-memory limiter discards an IP once its window ends,
+  // even if that client never returns. Short window/sweep so the test is fast.
+  {
+    const lim = new InMemoryRateLimiter(200, 50)
+    await lim.check('203.0.113.1')
+    await lim.check('203.0.113.2')
+    check('in-memory limiter holds IPs during the window', lim.size() === 2, `size ${lim.size()}`)
+    await new Promise((r) => setTimeout(r, 400))
+    check('in-memory limiter discards IPs after the window, with no further requests', lim.size() === 0, `size ${lim.size()}`)
+    const again = await lim.check('203.0.113.1')
+    check('a returning IP starts a fresh window', again.remaining === 59, `remaining ${again.remaining}`)
+  }
 
   const server = await startHttpServer(PORT)
   try {
@@ -67,6 +81,23 @@ async function main(): Promise<void> {
     )
 
     await transport.close().catch(() => {})
+
+    // Gem 10 condition (1.4.0): the server card's human-readable title and
+    // description say AskSakina; the functional name is unchanged.
+    const cardRes = await fetch(`http://localhost:${PORT}/.well-known/mcp/server-card.json`)
+    const card = (await cardRes.json().catch(() => ({}))) as {
+      name?: string
+      displayName?: string
+      description?: string
+    }
+    check('server card served', cardRes.status === 200, `got ${cardRes.status}`)
+    check('server card displayName is "AskSakina Islamic Knowledge"', card.displayName === 'AskSakina Islamic Knowledge', `got ${card.displayName}`)
+    check(
+      'server card description names AskSakina, not bare Sakina',
+      (card.description ?? '').includes('from AskSakina (asksakina.com)') && !/(?<!Ask)Sakina\b/.test(card.description ?? ''),
+      card.description ?? '',
+    )
+    check('server card functional name unchanged', card.name === 'com.asksakina/islamic-knowledge', `got ${card.name}`)
   } catch (err) {
     check('server survived the /mcp POST (no crash)', false, err instanceof Error ? err.message : String(err))
   } finally {

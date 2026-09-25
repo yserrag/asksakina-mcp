@@ -47,9 +47,9 @@ import { handleStatsRequest } from './logging/stats.js'
 import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
-const SERVER_VERSION = '1.3.0'
+const SERVER_VERSION = '1.4.0'
 const SERVER_DESCRIPTION =
-  "Verified Islamic knowledge from Sakina (asksakina.com). Provides Quranic verses, authenticated du'as (supplications), and the 99 Names of Allah. All content is reviewed through AskSakina's structured specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
+  "Verified Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, authenticated du'as (supplications), and the 99 Names of Allah. All content is reviewed through AskSakina's structured specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
 // WO#129 Task 1 — Smithery server-card.json. Mirrors the MCP registry
 // entry at `.mcp/server.json` but adds JSON-Schema-shaped descriptors
@@ -59,7 +59,9 @@ const SERVER_DESCRIPTION =
 const SERVER_CARD = {
   schemaVersion: '2025-07-09',
   name: 'com.asksakina/islamic-knowledge',
-  displayName: 'Sakina Islamic Knowledge',
+  // Gem 10 condition (1.4.0): human-readable title and description say
+  // AskSakina. The functional `name`, SERVER_NAME and X-Sakina-App-Id stay.
+  displayName: 'AskSakina Islamic Knowledge',
   description: SERVER_DESCRIPTION,
   version: SERVER_VERSION,
   homepage: 'https://www.asksakina.com/en/mcp',

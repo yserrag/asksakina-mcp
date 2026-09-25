@@ -1,6 +1,6 @@
 {
   "name": "@asksakina/islamic-knowledge-mcp",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": false,
   "description": "Verified Islamic knowledge MCP server — Quranic verses, authenticated du'as, and the 99 Names of Allah. Reviewed through AskSakina's structured specialist-AI review chain across mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali); not a substitute for a qualified scholar. Provides three lookup tools to AI agents over the Model Context Protocol.",
   "mcpName": "com.asksakina/islamic-knowledge",
@@ -21,15 +21,16 @@
     "update-geoip": "node node_modules/geoip-lite/scripts/updatedb.js",
     "prebuild": "npm run bundle-data",
     "build": "tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
-    "prepublishOnly": "npm run bundle-data && npm run build && npm run test:tools && npm run test:analytics && npm run test:http",
+    "prepublishOnly": "npm run bundle-data && npm run build && npm run test:tools && npm run test:analytics && npm run test:http && npm run guards",
     "start": "tsx src/server.ts",
     "start:dist": "node dist/server.js",
     "test:tools": "tsx scripts/test-tools.ts",
     "test:analytics": "tsx scripts/test-analytics.ts",
-    "test:http": "tsx scripts/test-http-smoke.ts"
+    "test:http": "tsx scripts/test-http-smoke.ts",
+    "guards": "node scripts/publish-guards.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.1",
     "geoip-lite": "^1.4.10",
     "zod": "^3.23.8"
   },
