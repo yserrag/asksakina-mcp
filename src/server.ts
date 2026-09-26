@@ -56,7 +56,7 @@ import { extractClientIp } from './logging/geo.js'
 const SERVER_NAME = 'sakina-islamic-knowledge'
 const SERVER_VERSION = '1.5.0'
 const SERVER_DESCRIPTION =
-  "Verified Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a collection (supplications), and the 99 Names of Allah. All content is reviewed through AskSakina's structured specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
+  "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a collection (supplications), and the 99 Names of Allah. All content is reviewed through AskSakina's structured specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
 // WO#129 Task 1 — Smithery server-card.json. Mirrors the MCP registry
 // entry at `.mcp/server.json` but adds JSON-Schema-shaped descriptors

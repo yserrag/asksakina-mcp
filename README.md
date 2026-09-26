@@ -12,7 +12,7 @@
 
 ## What it provides
 
-Four lookup tools and one canonical resource over the Model Context Protocol. Every record is sourced from AskSakina's main app (`asksakina.com`), so the MCP server can never drift from what the public app surfaces.
+Four lookup tools and one canonical resource over the Model Context Protocol. Every record is sourced from AskSakina's main app (`asksakina.com`), so each MCP release matches what the public app surfaced when it was built.
 
 | Tool | What it does |
 |---|---|
@@ -278,13 +278,13 @@ Add to `.vscode/mcp.json` in your workspace:
 
 ## Use cases
 
-The MCP server is designed for any agent or application that needs verified Islamic source material with a hard guarantee against silent misrepresentation.
+The MCP server is designed for any agent or application that needs curated Islamic source material, returned with explicit instructions to quote it exactly rather than paraphrase it.
 
-- **Build an Islamic chatbot with verified sources.** Pipe `get_quran_verse` and `get_dua` into your conversation flow; the presentation contract keeps the agent honest about what is direct revelation, what is hadith with a grading, and what is editorial reflection.
+- **Build an Islamic chatbot with cited references where recorded.** Pipe `get_quran_verse` and `get_dua` into your conversation flow; the presentation contract instructs the agent to quote exactly and keep gradings attached, and each response states its content type and, for du'as, each record's grading status.
 - **Add prayer-time-aware spiritual content to your agent.** Combine the Quranic and du'a tools with a prayer-time API to surface Allah's words at the right moment of the day.
-- **Recommend du'as based on user context.** The crisis-keyword filter in `get_dua` handles the dangerous edge cases (self-harm language, abuse) so your assistant never replies with a generic du'a to a safety-critical message.
+- **Recommend du'as based on user context.** The crisis-keyword filter in `get_dua` handles the dangerous edge cases (self-harm language, abuse) so your assistant is directed not to reply with a generic du'a to a safety-critical message.
 - **Answer questions about the 99 Names.** `get_name_of_allah` returns the canonical Arabic, transliteration, meaning, and reflection — plus Quranic references — for both number-based and name-based lookups.
-- **Stay theologically inclusive.** Every record is reviewed across Hanafi, Maliki, Shafi'i, and Hanbali positions. The server never positions a contested ruling as the universal answer.
+- **Stay theologically inclusive.** The server never positions a contested ruling as the universal answer.
 
 ---
 
@@ -292,12 +292,12 @@ The MCP server is designed for any agent or application that needs verified Isla
 
 Every piece of content surfaced by this server has been reviewed by AskSakina's "Gem" specialist-AI review chain before shipping. The chain has nine reviewers; four of them gate every Islamic-knowledge release:
 
-1. **Quran & Translation Verification.** Ayah accuracy, surah/ayah citation correctness, hadith grading, source authentication.
+1. **Quran & Translation Verification.** Ayah accuracy, surah/ayah citation correctness, hadith grading, source review.
 2. **Fiqh Diversity (Multi-Madhab).** Cross-school accuracy, no single-madhab framing on contested topics, inclusive language.
 3. **Islamic Psychology & Pastoral Care.** Comfort window safety, crisis filter coverage, no guilt-based motivation.
 4. **Explorer / New-to-Islam Accessibility.** Glossing of Arabic terms for non-Muslim audiences, plain-English fiqh, zero-assumed-belief reflections.
 
-Architectural guarantees enforced in code:
+Architectural behaviours implemented in code:
 
 - The Unicode prophet salutation (U+FDFA, ﷺ) is replaced with `(peace be upon him)` at every data-loader boundary. The response builder rejects any output containing the symbol.
 - Each du'a record carries a `grading_status` (`quranic`, `graded`, `not_recorded`). The `hadith` presentation contract sets `require_grading: true` only when every returned record is graded or Quranic, and `"per_record"` otherwise, so the envelope never claims a grading the data does not hold.

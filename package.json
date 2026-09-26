@@ -2,7 +2,7 @@
   "name": "@asksakina/islamic-knowledge-mcp",
   "version": "1.5.0",
   "private": false,
-  "description": "Verified Islamic knowledge MCP server — Quranic verses, a curated du'a collection, and the 99 Names of Allah. Reviewed through AskSakina's structured specialist-AI review chain across mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali); not a substitute for a qualified scholar. Provides four lookup tools to AI agents over the Model Context Protocol.",
+  "description": "Curated Islamic knowledge MCP server — Quranic verses, a curated du'a collection, and the 99 Names of Allah. Reviewed through AskSakina's structured specialist-AI review chain across mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali); not a substitute for a qualified scholar. Provides four lookup tools to AI agents over the Model Context Protocol.",
   "mcpName": "com.asksakina/islamic-knowledge",
   "main": "dist/server.js",
   "bin": {
