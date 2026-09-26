@@ -284,7 +284,7 @@ The MCP server is designed for any agent or application that needs curated Islam
 - **Add prayer-time-aware spiritual content to your agent.** Combine the Quranic and du'a tools with a prayer-time API to surface Allah's words at the right moment of the day.
 - **Recommend du'as based on user context.** The crisis-keyword filter in `get_dua` handles the dangerous edge cases (self-harm language, abuse) so your assistant is directed not to reply with a generic du'a to a safety-critical message.
 - **Answer questions about the 99 Names.** `get_name_of_allah` returns the canonical Arabic, transliteration, meaning, and reflection — plus Quranic references — for both number-based and name-based lookups.
-- **Stay theologically inclusive.** The server never positions a contested ruling as the universal answer.
+- **Stay theologically inclusive.** The server is designed not to present a contested ruling as the universal answer.
 
 ---
 
