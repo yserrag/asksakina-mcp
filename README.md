@@ -290,7 +290,7 @@ The MCP server is designed for any agent or application that needs curated Islam
 
 ## Content integrity
 
-Every piece of content surfaced by this server has been reviewed by AskSakina's "Gem" specialist-AI review chain before shipping. The chain has nine reviewers; four of them gate every Islamic-knowledge release:
+New and changed content is reviewed by AskSakina's "Gem" specialist-AI review chain before shipping. Four of its reviewers gate every Islamic-knowledge release:
 
 1. **Quran & Translation Verification.** Ayah accuracy, surah/ayah citation correctness, hadith grading, source review.
 2. **Fiqh Diversity (Multi-Madhab).** Cross-school accuracy, no single-madhab framing on contested topics, inclusive language.
