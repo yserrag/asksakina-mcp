@@ -21,6 +21,7 @@ import {
   NAME_OF_ALLAH_CONTRACT,
   REFLECTION_CONTRACT,
   QURAN_DIRECTIVES,
+  VERSE_COLLECTION_DIRECTIVES,
   DUA_DIRECTIVES,
   NAME_DIRECTIVES,
   VOICE_2_RULE,
@@ -30,6 +31,8 @@ import {
 
 export type ContentType =
   | 'quran_verse'
+  /** WO#386: find_verses. Several verses from the thematic index. */
+  | 'verse_collection'
   | 'dua_collection'
   | 'name_of_allah'
   | 'not_found'
@@ -76,6 +79,13 @@ function metaForType(contentType: ContentType): {
     case 'quran_verse':
       return {
         directives: QURAN_DIRECTIVES,
+        contract: { quran: QURAN_CONTRACT },
+        educational: QURAN_VERSE_CONTEXT,
+        disclaimer: SAKINA_DISCLAIMER,
+      }
+    case 'verse_collection':
+      return {
+        directives: VERSE_COLLECTION_DIRECTIVES,
         contract: { quran: QURAN_CONTRACT },
         educational: QURAN_VERSE_CONTEXT,
         disclaimer: SAKINA_DISCLAIMER,

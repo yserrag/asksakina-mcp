@@ -10,7 +10,8 @@
 
 import { readFileSync } from 'node:fs'
 import { SOURCE_ONLY_GRADING_DIRECTIVE, UNRECORDED_GRADING_DIRECTIVE } from '../contracts/presentation.js'
-import { matchPhrase } from './context-matcher.js'
+import { griefRoute, matchPhrase } from './context-matcher.js'
+import { BEREAVED_DUAS } from './bereaved-duas.js'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -284,12 +285,26 @@ export function queryDuasByContext(input: string, opts: { phraseMatching?: boole
   const phrase = term || opts.phraseMatching === false ? null : matchPhrase(input, DUA_CATEGORIES, ALIAS_TO_SLUG)
   const slug = term ?? phrase?.slug ?? null
   if (!slug) return { resolvedCategory: null, duas: [] }
-  const matched = getDuasByCategory(slug)
-  return {
-    resolvedCategory: slug,
-    duas: matched.map(toRecord),
-    matchedBy: term ? { method: 'term', via: input.trim() } : { method: 'phrase', via: phrase!.via },
+  const matchedBy: DuaQueryResult['matchedBy'] = term
+    ? { method: 'term', via: input.trim() }
+    : { method: 'phrase', via: phrase!.via }
+  // WO#386 item D: the querier's own grief is 'bereaved', not 'deceased'.
+  if (slug === 'deceased' && griefRoute(input) === 'bereaved') {
+    return { resolvedCategory: BEREAVED_CONTEXT, duas: selectDuasById(BEREAVED_DUAS), matchedBy }
   }
+  const matched = getDuasByCategory(slug)
+  return { resolvedCategory: slug, duas: matched.map(toRecord), matchedBy }
+}
+
+/** Context key for du'as a bereaved person says for their own grief (WO#386). */
+export const BEREAVED_CONTEXT = 'bereaved'
+
+/** Records for the given ids, in list order; unknown ids are dropped. */
+function selectDuasById(ids: readonly string[]): DuaRecord[] {
+  return ids
+    .map((id) => ALL_DUAS.find((d) => d.id === id))
+    .filter((d): d is BundledDua => !!d)
+    .map(toRecord)
 }
 
 export const TOTAL_DUAS = ALL_DUAS.length

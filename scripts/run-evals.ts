@@ -33,7 +33,7 @@ interface Expect {
 interface Case {
   id: string
   description: string
-  tool: 'get_quran_verse' | 'get_dua' | 'get_name_of_allah'
+  tool: 'get_quran_verse' | 'get_dua' | 'get_name_of_allah' | 'find_verses'
   args: Record<string, unknown>
   expect: Expect
 }
@@ -75,23 +75,56 @@ async function inProcess(): Promise<Caller> {
   const { getQuranVerseHandler } = await import('../src/tools/get-quran-verse.js')
   const { getDuaHandler } = await import('../src/tools/get-dua.js')
   const { getNameOfAllahHandler } = await import('../src/tools/get-name-of-allah.js')
+  const { findVersesHandler } = await import('../src/tools/find-verses.js')
   const table = {
     get_quran_verse: getQuranVerseHandler,
     get_dua: getDuaHandler,
     get_name_of_allah: getNameOfAllahHandler,
+    find_verses: findVersesHandler,
   } as unknown as Record<Case['tool'], (a: unknown) => Promise<unknown>>
   return (tool, args) => table[tool](args)
+}
+
+// Rate-limit pacing (WO#386 follow-up), the same rule as publish-guards.mjs.
+// The server allows 60 requests per minute per IP, and every live mcp-deploy
+// step shares the runner's IP; since WO#386 the guards run first. A 429
+// carrying JSON-RPC -32029 is the limiter, not a result: wait until
+// X-RateLimit-Reset (+1 s, capped at 65 s) and resend the same request, at
+// most RATE_LIMIT_RETRIES times. Any other status, and a -32029 that
+// persists after the retries, still reaches the case as a failure.
+const RATE_LIMIT_RETRIES = 2
+const MAX_WAIT_MS = 65_000
+// The SDK aborts a request after 60 s by default, which a window wait can
+// outlast; allow for both retries plus the request itself.
+const REQUEST_OPTS = { timeout: (RATE_LIMIT_RETRIES + 1) * MAX_WAIT_MS }
+let rateLimitWaits = 0
+async function paced(input: string | URL | Request, init?: RequestInit): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(input, init)
+    if (res.status !== 429 || attempt >= RATE_LIMIT_RETRIES) return res
+    let code: unknown
+    try {
+      code = JSON.parse(await res.clone().text())?.error?.code
+    } catch {}
+    if (code !== -32029) return res
+    const reset = Number(res.headers.get('x-ratelimit-reset'))
+    const wait =
+      Number.isFinite(reset) && reset > 0 ? Math.min(Math.max(reset * 1000 - Date.now(), 0) + 1000, MAX_WAIT_MS) : MAX_WAIT_MS
+    rateLimitWaits++
+    console.log(`  rate limited (-32029); waiting ${Math.ceil(wait / 1000)} s for the window to reset (retry ${attempt + 1}/${RATE_LIMIT_RETRIES})`)
+    await new Promise((r) => setTimeout(r, wait))
+  }
 }
 
 async function live(url: string): Promise<{ call: Caller; close: () => Promise<void> }> {
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
   const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js')
   const client = new Client({ name: 'sakina-evals', version: '1.0.0' })
-  const transport = new StreamableHTTPClientTransport(new URL(url))
-  await client.connect(transport)
+  const transport = new StreamableHTTPClientTransport(new URL(url), { fetch: paced })
+  await client.connect(transport, REQUEST_OPTS)
   return {
     call: async (tool, args) => {
-      const res = (await client.callTool({ name: tool, arguments: args })) as { content?: Array<{ text?: string }> }
+      const res = (await client.callTool({ name: tool, arguments: args }, undefined, REQUEST_OPTS)) as { content?: Array<{ text?: string }> }
       const text = res?.content?.[0]?.text ?? ''
       try {
         return JSON.parse(text)
@@ -160,6 +193,7 @@ async function main() {
   const mode = LIVE ? `live ${LIVE}` : FIXTURE ? 'in-process, fixture upstream' : 'in-process'
   const line = `Agent evals: ${passed}/${rows.length} passed (${mode})`
   console.log(`\n${line}`)
+  if (LIVE) console.log(`rate-limit waits: ${rateLimitWaits}`)
   if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(rows, null, 2))
   if (process.env.GITHUB_STEP_SUMMARY) {
     const failed = rows.filter((r) => !r.pass).map((r) => r.id)

@@ -1,7 +1,7 @@
 /**
  * Sakina Islamic Knowledge MCP Server v1 (WO#102).
  *
- * Streamable HTTP transport. Three lookup tools, one canonical
+ * Streamable HTTP transport. Four lookup tools, one canonical
  * resource (`sakina://about`), per-IP rate limiting (60 req/min,
  * Upstash Redis when configured, in-memory fallback otherwise).
  *
@@ -34,6 +34,12 @@ import {
   getNameOfAllahShape,
   getNameOfAllahHandler,
 } from './tools/get-name-of-allah.js'
+import {
+  FIND_VERSES_DESCRIPTION,
+  FIND_VERSES_TITLE,
+  findVersesShape,
+  findVersesHandler,
+} from './tools/find-verses.js'
 import { ABOUT_RESOURCE_BODY } from './contracts/educational.js'
 import {
   RATE_LIMIT_BUDGET,
@@ -48,7 +54,7 @@ import { handleStatsRequest } from './logging/stats.js'
 import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
-const SERVER_VERSION = '1.4.1'
+const SERVER_VERSION = '1.5.0'
 const SERVER_DESCRIPTION =
   "Verified Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a collection (supplications), and the 99 Names of Allah. All content is reviewed through AskSakina's structured specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
@@ -88,8 +94,7 @@ const SERVER_CARD = {
   tools: [
     {
       name: 'get_quran_verse',
-      description:
-        'Retrieve a single Quranic verse by surah and ayah reference. Returns the verbatim Arabic text and a canonical translation along with citation metadata. Output must be presented exactly as returned; do not paraphrase the Arabic or the translation.',
+      description: GET_QURAN_VERSE_DESCRIPTION,
       inputSchema: {
         type: 'object',
         properties: {
@@ -111,8 +116,7 @@ const SERVER_CARD = {
     },
     {
       name: 'get_dua',
-      description:
-        "Look up the curated du'a collection (supplications) matching a life-context keyword (e.g. 'anxiety', 'morning', 'travel', 'grief'). Returns Arabic text, transliteration, translation, and source citation with hadith grading. Includes a mandatory crisis_resource block when the context contains a crisis keyword.",
+      description: GET_DUA_DESCRIPTION,
       inputSchema: {
         type: 'object',
         properties: {
@@ -128,8 +132,7 @@ const SERVER_CARD = {
     },
     {
       name: 'get_name_of_allah',
-      description:
-        'Look up one of the 99 Names of Allah by number (1-99) or by string (transliteration, Arabic, or English meaning). Returns Arabic, transliteration, locale-aware meaning, reflection, and Quranic references.',
+      description: GET_NAME_DESCRIPTION,
       inputSchema: {
         type: 'object',
         properties: {
@@ -144,6 +147,28 @@ const SERVER_CARD = {
             description: 'Translation locale; defaults to "en".',
           },
         },
+      },
+    },
+    {
+      name: 'find_verses',
+      description: FIND_VERSES_DESCRIPTION,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: "Topic or keyword, e.g. 'patience', 'grief', 'gratitude'" },
+          limit: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 10,
+            description: 'Number of verses to return; default 5, max 10',
+          },
+          locale: {
+            type: 'string',
+            enum: ['en', 'id', 'ur', 'ar'],
+            description: 'Selects in-country crisis resources if needed; defaults to "en".',
+          },
+        },
+        required: ['query'],
       },
     },
   ],
@@ -235,6 +260,16 @@ export function createMcpServer(): McpServer {
       inputSchema: getNameOfAllahShape,
     },
     withLogging('get_name_of_allah', getNameOfAllahHandler),
+  )
+
+  server.registerTool(
+    FIND_VERSES_TITLE,
+    {
+      title: FIND_VERSES_TITLE,
+      description: FIND_VERSES_DESCRIPTION,
+      inputSchema: findVersesShape,
+    },
+    withLogging('find_verses', findVersesHandler),
   )
 
   // ── Resources ─────────────────────────────────────────────────────

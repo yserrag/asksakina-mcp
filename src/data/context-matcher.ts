@@ -174,3 +174,41 @@ export function matchPhrase(
   hits.sort((a, b) => rank(a.slug) - rank(b.slug) || a.pos - b.pos)
   return { slug: hits[0].slug, via: hits[0].via }
 }
+
+// ─── Grief routing (WO#386 item D) ──────────────────────────────────
+
+/** A funeral rite or the person who has died: the query is about them. */
+const RITE_WORDS = new Set([
+  'funeral', 'janazah', 'janaza', 'burial', 'bury', 'buried', 'grave', 'graves', 'graveside',
+  'cemetery', 'condolence', 'condolences', 'deceased', 'dead',
+])
+/** Words that name a living person's grief. */
+const GRIEF_WORDS = new Set([
+  'grief', 'grieving', 'grieve', 'bereaved', 'bereavement', 'mourning', 'heartbroken', 'heartbreak',
+])
+/** A death or loss as an event; bereaved only with a first-person word. */
+const LOSS_EVENT_WORDS = new Set(['lost', 'losing', 'loss', 'died', 'death', 'passed', 'widow', 'widowed'])
+const FIRST_PERSON = new Set(['i', 'im', 'ive', 'id', 'me', 'my', 'mine', 'myself', 'we', 'us', 'our'])
+
+/**
+ * Decides, for a query already routed to 'deceased', whether it is about
+ * the querier's own grief ('bereaved') or about the person who has died
+ * or a funeral rite ('deceased'). Deterministic, in this order:
+ *
+ *   1. a rite word (funeral, janazah, grave, condolences, deceased...)
+ *      -> 'deceased'
+ *   2. a grief word (grief, grieving, bereaved, mourning...)
+ *      -> 'bereaved'
+ *   3. a first-person word (I, my, me, we, our...) with a loss event
+ *      (lost, losing, died, passed, widowed...) -> 'bereaved'
+ *   4. otherwise -> 'deceased' (unchanged: "death", "loss", "died")
+ *
+ * Known limit: "my friend's mother died" reads as the querier's own loss.
+ */
+export function griefRoute(input: string): 'bereaved' | 'deceased' {
+  const words = normalisePhrase(input).split(' ')
+  if (words.some((w) => RITE_WORDS.has(w))) return 'deceased'
+  if (words.some((w) => GRIEF_WORDS.has(w))) return 'bereaved'
+  if (words.some((w) => FIRST_PERSON.has(w)) && words.some((w) => LOSS_EVENT_WORDS.has(w))) return 'bereaved'
+  return 'deceased'
+}

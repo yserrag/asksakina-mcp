@@ -19,7 +19,13 @@
 
 import { getQuranVerseHandler } from '../src/tools/get-quran-verse.js'
 import { getDuaHandler } from '../src/tools/get-dua.js'
-import { getNameOfAllahHandler } from '../src/tools/get-name-of-allah.js'
+import { getNameOfAllahHandler, GET_NAME_DESCRIPTION } from '../src/tools/get-name-of-allah.js'
+import { findVersesHandler, FIND_VERSES_DESCRIPTION } from '../src/tools/find-verses.js'
+import { GET_QURAN_VERSE_DESCRIPTION } from '../src/tools/get-quran-verse.js'
+import { GET_DUA_DESCRIPTION } from '../src/tools/get-dua.js'
+import { THEMATIC_INDEX } from '../src/data/thematic.js'
+import { griefRoute } from '../src/data/context-matcher.js'
+import { BEREAVED_DUAS, BEREAVED_EXCLUDED, BEREAVED_GENDER_NOTE } from '../src/data/bereaved-duas.js'
 import { TOTAL_DUAS, selectAbuseSafeDuas, isEnduranceDua } from '../src/data/duas.js'
 import { ABUSE_SAFE_DUAS } from '../src/data/abuse-safe-duas.js'
 import { abuseResponse, ABUSE_ORDER_DIRECTIVE } from '../src/tools/get-dua.js'
@@ -29,6 +35,10 @@ import { TOTAL_NAMES } from '../src/data/names.js'
 import { readFileSync } from 'node:fs'
 import { getVerseArabic } from '../../src/lib/scripture/index.js'
 import { skeleton } from './quranic-labels.js'
+
+const BUNDLED_FULL = JSON.parse(
+  readFileSync(new URL('../data/duas.json', import.meta.url), 'utf-8'),
+) as Array<{ id: string; arabic: string; category: string; translation: string }>
 
 const BUNDLED_DUAS = JSON.parse(
   readFileSync(new URL('../data/duas.json', import.meta.url), 'utf-8'),
@@ -771,8 +781,6 @@ async function testQuranParkedLocales() {
 async function testDuaPhrases() {
   console.log('\n=== get_dua: natural-language phrases (WO#385) ===')
   const cases: Array<[string, string]> = [
-    ['grief after losing my mother', 'deceased'],
-    ['my mother passed away', 'deceased'],
     ['I lost my job', 'work-success'],
     ['feeling sick today', 'health-healing'],
     ['I have an exam tomorrow', 'exams-study'],
@@ -899,6 +907,225 @@ async function testFastTrackLabels() {
   }
 }
 
+// WO#386 item D: the querier's own grief routes to 'bereaved', a funeral
+// rite or the person who has died to 'deceased'. Gem 4 ruled the bereaved
+// du'as (26 Sep 2026) by their Arabic; the ids are re-checked against it.
+const GEM4_BEREAVED_ARABIC: readonly string[] = [
+  "إِنَّا لِلَّهِ وَإِنَّا إِلَيْهِ رَاجِعُونَ اللهُمَّ أْجُرْنِي فِي مُصِيبَتِي، وَأَخْلِفْ لِي خَيْرًا مِنْهَا",
+  "اَللّٰهُمَّ لَا سَهْلَ إِلاَّ مَا جَعَلْتَهُۥ سَهْلًا وَأَنْتَ تَجْعَلُ الْحَزَنَ إِذَا شِئْتَ سَهْلًا",
+  "اَللّٰهُمَّ رَحْمَتَكَ أَرْجُوْا فَلَا تَكِلْنِيْ إِلٰى نَفْسِيْ طَرْفَةَ عَيْنٍ وَّأَصْلِحْ لِيْ شَأْنِيْ كُلَّهُۥ لَآ إِلٰهَ إِلَّآ أَنْتَ",
+  "لَآ إِلٰهَ إِلَّا اللهُ الْعَظِيْمُ الْحَلِيْمُ لَآ إِلٰهَ إِلَّا اللهُ رَبُّ الْعَرْشِ الْعَظِيْمِ لَآ إِلٰهَ إِلَّا اللهُ رَبُّ السَّمٰوٰتِ وَرَبُّ الْأَرْضِ وَ رَبُّ الْعَرْشِ الْكَرِيْمِ",
+  "حَسۡبُنَا ٱللَّهُ وَنِعۡمَ ٱلۡوَكِيلُ",
+  "حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيم",
+  "لَاحَوْلَ وَلَا قُوَّةَ إِلَّا بِاللهِ"
+]
+const GEM4_EXCLUDED_ARABIC = "لَآ إِلٰهَ إِلَّا اَنْتَ سُبْحَانَكَ إِنِّيْ كُنْتُ مِنَ الظَّالِمِيْنَ"
+const GEM4_GENDER_NOTE = "These du'as use the masculine form in the Arabic; the meaning and reward apply equally regardless of the gender of the person making the supplication."
+
+async function testBereavedRoute() {
+  console.log('\n=== get_dua: bereaved route (WO#386) ===')
+  const k = (x: string) => skeleton(x).replace(/\s+/g, '')
+  const byId = new Map(BUNDLED_FULL.map((d) => [d.id, d]))
+  const idsOk =
+    BEREAVED_DUAS.length === GEM4_BEREAVED_ARABIC.length &&
+    BEREAVED_DUAS.every((id, i) => byId.get(id)?.category === 'calamity' && k(byId.get(id)!.arabic) === k(GEM4_BEREAVED_ARABIC[i]))
+  results.push(idsOk ? pass('BEREAVED_DUAS: 7 calamity records, each matching Gem 4\'s Arabic, in Gem 4\'s order') : fail('BEREAVED_DUAS', JSON.stringify(BEREAVED_DUAS.map((id) => [id, byId.get(id)?.category]))))
+  const excl = BUNDLED_FULL.filter((d) => k(d.arabic) === k(GEM4_EXCLUDED_ARABIC))
+  results.push(
+    excl.length === 1 && BEREAVED_EXCLUDED.includes(excl[0].id) && !BEREAVED_DUAS.includes(excl[0].id)
+      ? pass(`Gem 4 exclusion ${excl[0].id} not in bereaved`)
+      : fail('exclusion', JSON.stringify(excl.map((d) => d.id))),
+  )
+  results.push(BEREAVED_GENDER_NOTE === GEM4_GENDER_NOTE ? pass('teaching note is Gem 4\'s wording, verbatim') : fail('teaching note', String(BEREAVED_GENDER_NOTE)))
+  const route: Array<[string, 'bereaved' | 'deceased']> = [
+    ['grief after losing my mother', 'bereaved'],
+    ['I lost my mother', 'bereaved'],
+    ['my father passed away', 'bereaved'],
+    ['my mother passed away', 'bereaved'],
+    ['grief after losing', 'bereaved'],
+    ['grief', 'bereaved'],
+    ['bereaved', 'bereaved'],
+    ['bereavement', 'bereaved'],
+    ['I was widowed last year', 'bereaved'],
+    ['funeral', 'deceased'],
+    ['dua at the funeral of my father', 'deceased'],
+    ['visiting my mothers grave', 'deceased'],
+    ['deceased', 'deceased'],
+    ['death', 'deceased'],
+    ['loss', 'deceased'],
+    ['condolences', 'deceased'],
+  ]
+  for (const [q, want] of route) {
+    const got = griefRoute(q)
+    results.push(got === want ? pass(`griefRoute "${q}" -> ${want}`) : fail(`griefRoute "${q}"`, got))
+  }
+  type R = {
+    _sakina_meta: { content_type: string }
+    content: { context?: string; duas?: Array<{ arabic: string; title: string }>; teaching_note?: string }
+    crisis_resource?: { level?: string }
+  }
+  const want = BEREAVED_DUAS.map((id) => byId.get(id)!.arabic)
+  for (const q of ['bereaved', 'grief after losing my mother', 'my mother passed away', 'I lost my mother', 'grief']) {
+    const res = (await getDuaHandler({ context: q })) as unknown as R
+    const got = (res.content.duas ?? []).map((d) => d.arabic)
+    const ok =
+      res._sakina_meta.content_type === 'dua_collection' &&
+      res.content.context === 'bereaved' &&
+      got.length === 7 && got.every((a, i) => k(a) === k(want[i])) &&
+      res.content.teaching_note === GEM4_GENDER_NOTE &&
+      res.crisis_resource?.level === 'soft'
+    results.push(ok ? pass(`get_dua("${q}") -> bereaved: 7 du'as in Gem 4's order, teaching note, soft note kept`) : fail(`get_dua("${q}")`, JSON.stringify({ ct: res._sakina_meta.content_type, ctx: res.content.context, n: got.length, note: res.content.teaching_note, cr: res.crisis_resource })))
+    results.push(assertNoUnicodeHonorific(`get_dua("${q}") no unicode honorific`, res))
+  }
+  const cal = (await getDuaHandler({ context: 'calamity' })) as unknown as R
+  results.push(
+    cal.content.context === 'calamity' && (cal.content.duas?.length ?? 0) === 21 && cal.content.teaching_note === undefined
+      ? pass('calamity unchanged: 21 records (D00499 included), no teaching note')
+      : fail('calamity', `${cal.content.context} ${cal.content.duas?.length}`),
+  )
+  const deceased = (await getDuaHandler({ context: 'deceased' })) as unknown as R
+  results.push(deceased.content.teaching_note === undefined ? pass('deceased carries no teaching note') : fail('deceased note', String(deceased.content.teaching_note)))
+  for (const q of ['funeral', 'dua for the deceased', 'deceased']) {
+    const res = (await getDuaHandler({ context: q })) as unknown as R
+    results.push(
+      res._sakina_meta.content_type === 'dua_collection' && res.content.context === 'deceased' && (res.content.duas?.length ?? 0) === 12
+        ? pass(`get_dua("${q}") -> deceased, 12 records unchanged`)
+        : fail(`get_dua("${q}")`, `${res._sakina_meta.content_type} ${res.content.context} ${res.content.duas?.length}`),
+    )
+  }
+  const hard = (await getDuaHandler({ context: 'grief after losing my mother and I want to kill myself' })) as unknown as R
+  results.push(
+    hard._sakina_meta.content_type === 'not_found' && hard.crisis_resource?.level === 'hard' && hard.content.context === undefined
+      ? pass('hard crisis with grief words keeps the hard block and infers no context')
+      : fail('hard crisis grief', JSON.stringify({ ct: hard._sakina_meta.content_type, cr: hard.crisis_resource?.level, ctx: hard.content.context })),
+  )
+}
+
+// WO#386 item A: find_verses. The upstream is stubbed: the Arabic must be the
+// scripture module's bytes whatever the upstream sends, and only the
+// translation and surah names come from it.
+async function testFindVerses() {
+  console.log('\n=== find_verses (WO#386) ===')
+  results.push(
+    THEMATIC_INDEX.length > 0 && THEMATIC_INDEX.every((v) => v.arabic === getVerseArabic(v.ref))
+      ? pass(`bundled index: all ${THEMATIC_INDEX.length} verses carry getVerseArabic bytes`)
+      : fail('bundled index Arabic', THEMATIC_INDEX.filter((v) => v.arabic !== getVerseArabic(v.ref)).map((v) => v.ref).join(', ')),
+  )
+  type V = { reference: string; arabic: string; translation: string | null; translation_note?: string; surah_name_english?: string; relevance_note: string }
+  type R = {
+    _sakina_meta: { content_type: string; llm_directives: { CRITICAL_RULES: string[] } }
+    content: { verses?: V[]; no_results?: boolean; total_results?: number; withheld?: string; matched_themes?: Array<{ theme: string }> }
+    crisis_resource?: { level?: string; crisis_type?: string }
+  }
+  const realFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = (async (url: string | URL) => {
+    calls++
+    const m = String(url).match(/ayah\/(\d+):(\d+)\/editions\/quran-uthmani,en\.pickthall$/)
+    if (!m) return new Response('{}', { status: 404 })
+    const body = {
+      code: 200,
+      data: [
+        { number: 1, text: 'UPSTREAM ARABIC MUST NOT BE USED', surah: { number: +m[1], name: 'SURAH-AR', englishName: 'Surah-En' } },
+        { number: 1, text: `Pickthall ${m[1]}:${m[2]}` },
+      ],
+    }
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }) as typeof fetch
+  try {
+    const p = (await findVersesHandler({ query: 'patience' })) as unknown as R
+    const vs = p.content.verses ?? []
+    results.push(
+      p._sakina_meta.content_type === 'verse_collection' && vs.length > 0 && vs.length <= 5
+        ? pass(`"patience" -> verse_collection, ${vs.length} verses (default limit 5)`)
+        : fail('patience', JSON.stringify(p.content)),
+    )
+    results.push(
+      vs.every((v) => v.arabic === getVerseArabic(v.reference) && v.translation === `Pickthall ${v.reference}` && v.surah_name_english === 'Surah-En')
+        ? pass('each verse: Arabic byte-equal to getVerseArabic, translation and surah name from upstream')
+        : fail('verse fields', JSON.stringify(vs.map((v) => [v.reference, v.arabic === getVerseArabic(v.reference), v.translation]))),
+    )
+    results.push(
+      vs.every((v) => /^\d{1,3}:\d{1,3}$/.test(v.reference) && v.relevance_note.includes('"patience"'))
+        ? pass('reference is surah:ayah; relevance_note names the matched theme')
+        : fail('reference/relevance', JSON.stringify(vs)),
+    )
+    results.push(
+      p._sakina_meta.llm_directives.CRITICAL_RULES.includes('Quote the Arabic exactly as provided. Do not transliterate or paraphrase it.')
+        ? pass('llm_directives carry the WO#386 Arabic rule verbatim')
+        : fail('directive', JSON.stringify(p._sakina_meta.llm_directives)),
+    )
+    results.push(assertNoUnicodeHonorific('find_verses no unicode honorific', p))
+    const big = (await findVersesHandler({ query: 'anxiety gratitude patience trust', limit: 10 })) as unknown as R
+    const refs = (big.content.verses ?? []).map((v) => v.reference)
+    results.push(
+      refs.length === 10 && new Set(refs).size === 10
+        ? pass('limit 10 returns 10 distinct verses')
+        : fail('limit 10', JSON.stringify(refs)),
+    )
+    const two = (await findVersesHandler({ query: 'hope', limit: 2 })) as unknown as R
+    results.push((two.content.verses ?? []).length === 2 ? pass('limit 2 returns 2') : fail('limit 2', JSON.stringify(two.content)))
+    const syn = (await findVersesHandler({ query: 'I feel so thankful' })) as unknown as R
+    results.push(
+      syn.content.matched_themes?.[0]?.theme === 'gratitude'
+        ? pass('"I feel so thankful" -> gratitude (synonym)')
+        : fail('synonym', JSON.stringify(syn.content.matched_themes)),
+    )
+    const soft = (await findVersesHandler({ query: 'grief' })) as unknown as R
+    results.push(
+      soft._sakina_meta.content_type === 'verse_collection' && soft.crisis_resource?.level === 'soft'
+        ? pass('"grief" -> verses with the soft support note')
+        : fail('grief soft', JSON.stringify({ ct: soft._sakina_meta.content_type, cr: soft.crisis_resource })),
+    )
+    const none = (await findVersesHandler({ query: 'xyzzy blorp' })) as unknown as R
+    results.push(
+      none._sakina_meta.content_type === 'not_found' && Array.isArray(none.content.verses) && none.content.verses.length === 0 && none.content.no_results === true
+        ? pass('no match -> empty verses array with no_results flag, not an error')
+        : fail('no match', JSON.stringify(none.content)),
+    )
+    const hard = (await findVersesHandler({ query: 'I want to kill myself' })) as unknown as R
+    results.push(
+      hard.crisis_resource?.level === 'hard' && (hard.content.verses ?? []).length === 0
+        ? pass('hard crisis -> hard block, no verses inferred')
+        : fail('hard crisis', JSON.stringify(hard)),
+    )
+    const abuse = (await findVersesHandler({ query: 'my husband hits me' })) as unknown as R
+    results.push(
+      abuse._sakina_meta.content_type === 'crisis_resource_only' && abuse.crisis_resource?.crisis_type === 'abuse' && abuse.content.withheld === 'verse_collection'
+        ? pass('abuse disclosure -> crisis_resource_only, verses withheld (Gem 3 ruling as on get_dua)')
+        : fail('abuse', JSON.stringify(abuse)),
+    )
+    const ur = (await findVersesHandler({ query: 'patience', locale: 'ur' })) as unknown as R
+    results.push(
+      (ur.content.verses ?? []).every((v) => v.translation_note?.includes('Urdu')) &&
+        ur._sakina_meta.llm_directives.CRITICAL_RULES.some((d) => d.includes('MUST NOT translate them into Urdu'))
+        ? pass('ur: Pickthall with the parked note and no-self-translate directive')
+        : fail('ur', JSON.stringify(ur._sakina_meta.llm_directives)),
+    )
+    globalThis.fetch = (async () => new Response('down', { status: 503 })) as typeof fetch
+    const down = (await findVersesHandler({ query: 'ramadan' })) as unknown as R
+    const dv = down.content.verses ?? []
+    results.push(
+      dv.length > 0 && dv.every((v) => v.translation === null && v.arabic === getVerseArabic(v.reference) && v.translation_note?.includes('get_quran_verse'))
+        ? pass('upstream down: Arabic still served, translation null with a note')
+        : fail('upstream down', JSON.stringify(dv)),
+    )
+  } finally {
+    globalThis.fetch = realFetch
+  }
+  results.push(calls > 0 ? pass(`upstream stub was exercised (${calls} calls)`) : fail('stub', 'no upstream calls recorded'))
+}
+
+// WO#386 item B: directory-listing length.
+async function testToolDescriptions() {
+  console.log('\n=== tool descriptions (WO#386) ===')
+  const all = { get_quran_verse: GET_QURAN_VERSE_DESCRIPTION, get_dua: GET_DUA_DESCRIPTION, get_name_of_allah: GET_NAME_DESCRIPTION, find_verses: FIND_VERSES_DESCRIPTION }
+  for (const [name, d] of Object.entries(all)) {
+    const n = [...d].length
+    results.push(n < 200 ? pass(`${name} description ${n} characters (< 200)`) : fail(`${name} description`, `${n} characters`))
+  }
+}
+
 async function main() {
   console.log('Sakina MCP Server v1 — tool test harness (Gem 10 revision)')
   console.log(`Du'a corpus size: ${TOTAL_DUAS}, 99 Names corpus: ${TOTAL_NAMES}`)
@@ -922,6 +1149,9 @@ async function main() {
   await testNameByNumber()
   await testNameByString()
   await testNotFound()
+  await testBereavedRoute()
+  await testFindVerses()
+  await testToolDescriptions()
 
   console.log('\n=== Summary ===')
   let pass_count = 0

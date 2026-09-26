@@ -23,6 +23,7 @@ const ALL_TOOLS: readonly ToolName[] = [
   'get_quran_verse',
   'get_dua',
   'get_name_of_allah',
+  'find_verses',
 ]
 
 const BEARER_PREFIX = 'Bearer '

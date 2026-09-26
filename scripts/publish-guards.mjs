@@ -10,12 +10,14 @@
  *
  * Offline (default): scans DIR/data, DIR/dist, DIR/src/safety/_synced and
  * the crisis_resource blocks built by DIR/dist/safety/crisis-keywords.js.
- * Live: calls get_dua and get_name_of_allah on URL (an MCP /mcp endpoint).
+ * Live: calls get_dua, get_name_of_allah and find_verses on URL (an MCP /mcp
+ * endpoint).
  * --report prints the counts and exits 0; otherwise any hit exits 1.
  *
  * Every check is scoped to avoid false positives:
  *   a. "Saheeh International", exact, in data/ and dist/.
- *   b. U+FDFA in data/ and in live get_dua / get_name_of_allah responses,
+ *   b. U+FDFA in data/ and in live get_dua / get_name_of_allah / find_verses
+ *      responses,
  *      NOT dist/ (the sanitiser handles the character); "PBUH" and "SAW",
  *      exact case and whole-word, in data/ only.
  *   c. Numbers that must never be served as MCP crisis lines, matched as
@@ -198,11 +200,45 @@ async function offline() {
   }
 }
 
+// Rate-limit pacing (1.4.1). The server enforces 60 requests per minute per
+// IP, and earlier mcp-deploy steps (byte-check, Dhun-Nun, probe) share this
+// runner's IP. Since WO#386 the 42 evals run after this step, so the budget
+// is normally whole; the pacing below is kept as a backstop. A 429 carrying JSON-RPC -32029 is the limiter, not
+// a content result: wait until X-RateLimit-Reset (+1 s, capped at 65 s) and
+// resend the same request, at most RATE_LIMIT_RETRIES times. Only that exact
+// response is retried. Any other status or error, and a -32029 that persists
+// after the retries, still reaches the catch below as a setup hit.
+const RATE_LIMIT_RETRIES = 2
+const MAX_WAIT_MS = 65_000
+// The SDK aborts a request after 60 s by default, which a window wait can
+// outlast; allow for both retries plus the request itself.
+const REQUEST_OPTS = { timeout: (RATE_LIMIT_RETRIES + 1) * MAX_WAIT_MS }
+let rateLimitWaits = 0
+async function paced(input, init) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(input, init)
+    if (res.status !== 429 || attempt >= RATE_LIMIT_RETRIES) return res
+    const body = await res.clone().text()
+    let code
+    try {
+      code = JSON.parse(body)?.error?.code
+    } catch {}
+    if (code !== -32029) return res
+    const reset = Number(res.headers.get('x-ratelimit-reset'))
+    const wait = Number.isFinite(reset) && reset > 0
+      ? Math.min(Math.max(reset * 1000 - Date.now(), 0) + 1000, MAX_WAIT_MS)
+      : MAX_WAIT_MS
+    rateLimitWaits++
+    console.log(`  rate limited (-32029); waiting ${Math.ceil(wait / 1000)} s for the window to reset (retry ${attempt + 1}/${RATE_LIMIT_RETRIES})`)
+    await new Promise((r) => setTimeout(r, wait))
+  }
+}
+
 async function live(url) {
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
   const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js')
   const client = new Client({ name: 'ci-publish-guards', version: '1.0.0' })
-  const transport = new StreamableHTTPClientTransport(new URL(url))
+  const transport = new StreamableHTTPClientTransport(new URL(url), { fetch: paced })
   const calls = [
     ['get_dua', { context: 'anxiety' }],
     ['get_dua', { context: 'morning' }],
@@ -213,13 +249,17 @@ async function live(url) {
     ['get_name_of_allah', { number: 1 }],
     ['get_name_of_allah', { number: 28 }],
     ['get_name_of_allah', { number: 99 }],
+    // WO#386: the fourth tool, a verse list and both crisis paths.
+    ['find_verses', { query: 'patience' }],
+    ['find_verses', { query: 'I want to kill myself' }],
+    ['find_verses', { query: 'my husband hits me' }],
   ]
   touch('b. U+FDFA (live)')
   touch('c. banned crisis number')
   try {
-    await client.connect(transport)
+    await client.connect(transport, REQUEST_OPTS)
     for (const [name, a] of calls) {
-      const res = await client.callTool({ name, arguments: a })
+      const res = await client.callTool({ name, arguments: a }, undefined, REQUEST_OPTS)
       const text = res?.content?.[0]?.text ?? ''
       const where = `live ${name} ${JSON.stringify(a)}`
       if (!text) record('setup', where, 'empty response')
@@ -250,6 +290,7 @@ else await offline()
 
 console.log(`publish guards (${LIVE ? `live ${LIVE}` : `offline ${ROOT}`})`)
 for (const [check, n] of Object.entries(counts)) console.log(`  ${check}: ${n}`)
+if (LIVE) console.log(`  rate-limit waits: ${rateLimitWaits}`)
 for (const h of hits) console.log(`  HIT [${h.check}] ${h.where}: ${h.detail}`)
 if (hits.length && !REPORT) {
   console.error(`FAIL: ${hits.length} hit(s). Publish blocked.`)

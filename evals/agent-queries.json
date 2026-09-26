@@ -269,28 +269,40 @@
     },
     {
       "id": "dua-phrase-grief-mother",
-      "description": "Natural phrase: grief outranks the relation word",
+      "description": "Own grief routes to bereaved (WO#386); soft note kept",
       "tool": "get_dua",
       "args": {
         "context": "grief after losing my mother"
       },
       "expect": {
         "content_type": "dua_collection",
-        "context": "deceased",
-        "crisis_level": "soft"
+        "context": "bereaved",
+        "crisis_level": "soft",
+        "must_contain": [
+          "the meaning and reward apply equally regardless of the gender"
+        ],
+        "must_not_contain": [
+          "I have oppressed my soul"
+        ]
       }
     },
     {
       "id": "dua-phrase-passed-away",
-      "description": "Multi-word synonym",
+      "description": "Own loss routes to bereaved (WO#386); every bereaved route carries the soft note",
       "tool": "get_dua",
       "args": {
         "context": "my mother passed away"
       },
       "expect": {
         "content_type": "dua_collection",
-        "context": "deceased",
-        "crisis_level": "none"
+        "context": "bereaved",
+        "crisis_level": "soft",
+        "must_contain": [
+          "the meaning and reward apply equally regardless of the gender"
+        ],
+        "must_not_contain": [
+          "I have oppressed my soul"
+        ]
       }
     },
     {
@@ -304,6 +316,49 @@
         "content_type": "dua_collection",
         "context": "work-success",
         "crisis_level": "none"
+      }
+    },
+    {
+      "id": "dua-bereaved-direct",
+      "description": "get_dua(\"bereaved\") returns Gem 4's 7 du'as and the teaching note (WO#386)",
+      "tool": "get_dua",
+      "args": {
+        "context": "bereaved"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "bereaved",
+        "crisis_level": "soft",
+        "must_contain": [
+          "the meaning and reward apply equally regardless of the gender"
+        ],
+        "must_not_contain": [
+          "I have oppressed my soul"
+        ]
+      }
+    },
+    {
+      "id": "dua-deceased-funeral",
+      "description": "A funeral rite stays deceased (WO#386)",
+      "tool": "get_dua",
+      "args": {
+        "context": "dua at the funeral of my father"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "deceased"
+      }
+    },
+    {
+      "id": "dua-deceased-direct",
+      "description": "Du'as for the deceased unchanged (WO#386)",
+      "tool": "get_dua",
+      "args": {
+        "context": "deceased"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "deceased"
       }
     },
     {
@@ -841,6 +896,71 @@
       },
       "expect": {
         "content_type": "not_found"
+      }
+    },
+    {
+      "id": "find-verses-patience",
+      "description": "Topic lookup returns verses with a real Pickthall translation, not the upstream-down fallback (WO#386)",
+      "tool": "find_verses",
+      "args": {
+        "query": "patience"
+      },
+      "expect": {
+        "content_type": "verse_collection",
+        "must_contain": [
+          "Quote the Arabic exactly as provided. Do not transliterate or paraphrase it."
+        ],
+        "must_not_contain": [
+          "The translation is temporarily unavailable"
+        ],
+        "field_checks": [
+          {
+            "path": "content.verses.0.translation",
+            "matches": "\\S"
+          },
+          {
+            "path": "content.verses.0.translation_source",
+            "equals": "Pickthall"
+          }
+        ]
+      }
+    },
+    {
+      "id": "find-verses-no-match",
+      "description": "No theme: empty array with no_results, not an error (WO#386)",
+      "tool": "find_verses",
+      "args": {
+        "query": "xyzzy blorp"
+      },
+      "expect": {
+        "content_type": "not_found",
+        "must_contain": [
+          "\"no_results\":true"
+        ]
+      }
+    },
+    {
+      "id": "find-verses-crisis",
+      "description": "Hard crisis: block, no verses inferred (WO#386)",
+      "tool": "find_verses",
+      "args": {
+        "query": "I want to kill myself"
+      },
+      "expect": {
+        "content_type": "not_found",
+        "crisis_level": "hard"
+      }
+    },
+    {
+      "id": "find-verses-abuse",
+      "description": "Abuse disclosure: crisis resource only (WO#386, Gem 3 ruling as on get_dua)",
+      "tool": "find_verses",
+      "args": {
+        "query": "my husband hits me"
+      },
+      "expect": {
+        "content_type": "crisis_resource_only",
+        "crisis_level": "hard"
       }
     }
   ]
