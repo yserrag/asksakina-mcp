@@ -29,6 +29,13 @@
  *      from the pa abuse modal only, and Madadgaar 1098 is a verified 24/7
  *      line on /ur/find-support. Add a number here only on a ruling that
  *      bans it as a crisis line everywhere.
+ *   f. Pending-wording markers ("WORDING PENDING") in any crisis_resource
+ *      block, offline (self-harm, abuse and soft, every locale) and live.
+ *      WO#385: the abuse block's sentence waits for Gem 3's wording.
+ *   d. .mcp/server.json `description` longer than 100 characters. The MCP
+ *      Registry rejects it with HTTP 422 (MCP Registry Publish run #2,
+ *      25 Sep 2026: the 600-character description). Counted in Unicode
+ *      code points, the way the registry's limit reads.
  */
 
 import { promises as fs } from 'node:fs'
@@ -78,6 +85,15 @@ function checkBannedNumbers(text, where) {
       record('c. banned crisis number', where, `"${raw}": ${BANNED_NUMBERS.get(digits)}`)
     }
   }
+}
+
+// f. A crisis block must never ship with pending wording (WO#385: the abuse
+//    block's user-facing sentence waits for Gem 3).
+const PLACEHOLDER = /WORDING PENDING/
+function checkPlaceholder(text, where) {
+  touch('f. placeholder wording in a crisis block')
+  const m = text.match(PLACEHOLDER)
+  if (m) record('f. placeholder wording in a crisis block', where, context(text, m.index, m[0].length))
 }
 
 function context(text, index, len) {
@@ -140,6 +156,17 @@ async function offline() {
     }
   }
 
+  // d. registry description limit
+  touch('d. server.json description > 100 chars')
+  const manifestPath = path.join(ROOT, '.mcp', 'server.json')
+  try {
+    const desc = JSON.parse(await fs.readFile(manifestPath, 'utf-8')).description ?? ''
+    const len = [...desc].length
+    if (len > 100) record('d. server.json description > 100 chars', '.mcp/server.json', `${len} characters (limit 100)`)
+  } catch (err) {
+    record('setup', manifestPath, `could not read server.json: ${err?.message ?? err}`)
+  }
+
   // c. banned numbers: _synced safety modules + every crisis_resource block
   for (const f of await walk(path.join(ROOT, 'src', 'safety', '_synced'))) {
     checkBannedNumbers(await fs.readFile(f, 'utf-8'), path.relative(ROOT, f))
@@ -148,12 +175,21 @@ async function offline() {
   try {
     const { distressBlockFor } = await import(pathToFileURL(crisisModule).href)
     let blocks = 0
-    for (const level of ['hard', 'soft']) {
+    touch('f. placeholder wording in a crisis block')
+    const hints = [
+      { level: 'hard', crisisType: 'self-harm' },
+      { level: 'hard', crisisType: 'abuse' },
+      { level: 'soft' },
+    ]
+    for (const hint of hints) {
       for (const locale of ['en', 'id', 'ur', 'ar']) {
-        const block = distressBlockFor(level, locale)
+        const block = distressBlockFor(hint, locale)
         if (!block) continue
         blocks++
-        checkBannedNumbers(JSON.stringify(block), `crisis_resource ${level}/${locale}`)
+        const where = `crisis_resource ${hint.level}${hint.crisisType ? `/${hint.crisisType}` : ''}/${locale}`
+        const json = JSON.stringify(block)
+        checkBannedNumbers(json, where)
+        checkPlaceholder(json, where)
       }
     }
     if (blocks === 0) record('setup', crisisModule, 'no crisis_resource blocks produced')
@@ -173,6 +209,7 @@ async function live(url) {
     ['get_dua', { context: 'laylat al qadr' }],
     ['get_dua', { context: 'ramadan' }],
     ...['en', 'id', 'ur', 'ar'].map((locale) => ['get_dua', { context: 'I want to kill myself', locale }]),
+    ...['en', 'id', 'ur', 'ar'].map((locale) => ['get_dua', { context: 'my husband hits me', locale }]),
     ['get_name_of_allah', { number: 1 }],
     ['get_name_of_allah', { number: 28 }],
     ['get_name_of_allah', { number: 99 }],
@@ -193,7 +230,10 @@ async function live(url) {
       }
       try {
         const cr = JSON.parse(text)?.crisis_resource
-        if (cr) checkBannedNumbers(JSON.stringify(cr), `${where} crisis_resource`)
+        if (cr) {
+          checkBannedNumbers(JSON.stringify(cr), `${where} crisis_resource`)
+          checkPlaceholder(JSON.stringify(cr), `${where} crisis_resource`)
+        }
       } catch {
         record('setup', where, 'response is not JSON')
       }

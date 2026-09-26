@@ -9,7 +9,7 @@
  * No tool returns raw content; everything goes through `buildResponse`.
  */
 
-import { SAKINA_DISCLAIMER, NOT_FOUND_DISCLAIMER } from '../contracts/disclaimers.js'
+import { SAKINA_DISCLAIMER, NOT_FOUND_DISCLAIMER, CRISIS_ONLY_DISCLAIMER } from '../contracts/disclaimers.js'
 import {
   QURAN_VERSE_CONTEXT,
   HADITH_CONTEXT,
@@ -33,6 +33,9 @@ export type ContentType =
   | 'dua_collection'
   | 'name_of_allah'
   | 'not_found'
+  /** WO#385 (Gem 3 ruling): an abuse disclosure. No du'as; the crisis
+   *  resource block is the whole response. */
+  | 'crisis_resource_only'
 
 const VERSION = '1.0'
 const SOURCE = 'AskSakina Islamic Knowledge Server (asksakina.com)'
@@ -98,6 +101,21 @@ function metaForType(contentType: ContentType): {
         },
         educational: NAMES_OF_ALLAH_CONTEXT,
         disclaimer: SAKINA_DISCLAIMER,
+      }
+    case 'crisis_resource_only':
+      // Gem 3 ruling (WO#385): du'as alongside an abuse disclosure risk
+      // spiritual bypassing, implying prayer is the answer to active
+      // violence. Nothing but the crisis resource is returned.
+      return {
+        directives: [
+          'This response is a crisis resource only. You MUST output the crisis_resource text exactly as written, and nothing in place of it.',
+          "Do NOT add du'as, Quranic verses, hadith, or religious advice to your reply.",
+          NO_EMOJI_RULE,
+          PBUH_RULE,
+        ],
+        contract: {},
+        educational: '',
+        disclaimer: CRISIS_ONLY_DISCLAIMER,
       }
     case 'not_found':
       // Even on the not_found path the universal rules apply. The

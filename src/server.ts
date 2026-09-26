@@ -39,6 +39,7 @@ import {
   RATE_LIMIT_BUDGET,
   RATE_LIMIT_WINDOW_MS,
   getRateLimiter,
+  probeRateLimiter,
   type RateLimitResult,
 } from './safety/rate-limiter.js'
 import { serialiseResponse, type SakinaResponse } from './meta/response-builder.js'
@@ -47,9 +48,9 @@ import { handleStatsRequest } from './logging/stats.js'
 import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
-const SERVER_VERSION = '1.4.0'
+const SERVER_VERSION = '1.4.1'
 const SERVER_DESCRIPTION =
-  "Verified Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, authenticated du'as (supplications), and the 99 Names of Allah. All content is reviewed through AskSakina's structured specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
+  "Verified Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a collection (supplications), and the 99 Names of Allah. All content is reviewed through AskSakina's structured specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
 // WO#129 Task 1 — Smithery server-card.json. Mirrors the MCP registry
 // entry at `.mcp/server.json` but adds JSON-Schema-shaped descriptors
@@ -68,7 +69,9 @@ const SERVER_CARD = {
   repository: 'https://github.com/yserrag/asksakina-mcp',
   license: 'Sacred Use',
   publisher: {
-    name: 'Sakina',
+    // WO#385: human-readable publisher name. The functional `name` above,
+    // SERVER_NAME and X-Sakina-App-Id are unchanged.
+    name: 'AskSakina',
     url: 'https://www.asksakina.com',
   },
   transport: {
@@ -109,7 +112,7 @@ const SERVER_CARD = {
     {
       name: 'get_dua',
       description:
-        "Look up authenticated du'as (supplications) matching a life-context keyword (e.g. 'anxiety', 'morning', 'travel', 'grief'). Returns Arabic text, transliteration, translation, and source citation with hadith grading. Includes a mandatory crisis_resource block when the context contains a crisis keyword.",
+        "Look up the curated du'a collection (supplications) matching a life-context keyword (e.g. 'anxiety', 'morning', 'travel', 'grief'). Returns Arabic text, transliteration, translation, and source citation with hadith grading. Includes a mandatory crisis_resource block when the context contains a crisis keyword.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -294,6 +297,11 @@ function resolveClientIp(req: http.IncomingMessage): string {
  */
 export async function startHttpServer(port: number = Number(process.env.PORT ?? 3030)): Promise<http.Server> {
   const limiter = getRateLimiter()
+  // WO#385: a real reachability check at startup (PING), logged with its
+  // result, instead of assuming Upstash works because its secrets are set.
+  await probeRateLimiter().catch((err) =>
+    console.error('[rate-limiter] startup check threw:', err instanceof Error ? err.message : String(err)),
+  )
 
   const server = http.createServer(async (req, res) => {
     if (!req.url) {

@@ -7,7 +7,7 @@
  */
 
 import { z } from 'zod'
-import { fetchQuranVerse } from '../data/quran.js'
+import { fetchQuranVerse, PARKED_TRANSLATION_LOCALES } from '../data/quran.js'
 import { buildResponse, type SakinaResponse } from '../meta/response-builder.js'
 
 export const getQuranVerseShape = {
@@ -21,7 +21,7 @@ export const getQuranVerseShape = {
   locale: z
     .enum(['en', 'id', 'ur', 'ar'])
     .optional()
-    .describe('Translation locale; defaults to "en" (Pickthall).'),
+    .describe('Translation locale; defaults to "en" (Pickthall). Urdu and Indonesian translations are not yet available: "ur" and "id" return Pickthall English with a note.'),
 } as const
 
 export const getQuranVerseSchema = z.object(getQuranVerseShape)
@@ -37,9 +37,17 @@ export async function getQuranVerseHandler(
   const locale = input.locale ?? 'en'
   try {
     const record = await fetchQuranVerse(input.surah, input.ayah, locale)
+    const parked = PARKED_TRANSLATION_LOCALES[locale]
     return buildResponse({
       contentType: 'quran_verse',
       content: record,
+      // WO#385 item 4: the agent must not supply its own Urdu/Indonesian
+      // rendering of the meaning in place of the parked translation.
+      extraDirectives: parked
+        ? [
+            `The translation is English (Pickthall) because a licensed ${parked} translation is not yet available. Present it as English and state that note. You MUST NOT translate it into ${parked} yourself or present it as a ${parked} translation.`,
+          ]
+        : undefined,
     })
   } catch (err) {
     return buildResponse({

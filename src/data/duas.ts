@@ -9,7 +9,8 @@
  */
 
 import { readFileSync } from 'node:fs'
-import { UNRECORDED_GRADING_DIRECTIVE } from '../contracts/presentation.js'
+import { SOURCE_ONLY_GRADING_DIRECTIVE, UNRECORDED_GRADING_DIRECTIVE } from '../contracts/presentation.js'
+import { matchPhrase } from './context-matcher.js'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -89,9 +90,15 @@ export interface DuaRecord {
   origin?: 'quran'
   /** "Quran s:a" citation; present iff origin === 'quran'. */
   quran_citation?: string
-  /** Present on every record with grading_status 'not_recorded' (Gem 10
-   *  interim directive, 1.4.0). Not part of dua_block: it instructs the
-   *  agent and is not for display. */
+  /** WO#377 labelling rule: the hadith reference of a Quran-labelled record
+   *  (its non-Quranic source or countSource), kept beside quran_citation. */
+  hadith_source?: string
+  /** Grading of hadith_source. Gem 4's to rule; not recorded today. */
+  hadith_grading_status?: 'not_recorded'
+  /** Present on every record with grading_status 'not_recorded': Gem 4's
+   *  wording when source and grading are both unrecorded, the held interim
+   *  wording when a source is recorded (WO#385). Not part of dua_block: it
+   *  instructs the agent and is not for display. */
   grading_directive?: string
   context_tags: string[]
 }
@@ -171,11 +178,24 @@ function toRecord(dua: BundledDua): DuaRecord {
   const grading_status: GradingStatus =
     isQuran || grading === 'Quranic' ? 'quranic' : recordedGrading ? 'graded' : 'not_recorded'
 
+  // WO#377 labelling rule (Architect, 25 Sep 2026): a Quranic label ADDS a
+  // citation and never replaces the hadith source line. A labelled record
+  // that also carries a hadith reference (a non-Quranic `source`, or a
+  // `countSource` grounding a recitation count) keeps it as its Source line,
+  // beside the Origin line; its grading belongs to Gem 4, not to the label.
+  const hadithRef = isQuran
+    ? (dua.source && !/qur/i.test(dua.source) ? dua.source : undefined) ?? dua.countSource
+    : undefined
+
   const sourceParts: string[] = []
-  if (dua.source) sourceParts.push(dua.source)
+  if (hadithRef) sourceParts.push(hadithRef)
+  else if (dua.source) sourceParts.push(dua.source)
   else if (quranCitation) sourceParts.push(quranCitation)
   if (!sourceParts.length && dua.countSource) sourceParts.push(dua.countSource)
   const source = sourceParts.join(', ') || 'Source not recorded in AskSakina corpus'
+  const gradingLine = hadithRef
+    ? `${grading} (the du'a text). The hadith's grading is not recorded in the AskSakina corpus.`
+    : grading
 
   const arabic = sanitise(dua.arabic)
   const transliteration = sanitise(dua.transliteration ?? '')
@@ -187,7 +207,7 @@ function toRecord(dua: BundledDua): DuaRecord {
     `Translation: ${translation}`,
     quranCitation ? `Origin: ${quranCitation}` : null,
     `Source: ${source}`,
-    `Grading: ${grading}`,
+    `Grading: ${gradingLine}`,
   ]
     .filter(Boolean)
     .join('\n')
@@ -207,8 +227,17 @@ function toRecord(dua: BundledDua): DuaRecord {
     record.origin = 'quran'
     record.quran_citation = quranCitation
   }
-  if (grading_status === 'not_recorded' && UNRECORDED_GRADING_DIRECTIVE) {
-    record.grading_directive = UNRECORDED_GRADING_DIRECTIVE
+  if (hadithRef) {
+    record.hadith_source = hadithRef
+    record.hadith_grading_status = 'not_recorded'
+  }
+  if (grading_status === 'not_recorded') {
+    // WO#385: Gem 4's wording applies only when BOTH source and grading are
+    // unrecorded. A record with a recorded source (source or countSource)
+    // keeps the held interim wording until Gem 4 rules its variant.
+    const sourceRecorded = Boolean(dua.source || dua.countSource)
+    const directive = sourceRecorded ? SOURCE_ONLY_GRADING_DIRECTIVE : UNRECORDED_GRADING_DIRECTIVE
+    if (directive) record.grading_directive = directive
   }
   return record
 }
@@ -241,17 +270,50 @@ export function resolveCategorySlug(input: string): string | null {
 export interface DuaQueryResult {
   resolvedCategory: string | null
   duas: DuaRecord[]
+  /** How the context resolved (WO#385): 'term' is the single-term resolver
+   *  above, 'phrase' the deterministic phrase matcher, with what matched. */
+  matchedBy?: { method: 'term' | 'phrase'; via: string }
 }
 
 function getDuasByCategory(slug: string): BundledDua[] {
   return ALL_DUAS.filter((d) => d.category === slug)
 }
 
-export function queryDuasByContext(input: string): DuaQueryResult {
-  const slug = resolveCategorySlug(input)
+export function queryDuasByContext(input: string, opts: { phraseMatching?: boolean } = {}): DuaQueryResult {
+  const term = resolveCategorySlug(input)
+  const phrase = term || opts.phraseMatching === false ? null : matchPhrase(input, DUA_CATEGORIES, ALIAS_TO_SLUG)
+  const slug = term ?? phrase?.slug ?? null
   if (!slug) return { resolvedCategory: null, duas: [] }
   const matched = getDuasByCategory(slug)
-  return { resolvedCategory: slug, duas: matched.map(toRecord) }
+  return {
+    resolvedCategory: slug,
+    duas: matched.map(toRecord),
+    matchedBy: term ? { method: 'term', via: input.trim() } : { method: 'phrase', via: phrase!.via },
+  }
 }
 
 export const TOTAL_DUAS = ALL_DUAS.length
+
+/**
+ * Sabr / endurance du'as (WO#385, Gem 3): never returned on an abuse input,
+ * even from the allowlist. Matched on the record's title and translation.
+ * "bear witness" and "bearers" are not matched; "strength to bear" is.
+ */
+const ENDURANCE = /\bsabr\b|\bpatien(?:ce|t)\b|steadfast|\bendur(?:e|ance|ing)\b|persever|strength to bear/i
+
+export function isEnduranceDua(id: string): boolean {
+  const d = ALL_DUAS.find((x) => x.id === id)
+  return !!d && ENDURANCE.test(`${d.name} ${d.translation}`)
+}
+
+/**
+ * Records for the abuse path, in allowlist order: unknown ids and every
+ * sabr/endurance du'a are dropped.
+ */
+export function selectAbuseSafeDuas(ids: readonly string[]): DuaRecord[] {
+  return ids
+    .map((id) => ALL_DUAS.find((d) => d.id === id))
+    .filter((d): d is BundledDua => !!d && !isEnduranceDua(d.id))
+    .map(toRecord)
+}
+

@@ -19,7 +19,11 @@
  * before any verdict.
  *
  * COUNTING shows a limiter is counting. It does not show which one: the
- * in-memory fallback counts too.
+ * in-memory fallback counts too. Since 1.4.1 (WO#385), a failing Upstash
+ * falls back to in-memory limiting instead of failing open, so a dead
+ * Upstash now reads COUNTING here; /stats rate_limiter.state says which
+ * limiter is live (upstash | degraded | memory). FAILING OPEN now means
+ * something unexpected, not a known Upstash failure.
  *
  * Prints one summary line, and appends it to $GITHUB_STEP_SUMMARY when set.
  */

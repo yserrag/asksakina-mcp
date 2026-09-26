@@ -20,7 +20,11 @@
 import { getQuranVerseHandler } from '../src/tools/get-quran-verse.js'
 import { getDuaHandler } from '../src/tools/get-dua.js'
 import { getNameOfAllahHandler } from '../src/tools/get-name-of-allah.js'
-import { TOTAL_DUAS } from '../src/data/duas.js'
+import { TOTAL_DUAS, selectAbuseSafeDuas, isEnduranceDua } from '../src/data/duas.js'
+import { ABUSE_SAFE_DUAS } from '../src/data/abuse-safe-duas.js'
+import { abuseResponse, ABUSE_ORDER_DIRECTIVE } from '../src/tools/get-dua.js'
+import { distressBlockFor, US_988_FOUNDER_VERIFIED, ABUSE_SENTENCE } from '../src/safety/crisis-keywords.js'
+import { stripPrependedBasmala, STRIP_PREFIXED_BASMALA, BASMALA_PREFIX_PLAIN, BASMALA_PREFIX_SHADDA, getBasmalaPrefixMismatchCount } from '../src/data/quran.js'
 import { TOTAL_NAMES } from '../src/data/names.js'
 import { readFileSync } from 'node:fs'
 import { getVerseArabic } from '../../src/lib/scripture/index.js'
@@ -228,26 +232,30 @@ async function testDuaAnxiety() {
       : fail('origin=quran citation', JSON.stringify(quranLabelled.map((d) => d.quran_citation))),
   )
 
-  // Gem 10 condition (1.4.0): the interim grading directive is ON. It is in
-  // CRITICAL_RULES verbatim when any record is ungraded, and on every
-  // not_recorded record (and only those) as grading_directive.
-  const GEM10_DIRECTIVE =
+  // WO#385 (Gem 4, 1.4.1): records whose source AND grading are unrecorded
+  // carry Gem 4's directive; records with a recorded source but no grading
+  // keep the held Gem 10 interim directive. Each distinct directive is also
+  // stated once in CRITICAL_RULES. The anxiety records are all unsourced.
+  const GEM4_DIRECTIVE =
+    "CRITICAL: This du'a's source and hadith grading are unrecorded in the AskSakina corpus. You MUST NOT invent, guess, or append a grading. The absence of a grading does not mean the du'a is weak or invalid. Present the text exactly as provided without implying formal authentication."
+  const INTERIM_DIRECTIVE =
     'CRITICAL: No grading is provided for this record. You MUST NOT invent, guess, or append a grading. Present the source exactly as provided without implying authentication.'
+  type DirRec = { grading_status?: string; grading_directive?: string; dua_block?: string; source?: string }
   const rulesNow = getDirectives(response)
   results.push(
-    rulesNow.includes(GEM10_DIRECTIVE)
-      ? pass('interim grading directive in CRITICAL_RULES (ungraded records present)')
-      : fail('interim grading directive', 'missing from CRITICAL_RULES'),
+    rulesNow.includes(GEM4_DIRECTIVE) && !rulesNow.includes(INTERIM_DIRECTIVE)
+      ? pass('anxiety: Gem 4 directive in CRITICAL_RULES; interim absent (no sourced ungraded record)')
+      : fail('anxiety CRITICAL_RULES directives', JSON.stringify(rulesNow.filter((r) => r.startsWith('CRITICAL')))),
   )
-  const recsWithDirective = recs as Array<{ grading_status?: string; grading_directive?: string; dua_block?: string }>
+  const recsWithDirective = recs as DirRec[]
   const directiveOk = recsWithDirective.every((d) =>
     d.grading_status === 'not_recorded'
-      ? d.grading_directive === GEM10_DIRECTIVE
+      ? d.grading_directive === GEM4_DIRECTIVE
       : d.grading_directive === undefined,
   )
   results.push(
     directiveOk
-      ? pass('grading_directive on every not_recorded record, and on no other')
+      ? pass('anxiety: Gem 4 grading_directive on every unsourced ungraded record, and on no graded one')
       : fail('per-record grading_directive', 'missing on an ungraded record or present on a graded one'),
   )
   results.push(
@@ -255,14 +263,36 @@ async function testDuaAnxiety() {
       ? pass('directive is not inside dua_block (display text)')
       : fail('directive in dua_block', 'the agent-facing directive leaked into the display block'),
   )
+  // Sourced but ungraded (morning adhkar: countSource names the hadith):
+  // the held interim directive, never Gem 4's "source ... unrecorded" text.
+  const morning = await getDuaHandler({ context: 'morning' })
+  const morningRecs = (morning.content as { duas?: DirRec[] }).duas ?? []
+  const morningRules = getDirectives(morning)
+  const sourced = morningRecs.filter((d) => d.grading_status === 'not_recorded' && d.source && !/Source not recorded/.test(d.source))
+  results.push(
+    sourced.length > 0 &&
+      sourced.every((d) => d.grading_directive === INTERIM_DIRECTIVE) &&
+      morningRules.includes(INTERIM_DIRECTIVE) &&
+      !morningRecs.some((d) => d.source && !/Source not recorded/.test(d.source) && d.grading_directive === GEM4_DIRECTIVE)
+      ? pass(`morning: ${sourced.length} sourced-but-ungraded records carry the held interim directive, never Gem 4's`)
+      : fail('sourced-but-ungraded directive', `sourced=${sourced.length}, directives=${JSON.stringify([...new Set(sourced.map((d) => d.grading_directive?.slice(0, 40)))])}`),
+  )
   // All-graded category: no directive at all, require_grading stays true.
   const fasting = await getDuaHandler({ context: 'fasting' })
   const fastingRules = getDirectives(fasting)
   const fastingHadith = (fasting._sakina_meta.presentation_contract as { hadith?: { require_grading?: unknown } }).hadith
+  const anyDirective = fastingRules.includes(GEM4_DIRECTIVE) || fastingRules.includes(INTERIM_DIRECTIVE)
   results.push(
-    !fastingRules.includes(GEM10_DIRECTIVE) && fastingHadith?.require_grading === true
-      ? pass('all-graded response (fasting): no interim directive, require_grading true')
-      : fail('all-graded response', `directive present=${fastingRules.includes(GEM10_DIRECTIVE)}, require_grading=${JSON.stringify(fastingHadith?.require_grading)}`),
+    !anyDirective && fastingHadith?.require_grading === true
+      ? pass('all-graded response (fasting): no grading directive, require_grading true')
+      : fail('all-graded response', `directive present=${anyDirective}, require_grading=${JSON.stringify(fastingHadith?.require_grading)}`),
+  )
+  // Gem 4 (c): the disclaimer says curated, not verified.
+  const disclaimer = (response._sakina_meta as { disclaimer?: string }).disclaimer ?? ''
+  results.push(
+    disclaimer.startsWith('AskSakina provides curated Islamic reference content') && !/verified/i.test(disclaimer)
+      ? pass('disclaimer reads "curated Islamic reference content" (Gem 4)')
+      : fail('disclaimer wording', disclaimer),
   )
 
   // Gem 10 fix 4 — soft distress block expected on "anxiety".
@@ -401,7 +431,7 @@ async function testDuaCrisisLocales() {
   const expectations: Array<{ locale: 'id' | 'ur' | 'ar'; must: string[] }> = [
     { locale: 'id', must: ['1500-567', 'Sehat Jiwa'] },
     { locale: 'ur', must: ['0311-7786264', 'Rozan'] },
-    { locale: 'ar', must: ['920033360', '800-HOPE', '1564', '762 2381'] },
+    { locale: 'ar', must: ['920033360', '800-HOPE', '1564'] },
   ]
   for (const { locale, must } of expectations) {
     const response = await getDuaHandler({ context: HARD, locale })
@@ -436,7 +466,7 @@ async function testDuaCrisisLocales() {
         : fail(`crisis ${locale} IASP directory`, 'IASP link missing'),
     )
   }
-  // en unchanged: UK + US + IASP, locale "en".
+  // en: Samaritans + IASP; 988 only once the Founder has verified it (WO#385).
   const en = await getDuaHandler({ context: HARD, locale: 'en' })
   const enCr = (en as Record<string, unknown>).crisis_resource as
     | { locale?: string; text?: string }
@@ -446,13 +476,427 @@ async function testDuaCrisisLocales() {
     enCr?.locale === 'en' &&
     enText.includes('Samaritans') &&
     enText.includes('116 123') &&
-    enText.includes('988') &&
+    enText.includes('988') === US_988_FOUNDER_VERIFIED &&
     /iasp\.info/i.test(enText)
   results.push(
     enOk
-      ? pass('crisis en unchanged (Samaritans + 988 + IASP, locale="en")')
-      : fail('crisis en unchanged', `en block changed: ${JSON.stringify(enCr)}`),
+      ? pass(`crisis en: Samaritans + IASP, 988 ${US_988_FOUNDER_VERIFIED ? 'present (Founder-verified)' : 'held (not Founder-verified)'}`)
+      : fail('crisis en', `en block: ${JSON.stringify(enCr)}`),
   )
+}
+
+// WO#385 rulings: Befrienders Cairo removed (Egypt -> IASP); 24/7 lines first;
+// every limited-hours line carries its hours.
+async function testCrisisOrderingAndHours() {
+  console.log('\n=== crisis blocks: 24/7 first, hours on limited lines, Cairo removed (WO#385) ===')
+  const text = (hint: Parameters<typeof distressBlockFor>[0], l: 'en' | 'id' | 'ur' | 'ar') =>
+    ((distressBlockFor(hint, l) as { text?: string } | undefined)?.text ?? '')
+  // [type, locale, 24/7 numbers, limited-hours numbers with their hours]
+  const plan: Array<['self-harm' | 'abuse', 'en' | 'id' | 'ur' | 'ar', string[], Array<[string, string]>]> = [
+    ['self-harm', 'id', ['119 ext 8'], [['1500-567', 'Monday to Friday, office hours']]],
+    ['self-harm', 'ur', ['0311-7786264'], [['0800-22444', 'business hours']]],
+    ['self-harm', 'ar', ['1564'], [['920033360', '8am to 8pm daily; Saturday 1pm to 8pm'], ['800-HOPE (4673)', '8am to 8pm']]],
+    ['abuse', 'id', ['129 ('], [['021-3903963', 'Monday to Friday, office hours']]],
+    ['abuse', 'ur', ['1098'], [['0800-22444', 'business hours']]],
+    ['abuse', 'ar', ['1919', '800-111', '15115', ' 110 '], [['0801 00 47 47', 'office hours']]],
+  ]
+  for (const [type, l, always, limited] of plan) {
+    const t = text({ level: 'hard', crisisType: type }, l)
+    const firstLimited = Math.min(...limited.map(([n]) => t.indexOf(n)))
+    const ok247 = always.every((n) => t.includes(n) && t.indexOf(n) < firstLimited)
+    const hoursOk = limited.every(([n, h]) => t.includes(n) && t.indexOf(h, t.indexOf(n)) > t.indexOf(n))
+    results.push(
+      ok247 && hoursOk && firstLimited >= 0
+        ? pass(`${type}/${l}: 24/7 lines first, limited lines carry their hours`)
+        : fail(`${type}/${l} ordering/hours`, t),
+    )
+  }
+  const all = (['en', 'id', 'ur', 'ar'] as const).flatMap((l) => [
+    text({ level: 'hard', crisisType: 'self-harm' }, l),
+    text({ level: 'hard', crisisType: 'abuse' }, l),
+  ])
+  results.push(
+    all.every((t) => !t.includes('762 2381') && !/Befrienders/.test(t))
+      ? pass('Befrienders Cairo 762 2381 is in no block')
+      : fail('Befrienders Cairo', 'still present'),
+  )
+  const arSelf = text({ level: 'hard', crisisType: 'self-harm' }, 'ar')
+  results.push(
+    /Egypt and other regions/.test(arSelf) && /iasp\.info/.test(arSelf)
+      ? pass('ar self-harm: Egypt is served by the IASP directory')
+      : fail('ar Egypt via IASP', arSelf),
+  )
+}
+
+// WO#385: abuse gets its own block (forked pathway), never the self-harm one,
+// with only Founder-verified DV lines from src/data/helplines.ts.
+async function testAbuseBlock() {
+  console.log('\n=== get_dua abuse block (WO#385 forked pathway) ===')
+  const helplines = readFileSync(new URL('../../src/data/helplines.ts', import.meta.url), 'utf-8')
+  const DV: Record<string, string[]> = {
+    en: ['0808 2000 247'],
+    id: ['129', '021-3903963'],
+    ur: ['1098', '0800-22444'],
+    ar: ['1919', '800-111', '15115', '110', '0801 00 47 47'],
+  }
+  const cases: Array<[string, 'en' | 'id' | 'ur' | 'ar']> = [
+    ['my husband hits me', 'en'],
+    ['he beats me', 'en'],
+    ['I am being abused', 'en'],
+    ['my husband hits me', 'id'],
+    ['mera shohar mujhe marta hai', 'ur'],
+    ['my husband hits me', 'ar'],
+  ]
+  for (const [q, locale] of cases) {
+    const r = (await getDuaHandler({ context: q, locale })) as unknown as {
+      _sakina_meta: { content_type: string; llm_directives: { CRITICAL_RULES: string[] } }
+      content: { context?: string }
+      crisis_resource?: { level?: string; crisis_type?: string; locale?: string; directive?: string; text?: string }
+    }
+    const cr = r.crisis_resource
+    const text = cr?.text ?? ''
+    const dir = cr?.directive ?? ''
+    const ok =
+      cr?.level === 'hard' &&
+      cr.crisis_type === 'abuse' &&
+      cr.locale === locale &&
+      !/harming yourself/i.test(text) &&
+      DV[locale].every((n) => text.includes(n) && helplines.includes(`phone: '${n}'`)) &&
+      /confrontation/.test(dir) &&
+      /just leave/.test(dir) &&
+      /couples counselling/.test(dir) &&
+      /sabr/.test(dir) &&
+      r._sakina_meta.content_type === 'crisis_resource_only' &&
+      text.startsWith(ABUSE_SENTENCE) &&
+      !('duas' in (r.content as object)) &&
+      r.content.context === undefined &&
+      r._sakina_meta.llm_directives.CRITICAL_RULES.some((d) => d.includes("Do NOT add du'as")) &&
+      !r._sakina_meta.llm_directives.CRITICAL_RULES.some((d) => /rephrase/i.test(d))
+    results.push(
+      ok
+        ? pass(`abuse "${q}" (${locale}): Gem 3 sentence, verified DV lines, no self-harm wording, no du'as at all`)
+        : fail(`abuse "${q}" (${locale})`, JSON.stringify({ ct: r._sakina_meta.content_type, cr })),
+    )
+  }
+  const selfHarm = distressBlockFor({ level: 'hard', crisisType: 'self-harm' }, 'en') as { crisis_type?: string; text?: string }
+  results.push(
+    selfHarm.crisis_type === 'self-harm' && !selfHarm.text?.includes('0808 2000 247')
+      ? pass('self-harm block carries no abuse lines')
+      : fail('self-harm block', JSON.stringify(selfHarm)),
+  )
+}
+
+// WO#385, Gem 2 ruling: the basmala is not part of ayah 1 except 1:1.
+// Tested against the RECORDED upstream ayah 1 of all 114 surahs
+// (evals/fixtures/alquran-ayah1, CI run 36184881437): for the 112 affected
+// ayat, the result is an exact byte tail of the input, the removed part is
+// exactly one of the two recorded prefixes, and nothing still starts with a
+// basmala. 1:1 keeps its basmala (BOM removed); 9:1 is unchanged.
+async function testBasmalaGuards() {
+  console.log('\n=== basmala removal on recorded upstream ayah 1 (WO#385, Gem 2) ===')
+  results.push(STRIP_PREFIXED_BASMALA === true ? pass('STRIP_PREFIXED_BASMALA is ON (Gem 2 ruling)') : fail('basmala flag', 'expected true'))
+  const dir = new URL('../evals/fixtures/alquran-ayah1/', import.meta.url)
+  const upstream = (s: number) =>
+    (JSON.parse(readFileSync(new URL(`${s}.json`, dir), 'utf-8')) as { data: Array<{ text: string }> }).data[0].text
+  const nfc = (x: string) => x.normalize('NFC')
+  const basmalaStarts = [BASMALA_PREFIX_PLAIN, BASMALA_PREFIX_SHADDA].flatMap((p) => [p, nfc(p), p.trimEnd(), nfc(p).trimEnd()])
+  const warned: string[] = []
+  const realWarn = console.warn
+  console.warn = (...a: unknown[]) => { warned.push(a.map(String).join(' ')) }
+  try {
+    const bad: string[] = []
+    let plain = 0
+    let shadda = 0
+    for (let s = 2; s <= 114; s++) {
+      if (s === 9) continue
+      const input = upstream(s)
+      const out = stripPrependedBasmala(s, 1, input)
+      const inB = Buffer.from(input, 'utf-8')
+      const outB = Buffer.from(out, 'utf-8')
+      const tail = outB.length < inB.length && inB.subarray(inB.length - outB.length).equals(outB)
+      const removed = input.slice(0, input.length - out.length)
+      if (removed === BASMALA_PREFIX_PLAIN) plain++
+      else if (removed === BASMALA_PREFIX_SHADDA) shadda++
+      const stillBasmala = basmalaStarts.some((p) => out.startsWith(p) || nfc(out).startsWith(p))
+      if (!tail || (removed !== BASMALA_PREFIX_PLAIN && removed !== BASMALA_PREFIX_SHADDA) || stillBasmala || out.length === 0) bad.push(String(s))
+    }
+    results.push(
+      bad.length === 0 && plain + shadda === 112
+        ? pass(`112 recorded ayat: each result is an exact byte tail, the removed part is a recorded prefix (A ${plain}, B ${shadda}), none still starts with a basmala`)
+        : fail('112 recorded ayat', `bad surahs: ${bad.join(', ')}; A ${plain}, B ${shadda}`),
+    )
+    const s1 = upstream(1)
+    results.push(
+      s1.startsWith('\uFEFF') && stripPrependedBasmala(1, 1, s1) === s1.slice(1) && s1.slice(1).startsWith(BASMALA_PREFIX_PLAIN.trimEnd())
+        ? pass('1:1 keeps its basmala (it is the ayah); only the upstream BOM is removed')
+        : fail('1:1', JSON.stringify(stripPrependedBasmala(1, 1, s1))),
+    )
+    const s9 = upstream(9)
+    results.push(stripPrependedBasmala(9, 1, s9) === s9 ? pass('9:1 unchanged (no basmala)') : fail('9:1', 'changed'))
+    const s97 = upstream(97)
+    results.push(stripPrependedBasmala(97, 1, s97, false) === s97 ? pass('flag OFF: 97:1 served as upstream') : fail('flag off', 'changed'))
+    const later = `${BASMALA_PREFIX_PLAIN}x`
+    results.push(
+      stripPrependedBasmala(2, 2, later) === later && stripPrependedBasmala(27, 30, later) === later
+        ? pass('ayah 2+ bypass even when the text starts with the prefix (2:2, 27:30)')
+        : fail('ayah 2+ bypass', 'stripped'),
+    )
+    warned.length = 0
+    const before = getBasmalaPrefixMismatchCount()
+    const odd = 'Z' + upstream(50).slice(1)
+    const r1 = stripPrependedBasmala(50, 1, odd)
+    stripPrependedBasmala(51, 1, 'Z' + upstream(51).slice(1))
+    results.push(
+      r1 === odd &&
+        getBasmalaPrefixMismatchCount() - before === 2 &&
+        warned.length === 1 &&
+        warned[0] === '[quran] basmala prefix mismatch on an ayah 1; served unchanged (count in /stats)' &&
+        !/\b5[01]\b/.test(warned[0])
+        ? pass('unrecognised ayah-1 start: unchanged, counted (2), one generic log line with no verse reference')
+        : fail('no-match path', JSON.stringify({ same: r1 === odd, delta: getBasmalaPrefixMismatchCount() - before, warned })),
+    )
+    const nfcOnly = nfc(upstream(97))
+    results.push(
+      nfcOnly !== upstream(97) && stripPrependedBasmala(97, 1, nfcOnly) === nfcOnly
+        ? pass('an NFC-normalised 97:1 (not upstream bytes) is NOT matched: exact bytes only')
+        : fail('exact-bytes', 'NFC text was stripped'),
+    )
+  } finally {
+    console.warn = realWarn
+  }
+}
+
+// WO#385 ruling: Name normalisation affects lookup only, never output text.
+async function testNameOutputUnchanged() {
+  console.log('\n=== Name lookup normalisation never alters output (WO#385) ===')
+  const names = JSON.parse(readFileSync(new URL('../data/names.json', import.meta.url), 'utf-8')) as Array<{ number: number; arabic: string }>
+  const bare = (x: string) => x.normalize('NFD').replace(/\p{M}/gu, '')
+  const bad: number[] = []
+  for (const n of names) {
+    const r = (await getNameOfAllahHandler({ name: bare(n.arabic) })) as unknown as {
+      content: { number?: number; arabic?: string; name_block?: string }
+    }
+    const ok = r.content.number === n.number && r.content.arabic === n.arabic && Boolean(r.content.name_block?.includes(`Arabic: ${n.arabic}`))
+    if (!ok) bad.push(n.number)
+  }
+  results.push(
+    bad.length === 0
+      ? pass(`bare-Arabic lookup returns the stored diacritised text for all ${names.length} Names`)
+      : fail('Name output', `mismatch for ${bad.join(', ')}`),
+  )
+}
+
+// WO#385 item 4: ur/id verse translations parked. The upstream is stubbed
+// with the payloads observed live on 25 Sep 2026 (ur.jalandhri returned
+// Arabic; the uthmani edition prefixes the basmala to 97:1, and 1:1 carried
+// a BOM), so this runs without network.
+async function testQuranParkedLocales() {
+  console.log('\n=== get_quran_verse: ur/id parked, 97:1 basmala, 1:1 BOM (stubbed upstream) ===')
+  // Recorded upstream bodies (CI runs 36184881437, 36185119553), served
+  // byte for byte for the edition pair the server requests. Any other
+  // edition (ur.jalandhri, id.indonesian) gets a 404.
+  const recorded = (key: string) => {
+    const [s, a] = key.split(':')
+    const file = a === '1' ? `../evals/fixtures/alquran-ayah1/${s}.json` : `../evals/fixtures/alquran-verses/${s}_${a}.json`
+    return readFileSync(new URL(file, import.meta.url))
+  }
+  const field = (key: string, i: 0 | 1) => (JSON.parse(recorded(key).toString('utf-8')) as { data: Array<{ text: string }> }).data[i].text
+  const AR: Record<string, string> = { '2:286': field('2:286', 0), '97:1': field('97:1', 0), '1:1': field('1:1', 0) }
+  const EN: Record<string, string> = { '2:286': field('2:286', 1), '97:1': field('97:1', 1), '1:1': field('1:1', 1) }
+  const requested: string[] = []
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async (url: string | URL) => {
+    const u = String(url)
+    requested.push(u)
+    const m = u.match(/ayah\/(\d+:\d+)\/editions\/quran-uthmani,en\.pickthall$/)
+    if (!m) return new Response('{"code":404}', { status: 404 })
+    return new Response(recorded(m[1]), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }) as typeof fetch
+  const ARABIC = /[؀-ۿ]/
+  try {
+    for (const locale of ['ur', 'id'] as const) {
+      for (const [surah, ayah] of [[2, 286], [97, 1], [1, 1]] as const) {
+        requested.length = 0
+        const r = (await getQuranVerseHandler({ surah, ayah, locale })) as unknown as {
+          _sakina_meta: { content_type: string; llm_directives: { CRITICAL_RULES: string[] } }
+          content: { translation: string; translation_source: string; translation_language: string; translation_note?: string }
+        }
+        const c = r.content
+        const lang = locale === 'ur' ? 'Urdu' : 'Indonesian'
+        const ok =
+          r._sakina_meta.content_type === 'quran_verse' &&
+          requested.every((u) => u.includes('en.pickthall')) &&
+          !ARABIC.test(c.translation) &&
+          c.translation === EN[`${surah}:${ayah}`] &&
+          c.translation_source === 'Pickthall' &&
+          c.translation_language === 'en' &&
+          (c.translation_note ?? '').includes(`licensed ${lang} translation is not yet available`) &&
+          r._sakina_meta.llm_directives.CRITICAL_RULES.some((d) => d.includes(`MUST NOT translate it into ${lang}`))
+        results.push(
+          ok
+            ? pass(`${locale} ${surah}:${ayah} returns Pickthall English with the parked note`)
+            : fail(`${locale} ${surah}:${ayah} parked`, JSON.stringify({ requested, c })),
+        )
+      }
+    }
+    for (const locale of ['en', 'ar'] as const) {
+      const r = (await getQuranVerseHandler({ surah: 2, ayah: 286, locale })) as unknown as {
+        content: { translation_note?: string; translation: string }; _sakina_meta: { llm_directives: { CRITICAL_RULES: string[] } }
+      }
+      results.push(
+        !r.content.translation_note && r.content.translation === EN['2:286'] && !r._sakina_meta.llm_directives.CRITICAL_RULES.some((d) => d.includes('not yet available'))
+          ? pass(`${locale} 2:286 unchanged (Pickthall, no parked note)`)
+          : fail(`${locale} 2:286`, JSON.stringify(r.content)),
+      )
+    }
+    const q97 = (await getQuranVerseHandler({ surah: 97, ayah: 1, locale: 'en' })) as unknown as { content: { arabic_text: string } }
+    results.push(
+      q97.content.arabic_text === AR['97:1'].slice(BASMALA_PREFIX_SHADDA.length) && AR['97:1'].startsWith(BASMALA_PREFIX_SHADDA)
+        ? pass('97:1 through the handler: the recorded prefix (form B) removed, the rest byte for byte')
+        : fail('97:1 handler', JSON.stringify(q97.content.arabic_text)),
+    )
+    const q11 = (await getQuranVerseHandler({ surah: 1, ayah: 1, locale: 'en' })) as unknown as { content: { arabic_text: string } }
+    results.push(
+      AR['1:1'].startsWith('\uFEFF') && q11.content.arabic_text === AR['1:1'].slice(1)
+        ? pass('1:1 keeps the basmala (it is the ayah), BOM removed')
+        : fail('1:1', JSON.stringify(q11.content.arabic_text)),
+    )
+  } finally {
+    globalThis.fetch = realFetch
+  }
+}
+
+// WO#385 item 5: deterministic phrase matching. Crisis runs on the full raw
+// input first; a phrase that also carries a crisis keyword keeps its block.
+async function testDuaPhrases() {
+  console.log('\n=== get_dua: natural-language phrases (WO#385) ===')
+  const cases: Array<[string, string]> = [
+    ['grief after losing my mother', 'deceased'],
+    ['my mother passed away', 'deceased'],
+    ['I lost my job', 'work-success'],
+    ['feeling sick today', 'health-healing'],
+    ['I have an exam tomorrow', 'exams-study'],
+    ["I can't sleep", 'before-sleep'],
+    ['what to say on laylat al qadr', 'laylat-al-qadr'],
+    ['anxiety', 'stress-anxiety'],
+    ['morning', 'morning-adhkar'],
+  ]
+  for (const [q, want] of cases) {
+    const r = (await getDuaHandler({ context: q })) as unknown as { _sakina_meta: { content_type: string }; content: { context?: string } }
+    results.push(
+      r._sakina_meta.content_type === 'dua_collection' && r.content.context === want
+        ? pass(`"${q}" -> ${want}`)
+        : fail(`"${q}"`, `got ${r._sakina_meta.content_type} ${r.content.context}`),
+    )
+  }
+  const none = (await getDuaHandler({ context: 'xyzzy blorp' })) as unknown as { _sakina_meta: { content_type: string } }
+  results.push(none._sakina_meta.content_type === 'not_found' ? pass('unknown phrase -> not_found') : fail('unknown phrase', none._sakina_meta.content_type))
+  const crisis = (await getDuaHandler({ context: 'grief after losing my mother and I want to kill myself' })) as unknown as {
+    crisis_resource?: { level?: string }
+  }
+  results.push(
+    crisis.crisis_resource?.level === 'hard'
+      ? pass('phrase with a crisis keyword still carries the hard crisis block')
+      : fail('phrase crisis', JSON.stringify(crisis.crisis_resource)),
+  )
+  for (const [q, ct] of [['grief after losing my mother and I want to kill myself', 'not_found'], ['my husband hits me', 'crisis_resource_only']] as const) {
+    const r = (await getDuaHandler({ context: q })) as unknown as { _sakina_meta: { content_type: string }; crisis_resource?: { level?: string } }
+    results.push(
+      r._sakina_meta.content_type === ct && r.crisis_resource?.level === 'hard'
+        ? pass(`hard crisis "${q}": crisis block, no du'a list inferred from the phrase`)
+        : fail(`hard crisis "${q}"`, `got ${r._sakina_meta.content_type}`),
+    )
+  }
+}
+
+// WO#385 (Gem 3): du'as on abuse inputs. 1.4.1 ships an empty allowlist
+// (block only). The mechanism is tested through abuseResponse(): allowlisted
+// du'as come after the block under the ordering directive, and a
+// sabr/endurance du'a is dropped even when it is on the list.
+async function testAbuseAllowlist() {
+  console.log("\n=== abuse du'a allowlist mechanism (WO#385) ===")
+  results.push(ABUSE_SAFE_DUAS.length === 0 ? pass('ABUSE_SAFE_DUAS is empty in 1.4.1') : fail('ABUSE_SAFE_DUAS', JSON.stringify(ABUSE_SAFE_DUAS)))
+  const endurance = ['D00018', 'D00051', 'D00067', 'D00303', 'D00304', 'D00331', 'D00408']
+  const kept = selectAbuseSafeDuas(['D00066', ...endurance, 'NOT-AN-ID']).map((d) => d.title)
+  results.push(
+    kept.length === 1 && endurance.every((id) => isEnduranceDua(id)) && !isEnduranceDua('D00066')
+      ? pass(`sabr/endurance du'as dropped even when allowlisted (${endurance.join(', ')})`)
+      : fail('endurance filter', JSON.stringify({ kept, flags: endurance.map((id) => [id, isEnduranceDua(id)]) })),
+  )
+  const block = distressBlockFor({ level: 'hard', crisisType: 'abuse' }, 'en')
+  const withList = abuseResponse('my husband hits me', { crisis_resource: block }, ['D00066', 'D00067']) as unknown as {
+    _sakina_meta: { content_type: string; llm_directives: { CRITICAL_RULES: string[] } }
+    content: { duas?: Array<{ title: string }> }
+    crisis_resource?: { crisis_type?: string }
+  }
+  results.push(
+    withList._sakina_meta.content_type === 'dua_collection' &&
+      withList.content.duas?.length === 1 &&
+      withList.crisis_resource?.crisis_type === 'abuse' &&
+      withList._sakina_meta.llm_directives.CRITICAL_RULES.includes(ABUSE_ORDER_DIRECTIVE)
+      ? pass('allowlist path: block kept, endurance du\'a dropped, ordering directive present')
+      : fail('allowlist path', JSON.stringify(withList).slice(0, 400)),
+  )
+  const empty = abuseResponse('my husband hits me', { crisis_resource: block }, ABUSE_SAFE_DUAS) as unknown as { _sakina_meta: { content_type: string } }
+  results.push(empty._sakina_meta.content_type === 'crisis_resource_only' ? pass('empty allowlist: crisis_resource_only') : fail('empty allowlist', empty._sakina_meta.content_type))
+}
+
+// WO#377 fast-track labels (Gem 2 ruling, 25 Sep 2026): the seven clause
+// records carry origin "quran" and the module's clause bytes. Each resolved
+// clause is an exact byte slice of the module ayah (a suffix: the clause
+// runs to the end of the ayah), and D00154/D00179 keep their hadith source.
+async function testFastTrackLabels() {
+  console.log('\n=== WO#377 fast-track Quranic labels (Gem 2 ruling) ===')
+  const bundled = JSON.parse(readFileSync(new URL('../data/duas.json', import.meta.url), 'utf-8')) as Array<{
+    id: string; arabic: string; origin?: string; quran_ref?: string; countSource?: string
+  }>
+  const plan: Array<[string, string, number]> = [
+    ['D00003', '3:173', 14], ['D00504', '3:173', 14], ['D00330', '7:23', 1],
+    ['D00154', '9:129', 3], ['D00179', '9:129', 3], ['D00308', '25:74', 2],
+  ]
+  for (const [id, ref, from] of plan) {
+    const d = bundled.find((x) => x.id === id)!
+    const ayah = Buffer.from(getVerseArabic(ref), 'utf-8')
+    const clause = Buffer.from(d.arabic, 'utf-8')
+    const words = getVerseArabic(ref).split(' ')
+    const expected = words.slice(from).join(' ')
+    const isSlice = ayah.length > clause.length && ayah.subarray(ayah.length - clause.length).equals(clause)
+    const ok = d.origin === 'quran' && d.quran_ref === ref && d.arabic === expected && isSlice && !d.arabic.includes('ࣰ')
+    results.push(
+      ok
+        ? pass(`${id}: origin quran, Quran ${ref} clause from module word ${from} to the end, an exact byte slice of the ayah`)
+        : fail(`${id} label`, JSON.stringify({ origin: d.origin, ref: d.quran_ref, same: d.arabic === expected, isSlice })),
+    )
+  }
+  results.push(
+    bundled.filter((x) => x.origin === 'quran').length === 9
+      ? pass('9 records labelled origin quran (3 tier-1 + 6 fast-track)')
+      : fail('labelled count', String(bundled.filter((x) => x.origin === 'quran').length)),
+  )
+  const d91 = bundled.find((x) => x.id === 'D00091')!
+  results.push(
+    !d91.origin && !d91.quran_ref
+      ? pass('D00091 held: no Quran label until the collection owner rules on its title (corpus Arabic and title as stored)')
+      : fail('D00091 held', JSON.stringify({ origin: d91.origin, ref: d91.quran_ref })),
+  )
+  for (const [ctx, title] of [['morning', 'Morning Dua/ Athkar (Recite Seven Times)'], ['evening', 'Evening Dua/ Athkar (Recite Seven Times)']] as const) {
+    const r = (await getDuaHandler({ context: ctx })) as unknown as {
+      content: { duas: Array<{ title: string; dua_block: string; source: string; quran_citation?: string; hadith_source?: string; hadith_grading_status?: string }> }
+    }
+    const d = r.content.duas.find((x) => x.title === title)!
+    const ok =
+      d.quran_citation === 'Quran 9:129' &&
+      d.hadith_source === 'Sunan Abī Dāwūd 5081' &&
+      d.hadith_grading_status === 'not_recorded' &&
+      d.dua_block.includes('Origin: Quran 9:129') &&
+      d.dua_block.includes('Source: Sunan Abī Dāwūd 5081') &&
+      !d.dua_block.includes('Source: Quran 9:129')
+    results.push(
+      ok
+        ? pass(`${ctx}: 9:129 record shows Origin Quran 9:129 AND Source Sunan Abi Dawud 5081 (labelling rule)`)
+        : fail(`${ctx} hadith source`, d.dua_block.split('\n').filter((l) => !l.startsWith('Arabic')).join(' || ')),
+    )
+  }
 }
 
 async function main() {
@@ -464,9 +908,17 @@ async function main() {
   } catch (err) {
     results.push(fail('quran verse', `threw: ${err instanceof Error ? err.message : String(err)}`))
   }
+  await testQuranParkedLocales()
   await testDuaAnxiety()
+  await testDuaPhrases()
   await testDuaCrisis()
   await testDuaCrisisLocales()
+  await testCrisisOrderingAndHours()
+  await testAbuseBlock()
+  await testAbuseAllowlist()
+  await testBasmalaGuards()
+  await testNameOutputUnchanged()
+  await testFastTrackLabels()
   await testNameByNumber()
   await testNameByString()
   await testNotFound()
