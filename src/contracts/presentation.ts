@@ -99,6 +99,24 @@ export const QURAN_DIRECTIVES: readonly string[] = [
   VOICE_2_RULE,
 ] as const
 
+/**
+ * find_verses (WO#386). The first rule is the WO#386 spec's wording,
+ * verbatim. The relevance note says where the index lists a verse; it is
+ * not commentary, and an agent must not present it as tafsir.
+ */
+export const VERSE_COLLECTION_DIRECTIVES: readonly string[] = [
+  'Quote the Arabic exactly as provided. Do not transliterate or paraphrase it.',
+  'You MUST NOT paraphrase or reword the translation of any verse below.',
+  'The translation is a "Translation of the Meaning"; label it as such if presenting to users.',
+  'You MUST cite each verse by its surah name and ayah reference.',
+  "Each relevance_note only says where AskSakina's thematic index lists the verse. It is not an interpretation (tafsir); do not present it as one.",
+  'If a verse has no translation, do not translate it yourself. Say the translation is unavailable, or call get_quran_verse for that reference.',
+  'These are the verses the index lists for the topic, not every relevant verse in the Quran. Do not add verses from memory as if they came from this response.',
+  NO_EMOJI_RULE,
+  PBUH_RULE,
+  VOICE_2_RULE,
+] as const
+
 export const DUA_DIRECTIVES: readonly string[] = [
   "You MUST NOT paraphrase the Arabic text or the English translation of any du'a below.",
   'The hadith grading and source reference MUST be cited exactly as provided.',

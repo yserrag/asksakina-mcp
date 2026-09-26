@@ -2,6 +2,30 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 1.5.0
+
+WO#386: find_verses, rewritten tool descriptions, bereaved route.
+
+### Added
+
+- **`find_verses`**: Quran verses by topic keyword from AskSakina's thematic
+  verse index (27 verses, 11 themes). Index lookup only: no embedding, no AI.
+  Arabic is the full ayah from the scripture module (Tanzil Uthmani, byte
+  for byte), translation is full-ayah Pickthall. No match returns `verses: []`
+  with `no_results: true`. Crisis handling as on `get_dua`.
+- **`bereaved` context on `get_dua`**: a query naming the querier's own
+  grief now resolves to `bereaved` instead of `deceased` (du'as for the
+  person who has died). It returns 7 du'as from the `calamity` collection,
+  in the reviewer's order, with a teaching note on the masculine forms in
+  the Arabic. Always carries at least the soft support note. `calamity`
+  and all du'a text are unchanged.
+
+### Changed
+
+- All four tool descriptions rewritten as agent instructions, each under
+  200 characters. The server card now uses the same strings as the tools.
+- mcp-deploy runs the live publish guards before the agent evals.
+
 ## 1.4.1
 
 WO#385: hardening after the 1.4.0 publish.

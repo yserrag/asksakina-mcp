@@ -17,7 +17,7 @@
 // them — was removed in WO#360, so the privacy claim now holds without
 // qualification.
 
-export type ToolName = 'get_quran_verse' | 'get_dua' | 'get_name_of_allah'
+export type ToolName = 'get_quran_verse' | 'get_dua' | 'get_name_of_allah' | 'find_verses'
 export type RequestStatus = 'ok' | 'not_found' | 'error'
 
 export interface ToolCounter {
@@ -37,7 +37,7 @@ export interface AggregateSnapshot {
   total: number
 }
 
-const TOOLS: readonly ToolName[] = ['get_quran_verse', 'get_dua', 'get_name_of_allah']
+const TOOLS: readonly ToolName[] = ['get_quran_verse', 'get_dua', 'get_name_of_allah', 'find_verses']
 
 function emptyCounter(): ToolCounter {
   return { ok: 0, not_found: 0, error: 0, total: 0, duration_ms_sum: 0 }
@@ -48,6 +48,7 @@ function emptyCounters(): Record<ToolName, ToolCounter> {
     get_quran_verse: emptyCounter(),
     get_dua: emptyCounter(),
     get_name_of_allah: emptyCounter(),
+    find_verses: emptyCounter(),
   }
 }
 

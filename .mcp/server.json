@@ -2,9 +2,9 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
   "name": "com.asksakina/islamic-knowledge",
   "title": "AskSakina Islamic Knowledge",
-  "description": "Quran verses, du'as and the 99 Names of Allah for AI agents, with sources and grading status.",
+  "description": "Curated Islamic MCP: Quran (Arabic + Pickthall), 445 du'as, 99 Names, crisis-aware.",
   "websiteUrl": "https://www.asksakina.com",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "repository": {
     "url": "https://github.com/yserrag/asksakina-mcp",
     "source": "github"
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "@asksakina/islamic-knowledge-mcp",
-      "version": "1.4.1",
+      "version": "1.5.0",
       "transport": {
         "type": "stdio"
       }

@@ -12,13 +12,14 @@
 
 ## What it provides
 
-Three lookup tools and one canonical resource over the Model Context Protocol. Every record is sourced from AskSakina's main app (`asksakina.com`), so the MCP server can never drift from what the public app surfaces.
+Four lookup tools and one canonical resource over the Model Context Protocol. Every record is sourced from AskSakina's main app (`asksakina.com`), so the MCP server can never drift from what the public app surfaces.
 
 | Tool | What it does |
 |---|---|
 | `get_quran_verse` | Verbatim Quranic verse lookup by surah:ayah |
-| `get_dua` | Curated du'a collection lookup by life context (anxiety, grief, morning, travel, ...) |
+| `get_dua` | Curated du'a collection lookup by life context (anxiety, morning, travel, ...) |
 | `get_name_of_allah` | One of the 99 Names by number (1–99) or string |
+| `find_verses` | Quran verses by topic keyword, from AskSakina's thematic verse index |
 | `sakina://about` (resource) | Read-once briefing — seven core directives plus three Gem-cleared dawah texts (Quran preservation, hadith grading, madhab attribution) |
 
 ---
@@ -64,7 +65,7 @@ Verbatim Quranic verse lookup by surah:ayah. Returns the canonical AskSakina env
 
 ### `get_dua`
 
-Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). Context is resolved against canonical category slugs, an alias map, and tag dimensions. A natural phrase ("grief after losing my mother") also resolves: the server normalises it and matches known category, alias, tag and synonym words and a few multi-word phrases inside it, deterministically and without AI. `content.matched_by` says how it resolved. Crisis detection runs first, on the full raw input. Self-harm and abuse get separate blocks (`crisis_type`): the abuse block carries domestic-abuse lines and an abuse-specific directive. **On an abuse disclosure no du'as are returned**: `content_type` is `crisis_resource_only` and the crisis resource is the whole response. Each block lists 24/7 lines first and states the hours of any limited-hours line. **If the context contains a crisis keyword (matched against the main app's `detectCrisis` keyword list), the response includes a mandatory `crisis_resource` block** with the appropriate hotline and prosocial directive.
+Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). Context is resolved against canonical category slugs, an alias map, and tag dimensions. A natural phrase ("grief after losing my mother") also resolves: the server normalises it and matches known category, alias, tag and synonym words and a few multi-word phrases inside it, deterministically and without AI. `content.matched_by` says how it resolved. **Grief (WO#386):** a query that names the querier's own grief ("I lost my mother", "grief after losing my mother", "my father passed away", "bereaved") resolves to context `bereaved`; a funeral rite or the person who has died ("funeral", "dua for the deceased", "grave") stays `deceased`. `bereaved` returns seven du'as ruled by the fiqh reviewer (Gem 4), in its order, with a `teaching_note` on the masculine forms in the Arabic, and always carries at least the soft support note. Crisis detection runs first, on the full raw input. Self-harm and abuse get separate blocks (`crisis_type`): the abuse block carries domestic-abuse lines and an abuse-specific directive. **On an abuse disclosure no du'as are returned**: `content_type` is `crisis_resource_only` and the crisis resource is the whole response. Each block lists 24/7 lines first and states the hours of any limited-hours line. **If the context contains a crisis keyword (matched against the main app's `detectCrisis` keyword list), the response includes a mandatory `crisis_resource` block** with the appropriate hotline and prosocial directive.
 
 **Parameters**
 
@@ -143,6 +144,22 @@ Plus optional `locale`.
   }
 }
 ```
+
+### `find_verses`
+
+Topic lookup beside `get_quran_verse`'s reference lookup (WO#386). The query is normalised and each word is matched to a theme of AskSakina's thematic verse index (anxiety, gratitude, patience, trust, grief, hope, forgiveness, morning, friday, ramadan, encouragement), by theme name or a fixed synonym list. Deterministic: no embedding, no AI call.
+
+Each verse carries `reference` (surah:ayah), `arabic` (the full ayah from the scripture module, Tanzil Uthmani, byte for byte), `translation` (full-ayah Pickthall, fetched as `get_quran_verse` fetches it), the surah names, and a `relevance_note` saying which theme lists it. The note is not commentary. If the upstream is unreachable, the Arabic is still served and `translation` is `null` with a note.
+
+No match returns `content_type: "not_found"` with `verses: []`, `no_results: true` and the list of available themes, not an error. Crisis detection runs first, as on `get_dua`: an abuse disclosure returns `crisis_resource_only` with no verses, and any other crisis keyword returns its block with no verses inferred from the message.
+
+**Parameters**
+
+| Name | Type | Required | Notes |
+|---|---|---|---|
+| `query` | `string` | yes | Topic or keyword, e.g. `patience`, `grief`, `gratitude` |
+| `limit` | `1`..`10` | no, defaults `5` | Number of verses |
+| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` | no, defaults `en` | Selects the in-country crisis resources. Translations are Pickthall English; `ur` and `id` carry the parked-translation note |
 
 ### Resource: `sakina://about`
 
@@ -386,6 +403,7 @@ The server no longer writes to the `/data` volume that `fly.toml` mounts; it was
 | `get_quran_verse` | `alquran.cloud`, fetched at runtime: Tanzil-derived Uthmani Arabic plus the translation for the locale: `en` and `ar` Pickthall (`en.pickthall`), `ur` and `id` also Pickthall, with a note (their translations are parked pending licences; 1.4.1). A leading byte-order mark is removed. The upstream also prefixes the basmala to ayah 1 of each surah except 1 and 9. Per Gem 2 (the basmala is part of ayah 1 only at 1:1), that exact prefix is removed from ayah 1 of surahs 2–8 and 10–114, matched against the two byte forms the upstream sends. The rest of the ayah is served byte for byte. An unrecognised start is served unchanged and counted in `/stats` (`basmala_prefix_mismatch`). Everything is fetched verse by verse (`/ayah/{surah}:{ayah}`). Saheeh International is not served (removed in 1.2.0, WO#245). Cached in process for 24 h per verse + edition. |
 | `get_dua` | AskSakina's du'a corpus (445 entries at 1.4.0), snapshotted from `../src/data/duas` into `data/duas.json` by `npm run bundle-data`. Du'as with a verified Quranic reference take their Arabic from the scripture module (`../src/lib/scripture`, Tanzil Uthmani) at the same step. |
 | `get_name_of_allah` | AskSakina's 99 Names, snapshotted from `../src/lib/data/99-names` by `npm run bundle-data`. |
+| `find_verses` | AskSakina's thematic verse index (`../src/lib/data/thematic-verses`), snapshotted into `data/thematic-verses.json` by `npm run bundle-data`. Only each verse's reference and themes are taken from the index; the Arabic comes from the scripture module at the same step, and the Pickthall translation from `alquran.cloud` at runtime (same cache as `get_quran_verse`). |
 
 The du'a and Names data are snapshots of the main app's data files, so any update to them lands here on the next `npm run bundle-data` (the deploy workflow runs it). A published package carries the snapshot taken when it was built.
 
@@ -395,7 +413,7 @@ The du'a and Names data are snapshots of the main app's data files, so any updat
 
 Per the Phase 3 planning doc:
 
-- Semantic search / `search_islamic_guidance` — needs a Gem-reviewed eval set.
+- Semantic search / `search_islamic_guidance` — needs a Gem-reviewed eval set. (`find_verses` is an index lookup, not semantic search.)
 - `explain_islamic_concept` — directly conflicts with CLAUDE.md's "AI never gives spiritual/fiqh advice" rule until an Architect-level ruling is made.
 - `get_pastoral_guidance` — Gem 3's framing depends on AskSakina-controlled surface; cannot ship via MCP without a separate review.
 - `check_halal_ingredient` — blocked on WO#61 restoration.
@@ -423,7 +441,7 @@ auth. The Architect triggers it from the repo **Actions** tab
 
 The job runs the full Gem 10 runbook on `main`: `npm ci` → `npm run bundle-data`
 (load-bearing) → `flyctl deploy` → poll `/health` → **live Pickthall byte-check on
-2:255** → `npm publish` → confirm the registry shows the published version. The
+2:255** → live Dhun-Nun check → rate-limiter probe (warn only) → **live publish guards** → agent evals (warn only; after the guards since WO#386, so the blocking guards get the rate-limit budget first) → `npm publish` → confirm the registry shows the published version. The
 byte-check runs the MCP `initialize` handshake + `tools/call get_quran_verse`
 against the live endpoint: `"save Him"` (Pickthall) passes; `"except Him"` (Saheeh
 International) or an unreachable `/mcp` **fails the job before `npm publish`**,

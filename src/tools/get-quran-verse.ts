@@ -28,8 +28,9 @@ export const getQuranVerseSchema = z.object(getQuranVerseShape)
 export type GetQuranVerseInput = z.infer<typeof getQuranVerseSchema>
 
 export const GET_QURAN_VERSE_TITLE = 'get_quran_verse'
+// WO#386 item B: under 200 characters (directory listings), agent-instructing.
 export const GET_QURAN_VERSE_DESCRIPTION =
-  'Retrieve a single Quranic verse by surah and ayah reference. Returns the verbatim Arabic text and a canonical translation along with citation metadata. Output must be presented exactly as returned; do not paraphrase the Arabic or the translation.'
+  'Returns one Quran verse by surah and ayah number: Tanzil Uthmani Arabic and Pickthall English, with citation. Quote the Arabic exactly; do not paraphrase either text.'
 
 export async function getQuranVerseHandler(
   input: GetQuranVerseInput,

@@ -10,7 +10,8 @@
  */
 
 import { z } from 'zod'
-import { queryDuasByContext, selectAbuseSafeDuas } from '../data/duas.js'
+import { BEREAVED_CONTEXT, queryDuasByContext, selectAbuseSafeDuas } from '../data/duas.js'
+import { BEREAVED_GENDER_NOTE } from '../data/bereaved-duas.js'
 import { ABUSE_SAFE_DUAS } from '../data/abuse-safe-duas.js'
 import {
   distressBlockFor,
@@ -24,7 +25,7 @@ export const getDuaShape = {
     .string()
     .min(2)
     .describe(
-      "Life context to match against. Examples: 'anxiety', 'grief', 'morning', 'travel', 'forgiveness', 'gratitude'.",
+      "Life context to match against. Examples: 'anxiety', 'morning', 'travel', 'forgiveness', 'gratitude'.",
     ),
   locale: z
     .enum(['en', 'id', 'ur', 'ar'])
@@ -36,8 +37,9 @@ export const getDuaSchema = z.object(getDuaShape)
 export type GetDuaInput = z.infer<typeof getDuaSchema>
 
 export const GET_DUA_TITLE = 'get_dua'
+// WO#386 item B: under 200 characters (directory listings), agent-instructing.
 export const GET_DUA_DESCRIPTION =
-  "Retrieve Islamic supplications (du'as) from the curated du'a collection for a life context. Returns Arabic, transliteration, English translation, and source with hadith grading where available. If the context contains crisis keywords, the response includes a mandatory crisis-resource block."
+  "Returns du'as from a curated collection for a life context (e.g. anxiety, travel, gratitude), with source and grading where recorded. Show any crisis_resource block verbatim."
 
 export async function getDuaHandler(
   input: GetDuaInput,
@@ -54,7 +56,7 @@ export async function getDuaHandler(
   // the request locale (en default). id/ur/ar get their own helplines, never
   // the UK/US numbers.
   const block = distressBlockFor(distress, input.locale ?? 'en')
-  const extras = block ? { crisis_resource: block } : undefined
+  let extras: Record<string, unknown> | undefined = block ? { crisis_resource: block } : undefined
 
   // Gem 3 ruling (WO#385): on an abuse disclosure, the safety block and
   // resources come first and, in 1.4.1, alone. The du'a query never runs.
@@ -67,6 +69,32 @@ export async function getDuaHandler(
   // marriage) must never sit beside the crisis block. Those inputs behave
   // exactly as before WO#385 (single-term match only).
   const result = queryDuasByContext(input.context, { phraseMatching: distress.level !== 'hard' })
+
+  if (result.resolvedCategory === BEREAVED_CONTEXT) {
+    // WO#386 item D: every bereaved route carries at least the soft
+    // support note, whether or not the words hit a soft keyword.
+    if (!extras) extras = { crisis_resource: distressBlockFor('soft', input.locale ?? 'en') }
+    if (!result.duas.length) {
+      return buildResponse({
+        contentType: 'not_found',
+        content: {
+          requested: { context: input.context },
+          context: BEREAVED_CONTEXT,
+          matched_by: result.matchedBy,
+          duas: [],
+          total_results: 0,
+          no_records_yet: true,
+          reason:
+            "No du'as are in the collection yet for a bereaved person to say for their own grief. They are awaiting scholarly review.",
+          see_also: {
+            context: 'deceased',
+            note: "Du'as said for the person who has died (funeral, grave, and du'as for the deceased).",
+          },
+        },
+        extras,
+      })
+    }
+  }
 
   if (!result.resolvedCategory) {
     return buildResponse({
@@ -99,6 +127,10 @@ export async function getDuaHandler(
     content: {
       context: result.resolvedCategory,
       matched_by: result.matchedBy,
+      // WO#386: Gem 4's teaching note on the bereaved context, verbatim.
+      ...(result.resolvedCategory === BEREAVED_CONTEXT && BEREAVED_GENDER_NOTE
+        ? { teaching_note: BEREAVED_GENDER_NOTE }
+        : {}),
       duas: result.duas,
       total_results: result.duas.length,
       grading_summary: {

@@ -44,8 +44,9 @@ export const getNameOfAllahSchema = z
 export type GetNameOfAllahInput = z.infer<typeof getNameOfAllahSchema>
 
 export const GET_NAME_TITLE = 'get_name_of_allah'
+// WO#386 item B: under 200 characters (directory listings), agent-instructing.
 export const GET_NAME_DESCRIPTION =
-  'Look up one of the 99 Names of Allah (al-Asma al-Husna) by number or name. Returns Arabic, transliteration, English meaning, spiritual reflection, and Quranic references.'
+  'Returns one of the 99 Names of Allah by number (1-99) or by name: Arabic, transliteration, meaning, reflection and Quranic references. Quote the Arabic exactly.'
 
 export async function getNameOfAllahHandler(
   input: GetNameOfAllahInput,
