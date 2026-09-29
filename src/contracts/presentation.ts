@@ -129,29 +129,29 @@ export const DUA_DIRECTIVES: readonly string[] = [
 ] as const
 
 /**
- * Directive for du'as whose source AND hadith grading are both unrecorded
- * (grading_status 'not_recorded', no `source`, no `countSource`).
+ * Directive for every ungraded hadith du'a (grading_status 'not_recorded').
  *
- * Gem 4 wording, verbatim (WO#385, 1.4.1). Emitted once in CRITICAL_RULES
- * whenever a response holds such a record, and on each such record as
- * `grading_directive`. Change it only on a Gem ruling, verbatim.
+ * Gem 4 wording, verbatim and LOCKED (WO#388, 26 Sep 2026). It replaces both
+ * earlier directives: Gem 4's "source and hadith grading are unrecorded"
+ * text (WO#385) and the held Gem 10 interim for sourced-but-ungraded records.
+ * Emitted on each such record as `grading_directive` and once in
+ * CRITICAL_RULES. Quranic records never carry it. Change only on a Gem
+ * ruling, verbatim.
  */
-export const UNRECORDED_GRADING_DIRECTIVE: string | null =
-  "CRITICAL: This du'a's source and hadith grading are unrecorded in the AskSakina corpus. You MUST NOT invent, guess, or append a grading. The absence of a grading does not mean the du'a is weak or invalid. Present the text exactly as provided without implying formal authentication."
+export const UNGRADED_GRADING_DIRECTIVE =
+  'CRITICAL: No hadith grading is available for this record. You MUST NOT invent, guess, or append a grading. Do not describe it as sahih, hasan, or authenticated. Present the source exactly as provided.'
 
 /**
- * Directive for du'as with a RECORDED source but no grading (grading_status
- * 'not_recorded' with a `source` or `countSource`: in 1.4.1, the 49 morning
- * and evening adhkar whose countSource names the hadith for the recitation
- * count).
+ * Teach block Field 2 fallback (WO#390 addendum, Gem 4, 27 Sep 2026).
  *
- * HELD: Gem 4's wording above says the source is unrecorded, which is false
- * for these records, so it is not reused here (Architect, WO#385). Until
- * Gem 4 rules the variant, these records keep the Gem 10 interim wording
- * shipped in 1.4.0, verbatim. Replace only on a Gem ruling.
+ * Gem 4 wording, verbatim and LOCKED. On an ungraded or sourceless du'a,
+ * Field 2 (recitation context / attribution) is exactly this string and
+ * nothing else. Attribution and communal-practice claims are permitted only
+ * with a citation (see TeachContextCited in src/teach/types.ts). Change only
+ * on a Gem ruling, verbatim. Not emitted anywhere until a later WO wires it.
  */
-export const SOURCE_ONLY_GRADING_DIRECTIVE: string | null =
-  'CRITICAL: No grading is provided for this record. You MUST NOT invent, guess, or append a grading. Present the source exactly as provided without implying authentication.'
+export const UNATTRIBUTED_CONTEXT_FALLBACK =
+  'Source not recorded in the AskSakina corpus. Not attributed to the Prophet (peace be upon him) or the Companions.'
 
 export const NAME_DIRECTIVES: readonly string[] = [
   'You MUST present the Arabic text exactly as provided.',
@@ -163,3 +163,22 @@ export const NAME_DIRECTIVES: readonly string[] = [
   PBUH_RULE,
   VOICE_2_RULE,
 ] as const
+
+/**
+ * Teach directives (WO#407, Gem 10, 29 Sep 2026; WO#390 §B.1 left both to
+ * Gem 10). Gem 10 wording, verbatim and LOCKED. The response builder emits
+ * both only when the response carries a teach block, never on their own.
+ * Change only on a Gem 10 ruling, verbatim. WO#408 addendum (Architect, after
+ * Gem 10 FAIL): the grief sentence is replaced by a payload condition the
+ * caller can verify; the server withholds teach on grief routes itself.
+ */
+export const TEACH_DIRECTIVE =
+  'CRITICAL: The accompanying `teach` block is for educational context only and MUST NOT be framed, summarized, or presented as a fatwa or religious ruling. You MUST quote the Arabic terms and script exactly as provided without paraphrasing, altering codepoints, or transliterating independently. If citations and gradings are provided, present them exactly as written without implying authentication beyond what is explicitly stated. If the payload includes a crisis resource block, you MUST silently drop the `teach` content entirely and prioritize the crisis resources. If a reflection question is included, offer it verbatim for the user to consider, but DO NOT answer it on their behalf.'
+
+/**
+ * `presentation_contract.teach`, same ruling as above. WO#408 (Gem 10 FAIL on
+ * the 2.0 pre-publish review, Architect wording): the grief/bereavement clause
+ * is removed; the server withholds teach on grief and support routes itself.
+ */
+export const TEACH_CONTRACT =
+  'Educational Context (Teach): Present the key word, root, and gloss exactly as provided to explain the linguistic context. Keep the reflection question completely open-ended; output it verbatim and wait for the user to respond. Do not synthesize the citations and gradings into a general statement; output the source strings exactly. Under no circumstances should this block be rendered if the payload includes a crisis resource block.'
