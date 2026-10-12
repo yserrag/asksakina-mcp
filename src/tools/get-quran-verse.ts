@@ -9,6 +9,8 @@
 import { z } from 'zod'
 import { fetchQuranVerse, PARKED_TRANSLATION_LOCALES } from '../data/quran.js'
 import { buildResponse, type SakinaResponse } from '../meta/response-builder.js'
+import { audienceArg } from '../teach/audience.js'
+import { withTeach } from '../teach/attach.js'
 
 export const getQuranVerseShape = {
   surah: z.number().int().min(1).max(114).describe('Surah number, 1-114'),
@@ -22,6 +24,7 @@ export const getQuranVerseShape = {
     .enum(['en', 'id', 'ur', 'ar'])
     .optional()
     .describe('Translation locale; defaults to "en" (Pickthall). Urdu and Indonesian translations are not yet available: "ur" and "id" return Pickthall English with a note.'),
+  audience: audienceArg,
 } as const
 
 export const getQuranVerseSchema = z.object(getQuranVerseShape)
@@ -41,7 +44,8 @@ export async function getQuranVerseHandler(
     const parked = PARKED_TRANSLATION_LOCALES[locale]
     return buildResponse({
       contentType: 'quran_verse',
-      content: record,
+      // WO#405: teach and related appended only when audience was sent.
+      content: withTeach(record, `verse:${input.surah}:${input.ayah}`, { audience: input.audience, locale }),
       // WO#385 item 4: the agent must not supply its own Urdu/Indonesian
       // rendering of the meaning in place of the parked translation.
       extraDirectives: parked

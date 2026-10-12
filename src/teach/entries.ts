@@ -5,7 +5,8 @@
  * variants), Field 3 omitted for all six. Field 1 signed by Gem 2, Field 2 by
  * Gem 4 (citations source-verified by the Architect on sunnah.com), Field 4
  * by Gem 3, related lists by Gem 2, all on 28 Sep 2026. Gem 10 approved all
- * six for publish on 29 Sep 2026 (WO#407), which the release gate checks
+ * six for publish on 29 Sep 2026 (WO#407, re-approved in the WO#408 re-review),
+ * which the release gate checks
  * (scripts/release-gate.ts). The gate passing is not a release.
  *
  * Arabic is written as \u escapes of the signed bytes so an editor cannot
@@ -22,13 +23,17 @@ const signed = (gem: SignOff['gem']): readonly SignOff[] => [{ gem, ruling: 'WO#
 const GEM2 = signed(2)
 const GEM3 = signed(3)
 const GEM4 = signed(4)
-/** Gem 10's publish review of batch 1 (WO#407). The release gate reads it. */
 /** WO#408 addendum: four Field 4 rewrites after Gem 10 FAIL, approved by Gem 3 and Gem 1. */
 const GEM3_GEM1_WO408: readonly SignOff[] = [
   { gem: 3, ruling: 'WO#408 addendum, reflection rewrite', date: '2026-09-29' },
   { gem: 1, ruling: 'WO#408 addendum, reflection rewrite', date: '2026-09-29' },
 ]
-const GEM10: readonly SignOff[] = [{ gem: 10, ruling: 'Gem 10, WO#405 publish review', date: '2026-09-29' }]
+/**
+ * Gem 10's publish review of batch 1. WO#407 approved it; the WO#408 pre-publish
+ * review failed it, and the WO#408 re-review approved the revised directive,
+ * contract and four reflection questions. The release gate reads it.
+ */
+const GEM10: readonly SignOff[] = [{ gem: 10, ruling: 'WO#408 re-review, Gem 10 APPROVED', date: '2026-09-29' }]
 
 export const TEACH_ENTRIES: Readonly<Partial<Record<TeachKey, TeachEntry>>> = {
   'dua:D00068': {

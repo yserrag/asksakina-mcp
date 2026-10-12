@@ -7,9 +7,10 @@
  * resolved at bundle time); the translation is the full-ayah Pickthall from
  * the same upstream get_quran_verse uses.
  *
- * Crisis detection runs first on the full raw query, exactly as in get_dua:
- * an abuse disclosure gets the crisis resource alone, and any other hard
- * crisis gets its block with no verses inferred from the message.
+ * Crisis detection runs first on the full raw query, with get_dua's detector.
+ * On ANY hard crisis (abuse or self-harm) the crisis resource is the whole
+ * response: no verse text, reference, translation or theme metadata (Gem 3,
+ * WO#388). Nothing is looked up before that check.
  */
 
 import { z } from 'zod'
@@ -17,6 +18,8 @@ import { fetchQuranVerse, PARKED_TRANSLATION_LOCALES } from '../data/quran.js'
 import { AVAILABLE_THEMES, matchThemes, versesForThemes, type ThematicVerseEntry } from '../data/thematic.js'
 import { distressBlockFor, evaluateDistress } from '../safety/crisis-keywords.js'
 import { buildResponse, type SakinaResponse } from '../meta/response-builder.js'
+import { audienceArg } from '../teach/audience.js'
+import { withTeach } from '../teach/attach.js'
 
 export const FIND_VERSES_DEFAULT_LIMIT = 5
 export const FIND_VERSES_MAX_LIMIT = 10
@@ -37,6 +40,7 @@ export const findVersesShape = {
     .enum(['en', 'id', 'ur', 'ar'])
     .optional()
     .describe('Selects the in-country crisis resources if one is needed; defaults to "en". Translations are Pickthall English.'),
+  audience: audienceArg,
 } as const
 
 export const findVersesSchema = z.object(findVersesShape)
@@ -115,23 +119,22 @@ export async function findVersesHandler(input: FindVersesInput): Promise<SakinaR
   const block = distressBlockFor(distress, locale)
   const extras = block ? { crisis_resource: block } : undefined
 
-  // Gem 3 ruling (WO#385), applied here as on get_dua: on an abuse
-  // disclosure the crisis resource is the whole response.
-  if (distress.level === 'hard' && distress.crisisType === 'abuse') {
+  // Gem 3 ruling (WO#385 for abuse, WO#388 for every hard crisis): the
+  // crisis resource is the whole response. This returns before matchThemes,
+  // so no verse, theme or index metadata exists yet to leak.
+  if (distress.level === 'hard') {
     return buildResponse({
       contentType: 'crisis_resource_only',
       content: {
         requested: { query: input.query },
         withheld: 'verse_collection',
-        reason: 'Quranic verses are not shown when a message discloses abuse. The crisis resource is the whole response.',
+        reason:
+          distress.crisisType === 'abuse'
+            ? 'Quranic verses are not shown when a message discloses abuse. The crisis resource is the whole response.'
+            : 'Quranic verses are not shown when a message carries a crisis keyword. The crisis resource is the whole response.',
       },
       extras,
     })
-  }
-  // Any other hard crisis: the block, and no verse list inferred from the
-  // words of a crisis message.
-  if (distress.level === 'hard') {
-    return noResults(input.query, 'No verses are matched from a message that carries a crisis keyword.', extras)
   }
 
   const matches = matchThemes(input.query)
@@ -143,7 +146,16 @@ export async function findVersesHandler(input: FindVersesInput): Promise<SakinaR
     )
   }
   const themes = matches.map((m) => m.theme)
-  const verses = await Promise.all(versesForThemes(themes, limit).map((v) => toFoundVerse(v, themes, locale)))
+  const found = await Promise.all(versesForThemes(themes, limit).map((v) => toFoundVerse(v, themes, locale)))
+  // WO#405: teach per verse, only when audience was sent. WO#407 (Gem 10):
+  // nothing attaches on the grief theme or whenever a support block is
+  // attached.
+  const withhold = Boolean(extras) || themes.includes('grief')
+  const verses = input.audience
+    ? found.map((v) =>
+        withTeach(v, `verse:${v.reference}` as `verse:${number}:${number}`, { audience: input.audience, locale, withhold }),
+      )
+    : found
   const parked = PARKED_TRANSLATION_LOCALES[locale]
 
   return buildResponse({

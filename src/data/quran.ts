@@ -9,7 +9,29 @@
  *
  * If the upstream is unreachable, the function throws so the tool
  * returns a structured error rather than a partial response.
+ *
+ * WO#444 (Architect, decision 1, option A): the English is no longer taken
+ * from the upstream. It is the app's corrected Pickthall, bundled as
+ * data/pickthall.json (bundle-data.ts), so the MCP serves what the app's
+ * reader shows, the WO#442 corrections included, with no verse-final
+ * punctuation (decision 2). The Arabic and surah names still come from the
+ * upstream.
  */
+
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const HERE = path.dirname(fileURLToPath(import.meta.url))
+// src/data/quran.ts and dist/data/quran.js both resolve to package-root/data
+const DATA_DIR = path.resolve(HERE, '..', '..', 'data')
+
+let pickthall: { contentVersion: string; verses: Record<string, string> } | null = null
+/** The bundled Pickthall English for one verse, or undefined if there is no such verse. */
+export function bundledPickthall(surah: number, ayah: number): string | undefined {
+  pickthall ??= JSON.parse(readFileSync(path.join(DATA_DIR, 'pickthall.json'), 'utf-8')) as { contentVersion: string; verses: Record<string, string> }
+  return pickthall.verses[`${surah}:${ayah}`]
+}
 
 const API_BASE = 'https://api.alquran.cloud/v1'
 
@@ -75,6 +97,13 @@ export async function fetchQuranVerse(
     throw new Error(`Invalid ayah: ${ayah}.`)
   }
 
+  // WO#444: the bundle knows every verse, so an ayah past the end of its surah
+  // is refused here rather than by the upstream.
+  const english = bundledPickthall(surah, ayah)
+  if (english === undefined) {
+    throw new Error(`Invalid ayah: ${surah}:${ayah} does not exist.`)
+  }
+
   const editionEntry = TRANSLATION_EDITIONS[locale] ?? TRANSLATION_EDITIONS.en
   const parked = PARKED_TRANSLATION_LOCALES[locale]
   const withNote = (r: QuranVerseRecord): QuranVerseRecord =>
@@ -84,6 +113,8 @@ export async function fetchQuranVerse(
   const cached = cache.get(cacheKey)
   if (cached && now - cached.cachedAt < CACHE_TTL_MS) return withNote(cached.record)
 
+  // WO#444: the request is unchanged (Arabic and Pickthall editions); only the
+  // upstream's Arabic and surah names are used. Its English is ignored.
   const url = `${API_BASE}/ayah/${surah}:${ayah}/editions/quran-uthmani,${editionEntry.id}`
   const res = await fetch(url, {
     headers: { Accept: 'application/json' },
@@ -97,8 +128,7 @@ export async function fetchQuranVerse(
     status?: string
   }
   const arabicEntry = data.data?.[0]
-  const translationEntry = data.data?.[1]
-  if (!arabicEntry || !translationEntry) {
+  if (!arabicEntry) {
     throw new Error('Quran upstream returned an unexpected payload shape')
   }
 
@@ -108,7 +138,7 @@ export async function fetchQuranVerse(
     surah_name_english: arabicEntry.surah?.englishName ?? '',
     ayah,
     arabic_text: stripPrependedBasmala(surah, ayah, stripUnicodeProphetSalutation(arabicEntry.text)),
-    translation: stripUnicodeProphetSalutation(translationEntry.text),
+    translation: stripUnicodeProphetSalutation(english),
     translation_source: editionEntry.label,
     translation_language: 'en',
   }

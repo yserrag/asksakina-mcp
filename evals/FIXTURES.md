@@ -14,6 +14,7 @@ are not part of the npm package or the Docker image.
 | `alquran-verses/2_286.json` | `https://api.alquran.cloud/v1/ayah/2:286/editions/quran-uthmani,en.pickthall` | 2026-09-25T20:20:03Z, GitHub Actions run 36185119553 |
 
 - This is the same verse endpoint the server calls at runtime: one ayah per request, Arabic plus one translation.
+- **Recording more verses (WO#393-D):** dispatch the `MCP Record Eval Fixtures` workflow (`.github/workflows/mcp-record-fixtures.yml`) with the refs, e.g. `2:153 3:200 39:10`, the three verses `find_verses("patience")` returns. It runs `scripts/record-alquran-fixtures.mjs`, which writes each response body's bytes unmodified (never parsed and re-serialised), regenerates `SHA256SUMS` only if every ref succeeded, and uploads the directory as an artifact. Commit the artifact's files by hand; the workflow does not push. The builder sandbox cannot reach api.alquran.cloud, which is why recording runs in Actions.
 - Each directory has a `SHA256SUMS` file (`sha256sum -c SHA256SUMS`) and a `RECORDED` note.
 - The bodies are unmodified, including what the upstream itself adds: the basmala prefixed to ayah 1 of surahs other than 1 and 9, and a byte-order mark on 1:1. The server strips both at runtime (see the CHANGELOG, 1.4.1). The fixtures keep them, so the tests can prove it.
 

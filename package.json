@@ -1,1 +1,83 @@
-{  "name": "@asksakina/islamic-knowledge-mcp",  "version": "2.0.0",  "private": false,  "description": "Verified Islamic knowledge MCP server — Quranic verses, a curated du'a collection, and the 99 Names of Allah. Reviewed through AskSakina's structured specialist-AI review chain across mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali); not a substitute for a qualified scholar. Provides four lookup tools to AI agents over the Model Context Protocol.",  "mcpName": "com.asksakina/islamic-knowledge",  "main": "dist/server.js",  "bin": {    "sakina-mcp": "dist/server.js"  },  "files": [    "dist/",    "data/",    "README.md",    "LICENSE",    ".mcp/server.json"  ],  "scripts": {    "typecheck": "tsc --noEmit",    "bundle-data": "tsx scripts/bundle-data.ts",    "update-geoip": "node node_modules/geoip-lite/scripts/updatedb.js",    "prebuild": "npm run bundle-data",    "build": "tsc -p tsconfig.build.json && node scripts/postbuild.mjs",    "prepublishOnly": "npm run bundle-data && npm run build && npm run test:tools && npm run test:analytics && npm run test:http && npm run test:ratelimit && npm run guards",    "start": "tsx src/server.ts",    "start:dist": "node dist/server.js",    "test:tools": "tsx scripts/test-tools.ts",    "test:analytics": "tsx scripts/test-analytics.ts",    "test:http": "tsx scripts/test-http-smoke.ts",    "test:ratelimit": "tsx scripts/test-ratelimit.ts",    "guards": "node scripts/publish-guards.mjs",    "eval": "tsx scripts/run-evals.ts"  },  "dependencies": {    "@modelcontextprotocol/sdk": "^1.30.1",    "geoip-lite": "^1.4.10",
+{
+  "name": "@asksakina/islamic-knowledge-mcp",
+  "version": "2.1.0",
+  "private": false,
+  "description": "Curated Islamic knowledge MCP server: Quranic verses, a curated du'a corpus, and the 99 Names of Allah. New and changed content is reviewed through AskSakina's structured specialist-AI review chain across mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali); not a substitute for a qualified scholar. Provides four lookup tools to AI agents over the Model Context Protocol.",
+  "mcpName": "com.asksakina/islamic-knowledge",
+  "main": "dist/server.js",
+  "bin": {
+    "sakina-mcp": "dist/server.js"
+  },
+  "files": [
+    "dist/",
+    "data/",
+    "README.md",
+    "LICENSE",
+    ".mcp/server.json"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "bundle-data": "tsx scripts/bundle-data.ts && tsx scripts/check-dua-chars.ts",
+    "update-geoip": "node node_modules/geoip-lite/scripts/updatedb.js",
+    "prebuild": "npm run bundle-data",
+    "build": "tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
+    "prepublishOnly": "npm run bundle-data && npm run build && npm run test:tools && npm run test:analytics && npm run test:http && npm run test:ratelimit && npm run test:crisis && npm run test:teach && npm run test:wo418 && npm run test:wo423 && npm run test:wo424 && npm run test:wo430 && npm run test:wo444 && npm run test:wo454 && npm run guards",
+    "start": "tsx src/server.ts",
+    "start:dist": "node dist/server.js",
+    "test:tools": "tsx scripts/test-tools.ts",
+    "test:analytics": "tsx scripts/test-analytics.ts",
+    "test:http": "tsx scripts/test-http-smoke.ts",
+    "test:ratelimit": "tsx scripts/test-ratelimit.ts",
+    "test:crisis": "tsx scripts/test-crisis-normalisation.ts",
+    "test:teach": "tsx scripts/test-teach.ts",
+    "test:wo418": "tsx scripts/test-wo418.ts",
+    "guards": "node scripts/publish-guards.mjs",
+    "release-gate": "tsx scripts/release-gate.ts",
+    "byte-identity": "tsx scripts/byte-identity.ts",
+    "eval": "tsx scripts/run-evals.ts",
+    "test:wo423": "tsx scripts/test-wo423.ts",
+    "test:wo424": "tsx scripts/test-wo424.ts",
+    "test:wo430": "tsx scripts/test-wo430.ts",
+    "test:wo444": "tsx scripts/test-wo444.ts",
+    "test:wo454": "tsx scripts/test-wo454.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.1",
+    "geoip-lite": "^1.4.10",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/geoip-lite": "^1.4.4",
+    "@types/node": "^22.7.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yserrag/asksakina-mcp"
+  },
+  "homepage": "https://www.asksakina.com",
+  "bugs": {
+    "url": "https://github.com/yserrag/asksakina-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "islam",
+    "islamic",
+    "quran",
+    "dua",
+    "supplication",
+    "hadith",
+    "asma-ul-husna",
+    "99-names-of-allah",
+    "spiritual",
+    "ai-agent",
+    "claude",
+    "sakina"
+  ],
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "node": ">=20"
+  }
+}

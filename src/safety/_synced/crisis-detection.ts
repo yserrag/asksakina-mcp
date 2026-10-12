@@ -76,7 +76,14 @@ export interface CrisisDetectionResult {
   crisisType: CrisisType
 }
 
-export const SELF_HARM_KEYWORDS = [
+/**
+ * English entries of the list below (WO#391). Moved here unchanged so the
+ * English-only normalisation steps (leetspeak, repeated letters; Gem 3,
+ * 27 Sep 2026) can target them. The full list spreads this array back in;
+ * its contents are the same set as before the move (asserted in
+ * wo391-crisis-normalisation.test.ts).
+ */
+export const SELF_HARM_KEYWORDS_EN = [
   // ── English — explicit ideation ─────────────────────────────────────────
   'kill myself', 'want to die', 'end my life', 'suicide',
   'better off dead', 'no reason to live', 'hurt myself', 'harm myself',
@@ -135,6 +142,25 @@ export const SELF_HARM_KEYWORDS = [
   'end it all', 'want to end it all',
   'feeling suicidal', 'suicidal thoughts', 'thoughts of suicide',
   'go to sleep and not wake up', 'never wake up',
+
+  // ── EN (WO#252-B expansion) ──
+  "i want to end it",
+  "nothing to live for",
+  "want to sleep forever",
+  "no point living",
+  "kms",
+  "cant take this anymore",
+  "cut myself",
+  "took a lot of pills",
+  "allah take me",
+  "pray allah takes me",
+  "is it haram to end it",
+  "dua to die in sleep",
+  "will i go to hell if i",
+]
+
+export const SELF_HARM_KEYWORDS = [
+  ...SELF_HARM_KEYWORDS_EN,
 
   // ── Indonesian (Bahasa Indonesia — informal kamu register) ─────────────
   'bunuh diri', 'ingin mati', 'pengen mati', 'akhiri hidup',
@@ -287,20 +313,6 @@ export const SELF_HARM_KEYWORDS = [
   // against the live post-252-A detector. Arabic stored in normaliseArabic()
   // form; Latin/transliterated lower-cased. Both folded again defensively by
   // matchesAny at match time.
-  // ── EN ──
-  "i want to end it",
-  "nothing to live for",
-  "want to sleep forever",
-  "no point living",
-  "kms",
-  "cant take this anymore",
-  "cut myself",
-  "took a lot of pills",
-  "allah take me",
-  "pray allah takes me",
-  "is it haram to end it",
-  "dua to die in sleep",
-  "will i go to hell if i",
   // ── TR ──
   "hayatıma son",
   "uyuyup uyanmamak",
@@ -387,7 +399,14 @@ export const SELF_HARM_KEYWORDS = [
   'کاش میں پیدا ای نہ ہوندا',
 ]
 
-export const ABUSE_KEYWORDS = [
+/**
+ * English entries of the list below (WO#391). Moved here unchanged so the
+ * English-only normalisation steps (leetspeak, repeated letters; Gem 3,
+ * 27 Sep 2026) can target them. The full list spreads this array back in;
+ * its contents are the same set as before the move (asserted in
+ * wo391-crisis-normalisation.test.ts).
+ */
+export const ABUSE_KEYWORDS_EN = [
   // ── English ─────────────────────────────────────────────────────────────
   'he hits me', 'she hits me', 'being abused', 'afraid to go home',
   'sexually abused', 'assaulted', 'raped', 'beats me',
@@ -430,6 +449,23 @@ export const ABUSE_KEYWORDS = [
   'uncle hits me', 'uncle beats me',
   'in-laws hit me', 'in-laws beat me',
   'mother-in-law hits me', 'mother-in-law beats me',
+
+  // ── EN (WO#252-B expansion) ──
+  "he hit me",
+  "physically abusive",
+  "emotionally abusive",
+  "forced to marry",
+  "husband is violent",
+  "dad hurts me",
+  "locked me in",
+  "he choked me",
+  "sin to leave abusive husband",
+  "forcing me to sleep with him",
+  "break family ties for safety",
+]
+
+export const ABUSE_KEYWORDS = [
+  ...ABUSE_KEYWORDS_EN,
 
   // ── Indonesian ──────────────────────────────────────────────────────────
   'dipukul', 'dilecehkan', 'diperkosa', 'takut pulang',
@@ -498,18 +534,6 @@ export const ABUSE_KEYWORDS = [
   // against the live post-252-A detector. Arabic stored in normaliseArabic()
   // form; Latin/transliterated lower-cased. Both folded again defensively by
   // matchesAny at match time.
-  // ── EN ──
-  "he hit me",
-  "physically abusive",
-  "emotionally abusive",
-  "forced to marry",
-  "husband is violent",
-  "dad hurts me",
-  "locked me in",
-  "he choked me",
-  "sin to leave abusive husband",
-  "forcing me to sleep with him",
-  "break family ties for safety",
   // ── TR ──
   "kocam dövüyor",
   "babam vuruyor",
@@ -669,6 +693,9 @@ export const SELF_HARM_GUARDS: ReadonlyArray<string> = [
 
 import { normaliseArabic, containsArabic } from './arabic-normalise.js'
 import { foldLatin } from './latin-fold.js'
+import {
+  normaliseSeparators, collapseLetterSpacing, englishVariants, matchesSquashed, isSquashable, boundedIncludes,
+} from './crisis-normalise.js'
 
 /**
  * WO#308 — apostrophe normalisation. Contraction keywords ("don't want to be
@@ -686,29 +713,123 @@ function stripApostrophes(s: string): string {
 }
 
 /**
- * Apply detection over a keyword list. Arabic-script keywords match against
- * `normaliseArabic(input)` (incl. the WO#252-A cross-script fold); Latin /
- * transliterated keywords match against the Turkish/Latin-folded lower-cased
- * input (WO#97 §S3D + WO#252-A).
- *
- * Both the keyword and the input are folded the same way, so a diacritic-free
- * "olmek istiyorum" matches the stored "ölmek istiyorum" and vice versa. The
- * normalise/fold calls on the keyword are defensive — the stored entries are
- * already in canonical form, but re-applying is idempotent and protects against
- * a contributor adding a non-canonical keyword by accident.
+ * WO#391 (Gem 3, 27 Sep 2026): the prepared input. Every form is for MATCHING
+ * ONLY; the caller's text is never altered. See crisis-normalise.ts.
+ *   - `latin`     lower-cased, Latin-folded, apostrophes stripped, then steps
+ *                 1, 2 and 6 (zero-width, separators, Unicode dashes/spaces);
+ *                 plus the step 4 letter-spacing collapse as a second base.
+ *   - `english`   steps 3 and 5 (leetspeak, repeated letters) on each base,
+ *                 matched against ENGLISH keywords only.
+ *   - `arabic`    steps 1 and 2, then normaliseArabic (WO#97 / WO#252-A).
+ *                 Arabic script gets nothing else (Gem 2 open item).
  */
-function matchesAny(
-  keywords: ReadonlyArray<string>,
-  folded: string,
-  normArabic: string
-): boolean {
-  for (const k of keywords) {
-    if (containsArabic(k)) {
-      if (normArabic.includes(normaliseArabic(k))) return true
-    } else {
-      if (folded.includes(stripApostrophes(foldLatin(k)))) return true
-    }
+interface PreparedInput {
+  latin: string[]
+  english: string[]
+  arabic: string
+}
+
+function prepareInput(text: string): PreparedInput {
+  const folded = normaliseSeparators(stripApostrophes(foldLatin(text.toLowerCase())))
+  const latin = [...new Set([folded, collapseLetterSpacing(folded)])]
+  const english = [...new Set(latin.flatMap(englishVariants))].filter((v) => !latin.includes(v))
+  let arabic = normaliseArabic(normaliseSeparators(text))
+  // WO#252-B — FP-guard precedence: strip guard phrases so a trigger that is a
+  // substring of a valid Qur'anic/devotional phrase does not fire when the user
+  // typed the longer phrase. Independent triggers elsewhere are untouched.
+  for (const guard of SELF_HARM_GUARDS) {
+    if (guard) arabic = arabic.split(guard).join('')
   }
+  return { latin, english, arabic }
+}
+
+/** A keyword in the form it is matched in, computed once per keyword. */
+interface PreparedKeyword {
+  arabic: boolean
+  norm: string
+  english: boolean
+  squash: boolean
+  /** true for every English keyword except the end-bounded ones above. */
+  openEnd: boolean
+}
+
+/**
+ * WO#391 addendum (d), Architect correction on 2e02e5f: every English keyword
+ * matches from a word START boundary ("skill myself", "draped" no longer hit),
+ * but only these keywords also need an END boundary, because only they have a
+ * known false-positive continuation: "self harm" (self-harmony) and the
+ * "hits me" family (the hits media). Every other English keyword stays
+ * open-ended at the end, as before WO#391, so glued tails such as
+ * "kill myselfnow" and stems such as "suicid" (suicidal) still hit.
+ * A lost hit on a self-harm phrase is a safety regression and outranks a
+ * false positive; widen this set only on a Gem 3 ruling.
+ */
+function needsEndBoundary(norm: string): boolean {
+  return norm === 'self harm' || norm.endsWith(' hits me')
+}
+
+/**
+ * WO#391, Gem 3 ruling (27 Sep 2026, Option 2): "kms" ("kill myself") is not
+ * a hit when the word right after it is a distance word, so "5 kms walk" and
+ * "10 kms away" do not fire. Only that occurrence is skipped: "kms" anywhere
+ * else, including after a number ("day 3 kms"), still hits. Residual false
+ * positive accepted by Gem 3: "ran 5 kms today".
+ */
+const KEYWORD_SUPPRESS_AFTER: Readonly<Record<string, RegExp>> = {
+  kms: /^ (?:walk|away|run|drive|from)(?![\p{L}\p{N}])/u,
+}
+
+const ENGLISH_KEYWORDS: ReadonlySet<string> = new Set([...SELF_HARM_KEYWORDS_EN, ...ABUSE_KEYWORDS_EN])
+const preparedCache = new Map<string, PreparedKeyword>()
+
+function prepareKeyword(k: string): PreparedKeyword {
+  let p = preparedCache.get(k)
+  if (!p) {
+    const arabic = containsArabic(k)
+    // The keyword goes through the same pipeline as the input, so a stored
+    // "self-harm" and a typed "self harm" meet as "self harm".
+    const norm = arabic
+      ? normaliseArabic(normaliseSeparators(k))
+      : normaliseSeparators(stripApostrophes(foldLatin(k.toLowerCase())))
+    const english = !arabic && ENGLISH_KEYWORDS.has(k)
+    p = { arabic, norm, english, squash: !arabic && isSquashable(norm), openEnd: !needsEndBoundary(norm) }
+    preparedCache.set(k, p)
+  }
+  return p
+}
+
+/**
+ * One keyword against the prepared input. Arabic-script keywords match the
+ * Arabic form only. Latin keywords match either base as a substring (the
+ * pre-WO#391 rule; English keywords from a word start boundary, and end-
+ * bounded only where needsEndBoundary says, addendum (d)),
+ * English ones also match the leet / repeat variants, and
+ * a Latin keyword of 6+ letters also matches in no-separator form on token
+ * boundaries (step 7).
+ */
+function keywordHits(k: string, input: PreparedInput): boolean {
+  const p = prepareKeyword(k)
+  if (!p.norm) return false
+  if (p.arabic) return input.arabic.includes(p.norm)
+  const forms = p.english ? [...input.latin, ...input.english] : input.latin
+  for (const f of forms) {
+    // English keywords match from a word start boundary, and the few listed
+    // in needsEndBoundary also end at one (addendum (d)); every other
+    // Latin-script language keeps substring matching (Turkish, Indonesian
+    // and roman Urdu attach suffixes a boundary rule would cut off).
+    if (p.english ? boundedIncludes(f, p.norm, p.openEnd, KEYWORD_SUPPRESS_AFTER[p.norm]) : f.includes(p.norm)) return true
+    if (p.squash && matchesSquashed(f, p.norm)) return true
+  }
+  return false
+}
+
+/**
+ * Apply detection over a keyword list. Both the keyword and the input are
+ * folded the same way (WO#97 §S3D, WO#252-A, WO#308 apostrophes, WO#391
+ * separators and variants), so normalisation can only ADD matches.
+ */
+function matchesAny(keywords: ReadonlyArray<string>, input: PreparedInput): boolean {
+  for (const k of keywords) if (keywordHits(k, input)) return true
   return false
 }
 
@@ -716,14 +837,13 @@ function matchesAny(
  * Detect crisis keywords in user input.
  * Self-harm is checked first (higher acuity).
  *
- * Two normalisation passes on the input, applied once and shared
- * across both keyword-list checks:
- *   - `lower`        — toLowerCase() for English / transliterated
- *                      Arabic / Indonesian / Urdu keywords. Acronym
- *                      keywords like `'kdrt'` rely on this.
- *   - `normArabic`   — Arabic-specific normalisation (WO#97 §S3D)
- *                      so chat-typed Arabic without hamza / tashkeel
- *                      matches the formal-MSA keyword spellings.
+ * The input is prepared once (prepareInput above) and shared across both
+ * keyword-list checks: the Latin forms for English / transliterated /
+ * Indonesian / Turkish / Bengali keywords (acronyms like `'kdrt'` rely on the
+ * lower-casing), and the Arabic form (WO#97 §S3D) so chat-typed Arabic without
+ * hamza / tashkeel matches the formal-MSA spellings. WO#391 adds separator,
+ * zero-width, leetspeak, letter-spacing, repeated-letter and no-separator
+ * normalisation; see crisis-normalise.ts.
  */
 /**
  * WO#265 — bare-noun frame-suppression (Gem 2 four-gate, Architect-tightened).
@@ -756,25 +876,19 @@ const FRAME_MARKERS: ReadonlyArray<string> = [...FA_FRAME_MARKERS, ...BN_FRAME_M
 const DISCLOSURE_MARKERS: ReadonlyArray<string> = [...FA_DISCLOSURE_MARKERS, ...BN_DISCLOSURE_MARKERS]
 
 /** matchesAny but skipping any keyword in `exclude` (the bare-noun set). */
-function matchesAnyExcept(
-  keywords: ReadonlyArray<string>, exclude: Set<string>, folded: string, normArabic: string,
-): boolean {
+function matchesAnyExcept(keywords: ReadonlyArray<string>, exclude: Set<string>, input: PreparedInput): boolean {
   for (const k of keywords) {
     if (exclude.has(k)) continue
-    if (containsArabic(k)) { if (normArabic.includes(normaliseArabic(k))) return true }
-    else { if (folded.includes(stripApostrophes(foldLatin(k)))) return true }
+    if (keywordHits(k, input)) return true
   }
   return false
 }
 
 /** Distinct bare-noun guards that hit the (normalised) input. */
-function bareNounHits(folded: string, normArabic: string): Array<{ kw: string; type: CrisisType }> {
+function bareNounHits(input: PreparedInput): Array<{ kw: string; type: CrisisType }> {
   const hits: Array<{ kw: string; type: CrisisType }> = []
   for (const g of BARE_NOUN_GUARDS) {
-    const hit = containsArabic(g.kw)
-      ? normArabic.includes(normaliseArabic(g.kw))
-      : folded.includes(foldLatin(g.kw))
-    if (hit) hits.push({ kw: g.kw, type: g.type })
+    if (keywordHits(g.kw, input)) hits.push({ kw: g.kw, type: g.type })
   }
   return hits
 }
@@ -788,39 +902,30 @@ function wordCount(text: string): number {
  * Gates 2-4 for a lone bare-noun hit (gate 1 is handled by the caller).
  * true = FIRE crisis, false = SUPPRESS (informational frame, no disclosure, short).
  */
-function fireBareNoun(text: string, folded: string, normArabic: string): boolean {
-  if (!matchesAny(FRAME_MARKERS, folded, normArabic)) return true       // gate 2: no frame => FIRE
-  if (matchesAny(DISCLOSURE_MARKERS, folded, normArabic)) return true   // gate 3: disclosure => FIRE
+function fireBareNoun(text: string, input: PreparedInput): boolean {
+  if (!matchesAny(FRAME_MARKERS, input)) return true       // gate 2: no frame => FIRE
+  if (matchesAny(DISCLOSURE_MARKERS, input)) return true   // gate 3: disclosure => FIRE
   return wordCount(text) > 8                                            // gate 4: <=8 SUPPRESS, >8 FIRE
 }
 
 export function detectCrisis(text: string): CrisisDetectionResult {
-  // WO#252-A — Latin branch: lower-case then Turkish/Latin-fold once, shared
-  // across both keyword-list checks so diacritic-free input (and dotted/dotless
-  // İ/ı) matches the stored diacritic forms.
-  const folded = stripApostrophes(foldLatin(text.toLowerCase()))
-  let normArabic = normaliseArabic(text)
-  // WO#252-B — FP-guard precedence: strip guard phrases so a trigger that is a
-  // substring of a valid Qur'anic/devotional phrase does not fire when the user
-  // typed the longer phrase. Independent triggers elsewhere are untouched.
-  for (const guard of SELF_HARM_GUARDS) {
-    if (guard) normArabic = normArabic.split(guard).join('')
-  }
-
+  // WO#252-A Latin fold + WO#391 normalisation, prepared once and shared
+  // across both keyword-list checks. `text` itself is never modified.
+  const input = prepareInput(text)
 
   // WO#265 — non-bare crisis strings fire exactly as before (gate 1: a
   // co-occurring non-bare trigger short-circuits here).
-  if (matchesAnyExcept(SELF_HARM_KEYWORDS, BARE_NOUN_SET, folded, normArabic)) {
+  if (matchesAnyExcept(SELF_HARM_KEYWORDS, BARE_NOUN_SET, input)) {
     return { isCrisis: true, crisisType: 'self-harm' }
   }
-  if (matchesAnyExcept(ABUSE_KEYWORDS, BARE_NOUN_SET, folded, normArabic)) {
+  if (matchesAnyExcept(ABUSE_KEYWORDS, BARE_NOUN_SET, input)) {
     return { isCrisis: true, crisisType: 'abuse' }
   }
   // Only bare-noun guards can match now — apply the four-gate suppression.
-  const hits = bareNounHits(folded, normArabic)
+  const hits = bareNounHits(input)
   if (hits.length === 0) return { isCrisis: false, crisisType: 'none' }
   const type: CrisisType = hits.some((h) => h.type === 'self-harm') ? 'self-harm' : 'abuse'
   if (hits.length >= 2) return { isCrisis: true, crisisType: type } // gate 1: 2+ distinct bare nouns
-  if (fireBareNoun(text, folded, normArabic)) return { isCrisis: true, crisisType: type }
+  if (fireBareNoun(text, input)) return { isCrisis: true, crisisType: type }
   return { isCrisis: false, crisisType: 'none' } // suppressed: informational frame
 }

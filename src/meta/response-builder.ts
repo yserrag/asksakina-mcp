@@ -27,6 +27,8 @@ import {
   VOICE_2_RULE,
   PBUH_RULE,
   NO_EMOJI_RULE,
+  TEACH_DIRECTIVE,
+  TEACH_CONTRACT,
 } from '../contracts/presentation.js'
 
 export type ContentType =
@@ -148,16 +150,28 @@ function metaForType(contentType: ContentType): {
   }
 }
 
+/** True when any record in the content carries a teach block (WO#405). */
+function carriesTeach(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(carriesTeach)
+  if (!value || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  if (record.teach && typeof record.teach === 'object') return true
+  return Object.values(record).some(carriesTeach)
+}
+
 export function buildResponse<TContent>(
   input: BuilderInput<TContent>,
 ): SakinaResponse<TContent> {
   const meta = metaForType(input.contentType)
-  const directives = input.extraDirectives?.length
-    ? [...meta.directives, ...input.extraDirectives]
-    : meta.directives
-  const contract = input.contractOverride
+  // WO#407 (Gem 10): the teach directive and contract go out only with a
+  // teach block, so a response without one serialises exactly as before.
+  const teach = carriesTeach(input.content)
+  const extra = [...(input.extraDirectives ?? []), ...(teach ? [TEACH_DIRECTIVE] : [])]
+  const directives = extra.length ? [...meta.directives, ...extra] : meta.directives
+  const merged = input.contractOverride
     ? { ...meta.contract, ...input.contractOverride }
     : meta.contract
+  const contract = teach ? { ...merged, teach: TEACH_CONTRACT } : merged
   const response: SakinaResponse<TContent> = {
     _sakina_meta: {
       version: VERSION,

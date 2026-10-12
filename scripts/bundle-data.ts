@@ -12,8 +12,10 @@
  *   - `mcp-server/data/names.json`           — 99 Names of Allah
  *   - `mcp-server/data/dua-categories.json`  — DUA_CATEGORIES metadata
  *   - `mcp-server/data/thematic-verses.json` — the thematic verse index (WO#386), Arabic from the scripture module
+ *   - `mcp-server/data/pickthall.json`       — WO#444: the app's corrected Pickthall, all 6,236 verses, served by get_quran_verse and find_verses
  *   - `mcp-server/src/safety/_synced/crisis-detection.ts`
  *   - `mcp-server/src/safety/_synced/arabic-normalise.ts`
+ *   - `mcp-server/src/safety/_synced/crisis-normalise.ts` (WO#391)
  *
  * Why synced TS files (not just keyword JSON): the main app's
  * `detectCrisis` is the canonical safety contract — Gem 3 + Gem 5
@@ -27,21 +29,44 @@
  * `prepublishOnly` so `npm publish` always re-bundles first.
  */
 
-import { promises as fs } from 'node:fs'
+import { existsSync, promises as fs, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { ALL_DUAS, DUA_CATEGORIES } from '../../src/data/duas/index.js'
+import { ALL_DUAS, CORPUS_DUAS, DUA_CATEGORIES } from '../../src/data/duas/index.js'
 import { namesOfAllah } from '../../src/lib/data/99-names.js'
 import { THEMATIC_VERSES } from '../../src/lib/data/thematic-verses.js'
 import { getVerseArabic } from '../../src/lib/scripture/index.js'
+import { QURAN_PICKTHALL } from '../../src/lib/scripture/_generated/quran-pickthall.js'
+import { SURAHS } from '../../src/lib/data/quran-metadata.js'
 import { QURANIC_LABELS, skeleton } from './quranic-labels.js'
+import { QURANIC_DUA_TEXT, SERVE_QURANIC_DUA_TEXT_FROM_SCRIPTURE } from '../../src/data/duas/quranic-text.js'
+import { MIXED_DUA_SPANS } from '../../src/data/duas/quranic-spans-mixed.js'
+import { ends, makePickthallRule } from '../../src/lib/scripture/pickthall-rule.js'
+import { TEACH_ENTRIES } from '../src/teach/entries.js'
+import { buildDuaIdAllowlist, validateTeachEntries } from '../src/teach/validate.js'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(SCRIPT_DIR, '..')
 const MAIN_REPO = path.resolve(ROOT, '..')
 const OUT_DATA_DIR = path.join(ROOT, 'data')
 const OUT_SYNCED_DIR = path.join(ROOT, 'src', 'safety', '_synced')
+
+// WO#444: the app's corrected Pickthall (public/quran/en.pickthall), read once.
+// It is what the app's reader shows, the WO#442 corrections included.
+const PICKTHALL_DIR = path.join(MAIN_REPO, 'public', 'quran', 'en.pickthall')
+const pickthallSurahs = new Map<number, Map<number, string>>()
+function readPickthallSurah(s: number): Map<number, string> | null {
+  if (!pickthallSurahs.has(s)) {
+    const f = path.join(PICKTHALL_DIR, `${s}.json`)
+    if (!existsSync(f)) return null
+    const d = JSON.parse(readFileSync(f, 'utf-8')) as { verses: { verse_number: number; translations: { text: string }[] }[] }
+    pickthallSurahs.set(s, new Map(d.verses.map((v) => [v.verse_number, v.translations[0].text])))
+  }
+  return pickthallSurahs.get(s)!
+}
+// The WO#421 rule (CLAUDE.md), the same code as the app's prebuild guard.
+const pickthallRule = makePickthallRule(readPickthallSurah)
 
 const SYNCED_HEADER = `// ─────────────────────────────────────────────────────────────────
 // SYNCED FILE — DO NOT EDIT BY HAND.
@@ -68,6 +93,11 @@ async function copySyncedTypeScript(srcRel: string, dest: string, rewrites: Arra
   for (const [from, to] of rewrites) {
     content = content.split(from).join(to)
   }
+  // WO#391: an unrewritten app alias would ship a synced file that cannot
+  // resolve its import in the package. Fail the bundle instead.
+  if (/from '@\//.test(content)) {
+    throw new Error(`${srcRel}: an '@/' import has no rewrite rule in syncSafetyFiles`)
+  }
   // Strip any sentinel JSDoc that references monorepo-internal paths
   // and prepend the synced header so the file is self-describing.
   await fs.writeFile(dest, SYNCED_HEADER + '\n' + content, 'utf-8')
@@ -76,9 +106,12 @@ async function copySyncedTypeScript(srcRel: string, dest: string, rewrites: Arra
 
 // WO#377 addendum: label Gem-2-verified Quranic du'as and resolve their
 // Arabic from the scripture module. Output only; the corpus is not edited.
+const MODULE_SERVED = new Set(QURANIC_DUA_TEXT.map((x) => x.id))
+
 function labelQuranicDuas() {
   const byId = new Map(QURANIC_LABELS.map((l) => [l.id, l]))
   const seen = new Set<string>()
+  let pickthallCount = 0
   const out = ALL_DUAS.map((dua) => {
     const label = byId.get(dua.id)
     if (!label) return dua
@@ -92,17 +125,113 @@ function labelQuranicDuas() {
         )
       }
     }
-    if (skeleton(arabic) !== skeleton(dua.arabic)) {
+    if (SERVE_QURANIC_DUA_TEXT_FROM_SCRIPTURE && label.translationAnchors) {
+      const w = (dua.translation ?? '').split(' ')
+      if (w[0] !== label.translationAnchors[0] || w[w.length - 1] !== label.translationAnchors[1]) {
+        throw new Error(`quranic label ${dua.id}: served Pickthall span for ${label.ref} no longer starts/ends at the ruled words; re-check the English word index`)
+      }
+    }
+    // WO#406: the guard compares against the corpus as authored (a corpus
+    // edit must still fail). The MCP resolves UNCONDITIONALLY (Architect,
+    // 28 Sep 2026): SERVE_QURANIC_DUA_TEXT_FROM_SCRIPTURE is an app-level
+    // rollback only and never changes what the package serves. So the
+    // app/bundle agreement is asserted only while the flag is on.
+    const corpusArabic = CORPUS_DUAS.find((c) => c.id === dua.id)?.arabic ?? ''
+    if (SERVE_QURANIC_DUA_TEXT_FROM_SCRIPTURE && arabic !== dua.arabic) {
+      throw new Error(`quranic label ${dua.id}: shared du'a layer and bundle resolve different Arabic`)
+    }
+    if (skeleton(arabic) !== skeleton(corpusArabic)) {
       throw new Error(
         `quranic label ${dua.id}: corpus Arabic no longer matches Quran ${label.ref}; re-verify with Gem 2 before labelling`,
       )
     }
-    return { ...dua, arabic, origin: 'quran' as const, quran_ref: label.ref }
+    // WO#418 (Architect: label by fact): mark the English as Pickthall only
+    // when it is Pickthall's own words for this reference. WO#444: judged by
+    // the WO#421 rule (CLAUDE.md), the same classifier as the app's prebuild
+    // guard, in place of the old letters-only test: class A (whole verse) or B
+    // (an excerpt or join within the rule). A leading Pickthall basmala line
+    // on a whole-surah row is checked verbatim and set aside, as in WO#441.
+    let english = ends(dua.translation ?? '')
+    const basmala = ends(readPickthallSurah(1)?.get(1) ?? '')
+    if (!label.ref.startsWith('1:') && basmala && english.startsWith(basmala) && english.length > basmala.length) {
+      english = ends(english.slice(basmala.length))
+    }
+    const klass = english ? pickthallRule.classify(english, label.ref).klass : 'C'
+    const pickthall = klass === 'A' || klass === 'B'
+    // A record whose English the scripture module serves is supposed to be
+    // Pickthall: class C there is a defect, not a missing label.
+    if (!pickthall && MODULE_SERVED.has(dua.id)) {
+      throw new Error(`quranic label ${dua.id}: English served from the scripture module is class ${klass} for ${label.ref} under the WO#421 rule`)
+    }
+    if (pickthall) pickthallCount++
+    return { ...dua, arabic, origin: 'quran' as const, quran_ref: label.ref, ...(pickthall ? { translation_source: 'pickthall' as const } : {}) }
   })
   const missing = QURANIC_LABELS.filter((l) => !seen.has(l.id)).map((l) => l.id)
   if (missing.length) throw new Error(`quranic labels for unknown du'a ids: ${missing.join(', ')}`)
-  console.log(`  labelled ${seen.size} du'as origin=quran (scripture module Arabic)`)
-  return out
+  console.log(`  labelled ${seen.size} du'as origin=quran (scripture module Arabic); English verified Pickthall on ${pickthallCount}`)
+  return labelMixedDuas(out)
+}
+
+/**
+ * WO#444 (Architect, ruling a): a mixed du'a (a Qur'anic span inside a longer
+ * supplication, src/data/duas/quranic-spans-mixed.ts, WO#450) is labelled by
+ * its Pickthall segments. Each segment must be in the du'a's English and be
+ * class A or B for its ref under the WO#421 rule; anything else fails the
+ * bundle. A mixed du'a is not labelled origin=quran: only its segments are
+ * Qur'an.
+ */
+function labelMixedDuas<T extends { id: string; translation?: string; origin?: string }>(duas: T[]) {
+  const byId = new Map<string, { ref: string; translation: string; translation_source: 'pickthall' }[]>()
+  for (const m of MIXED_DUA_SPANS) {
+    const dua = duas.find((d) => d.id === m.id)
+    if (!dua) throw new Error(`mixed du'a ${m.id}: not in the corpus`)
+    if (dua.origin === 'quran') throw new Error(`mixed du'a ${m.id}: also labelled origin=quran`)
+    if (!(dua.translation ?? '').includes(m.english)) throw new Error(`mixed du'a ${m.id}: its ${m.ref} segment is not in its English`)
+    const { klass } = pickthallRule.classify(m.english, m.ref)
+    if (klass !== 'A' && klass !== 'B') throw new Error(`mixed du'a ${m.id}: its ${m.ref} segment is class ${klass} under the WO#421 rule`)
+    const list = byId.get(m.id) ?? []
+    list.push({ ref: m.ref, translation: m.english, translation_source: 'pickthall' })
+    byId.set(m.id, list)
+  }
+  console.log(`  labelled ${byId.size} mixed du'as by ${MIXED_DUA_SPANS.length} Pickthall segments (quranic-spans-mixed.ts)`)
+  return duas.map((d) => (byId.has(d.id) ? { ...d, quran_spans: byId.get(d.id)! } : d))
+}
+
+/**
+ * WO#444 (Architect, decision 1, option A): bundle the app's whole corrected
+ * en.pickthall, so get_quran_verse and find_verses serve what the app's reader
+ * shows. No verse-final punctuation, as in the app (decision 2). Asserted: the
+ * map is the file's text byte for byte, all 6,236 verses, it carries the
+ * manifest's contentVersion, and every WO#442 correction reads its corrected
+ * text.
+ */
+async function bundlePickthall() {
+  const manifest = JSON.parse(readFileSync(path.join(MAIN_REPO, 'public', 'quran', 'manifest.json'), 'utf-8')) as { contentVersion: string; totalVerses: number }
+  const verses: Record<string, string> = {}
+  for (let s = 1; s <= 114; s++) {
+    const sv = readPickthallSurah(s)
+    if (!sv) throw new Error(`pickthall: surah ${s} missing from public/quran/en.pickthall`)
+    for (const [a, text] of sv) verses[`${s}:${a}`] = text
+  }
+  const n = Object.keys(verses).length
+  if (n !== manifest.totalVerses || n !== 6236) throw new Error(`pickthall: ${n} verses, manifest says ${manifest.totalVerses}`)
+  for (const s of SURAHS) {
+    if (!verses[`${s.id}:${s.versesCount}`] || verses[`${s.id}:${s.versesCount + 1}`]) throw new Error(`pickthall: surah ${s.id} does not have ${s.versesCount} verses`)
+  }
+  let corrections = 0
+  for (const f of ['phase2a-applied.json', 'phase2b-applied.json']) {
+    const rows = JSON.parse(readFileSync(path.join(MAIN_REPO, 'docs', 'wo442-data', f), 'utf-8')) as { key: string; proposed: string }[]
+    for (const r of rows) {
+      if (verses[r.key] !== r.proposed) throw new Error(`pickthall: ${r.key} does not read its WO#442 correction (${f})`)
+      corrections++
+    }
+  }
+  // the scripture module's Pickthall (what get_dua serves) agrees with the file
+  for (const [k, v] of Object.entries(QURAN_PICKTHALL)) {
+    if (verses[k] !== v) throw new Error(`pickthall: the scripture module's ${k} differs from public/quran/en.pickthall`)
+  }
+  console.log(`bundling Pickthall (${n} verses, contentVersion ${manifest.contentVersion}, ${corrections} WO#442 corrections present)`)
+  await writeJson(path.join(OUT_DATA_DIR, 'pickthall.json'), { contentVersion: manifest.contentVersion, source: 'public/quran/en.pickthall', verses })
 }
 
 async function bundleDuas() {
@@ -150,6 +279,12 @@ async function syncSafetyFiles() {
     path.join(OUT_SYNCED_DIR, 'latin-fold.ts'),
     [],
   )
+  // WO#391: crisis-input normalisation (matching only). No imports.
+  await copySyncedTypeScript(
+    'src/lib/utils/crisis-normalise.ts',
+    path.join(OUT_SYNCED_DIR, 'crisis-normalise.ts'),
+    [],
+  )
   await copySyncedTypeScript(
     'src/lib/utils/crisis-detection.ts',
     path.join(OUT_SYNCED_DIR, 'crisis-detection.ts'),
@@ -159,6 +294,8 @@ async function syncSafetyFiles() {
        "import { normaliseArabic, containsArabic } from './arabic-normalise.js'"],
       ["import { foldLatin } from '@/lib/utils/latin-fold'",
        "import { foldLatin } from './latin-fold.js'"],
+      ["} from '@/lib/utils/crisis-normalise'",
+       "} from './crisis-normalise.js'"],
     ],
   )
 }
@@ -174,11 +311,59 @@ async function writeManifest() {
     },
     notes: [
       'Generated by mcp-server/scripts/bundle-data.ts.',
-      'Quran verses are NOT bundled: fetched at runtime from alquran.cloud (en.pickthall / Pickthall).',
+      'Quran English is bundled (WO#444): data/pickthall.json, the app\'s corrected Pickthall. Quran Arabic and surah names are fetched at runtime from alquran.cloud.',
       'Pastoral Care content is NOT bundled: held back from agent surface (see docs/mcp-phase-3-planning.md).',
     ],
   }
   await writeJson(path.join(OUT_DATA_DIR, 'manifest.json'), manifest)
+}
+
+/**
+ * WO#390 addendum item 3: refuse to bundle any teach field lacking its
+ * sign-off, any uncited claim, or any related ref that does not resolve.
+ * Runs after bundleDuas so grading status is read from the bundled records.
+ * No glossary exists yet, so any glossary ref fails. Then writes the get_dua
+ * id allowlist. The Gem 10 publish sign-off is not checked here: the release
+ * gate (scripts/release-gate.ts) checks it before any deploy or publish.
+ */
+async function checkTeachEntries() {
+  const { gradingStatusById, getDuaRecordById } = await import('../src/data/duas.js')
+  const errors = validateTeachEntries(TEACH_ENTRIES, {
+    duaStatus: gradingStatusById,
+    // WO#405: a related verse resolves if it exists in the Quran (the app's
+    // surah metadata), since get_quran_verse serves any verse from upstream.
+    // The scripture module holds only the verses the app uses.
+    verseExists: (ref) => {
+      const m = /^(\d+):(\d+)$/.exec(ref)
+      if (!m) return false
+      const surah = SURAHS.find((x) => x.id === Number(m[1]))
+      return !!surah && Number(m[2]) >= 1 && Number(m[2]) <= surah.versesCount
+    },
+    nameExists: (n) => namesOfAllah.some((x) => x.number === n),
+    glossaryHas: () => false,
+    // Field 1 words are checked against: the bundled du'a Arabic (what
+    // get_dua serves), the scripture module's Tanzil text for a verse, and
+    // the Name's Arabic.
+    recordArabic: (entry) => {
+      const r = entry.record
+      if (r.kind === 'dua') return getDuaRecordById(r.id)?.arabic
+      if (r.kind === 'name') return namesOfAllah.find((x) => x.number === r.number)?.arabic
+      try {
+        return getVerseArabic(r.ref)
+      } catch {
+        return undefined
+      }
+    },
+  })
+  if (errors.length) {
+    throw new Error(`teach entries refused (${errors.length}):\n  ${errors.join('\n  ')}`)
+  }
+  console.log(`  teach entries: ${Object.keys(TEACH_ENTRIES).length} checked, 0 refused`)
+  // Flag 3 ruling (widened in WO#405): get_dua resolves an id only if it is
+  // a teach record or a signed related list names it.
+  const allowlist = buildDuaIdAllowlist(TEACH_ENTRIES)
+  await writeJson(path.join(OUT_DATA_DIR, 'dua-id-allowlist.json'), allowlist)
+  console.log(`  dua id allowlist: ${allowlist.length} ids`)
 }
 
 async function main() {
@@ -188,8 +373,10 @@ async function main() {
   await bundleDuas()
   await bundleNames()
   await bundleThematicVerses()
+  await bundlePickthall()
   await syncSafetyFiles()
   await writeManifest()
+  await checkTeachEntries()
   console.log('done.')
 }
 

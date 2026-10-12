@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-Sacred%20Use-8B6A42.svg?style=flat-square)](./LICENSE)
 [![MCP Registry](https://img.shields.io/badge/MCP-com.asksakina%2Fislamic--knowledge-4A6B4A.svg?style=flat-square)](https://registry.modelcontextprotocol.io/v0/servers?search=com.asksakina)
 
-> **Specialist-AI-reviewed Islamic knowledge for AI agents.** Quranic verses, a curated du'a collection, and the 99 Names of Allah — reviewed across the four mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali) through AskSakina's structured specialist-AI review chain, which is not a substitute for a qualified scholar. Every response is wrapped in a presentation contract so agents cannot silently misrepresent the content.
+> **Specialist-AI-reviewed Islamic knowledge for AI agents.** Quranic verses, a curated du'a corpus, and the 99 Names of Allah — reviewed across the four mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali) through AskSakina's structured specialist-AI review chain, which is not a substitute for a qualified scholar. Every response is wrapped in a presentation contract so agents cannot silently misrepresent the content.
 
 **Architectural posture:** *"AskSakina ships records, agents ship answers."* The server is a reference library, not an advisor. Each response includes a `_sakina_meta` envelope with disclaimer, LLM directives, presentation contract, and educational context. What the calling agent does with the record is its responsibility — but every response arms the agent with enough structural context to make mishandling difficult and trackable.
 
@@ -12,12 +12,12 @@
 
 ## What it provides
 
-Four lookup tools and one canonical resource over the Model Context Protocol. Every record is sourced from AskSakina's main app (`asksakina.com`), so the MCP server can never drift from what the public app surfaces.
+Four lookup tools and one canonical resource over the Model Context Protocol. Every record is sourced from AskSakina's main app (`asksakina.com`), so each MCP release matches what the public app surfaced when it was built.
 
 | Tool | What it does |
 |---|---|
 | `get_quran_verse` | Verbatim Quranic verse lookup by surah:ayah |
-| `get_dua` | Curated du'a collection lookup by life context (anxiety, morning, travel, ...) |
+| `get_dua` | Curated du'a corpus lookup by life context (anxiety, morning, travel, ...) |
 | `get_name_of_allah` | One of the 99 Names by number (1–99) or string |
 | `find_verses` | Quran verses by topic keyword, from AskSakina's thematic verse index |
 | `sakina://about` (resource) | Read-once briefing — seven core directives plus three Gem-cleared dawah texts (Quran preservation, hadith grading, madhab attribution) |
@@ -65,7 +65,7 @@ Verbatim Quranic verse lookup by surah:ayah. Returns the canonical AskSakina env
 
 ### `get_dua`
 
-Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). Context is resolved against canonical category slugs, an alias map, and tag dimensions. A natural phrase ("grief after losing my mother") also resolves: the server normalises it and matches known category, alias, tag and synonym words and a few multi-word phrases inside it, deterministically and without AI. `content.matched_by` says how it resolved. **Grief (WO#386):** a query that names the querier's own grief ("I lost my mother", "grief after losing my mother", "my father passed away", "bereaved") resolves to context `bereaved`; a funeral rite or the person who has died ("funeral", "dua for the deceased", "grave") stays `deceased`. `bereaved` returns seven du'as ruled by the fiqh reviewer (Gem 4), in its order, with a `teaching_note` on the masculine forms in the Arabic, and always carries at least the soft support note. Crisis detection runs first, on the full raw input. Self-harm and abuse get separate blocks (`crisis_type`): the abuse block carries domestic-abuse lines and an abuse-specific directive. **On an abuse disclosure no du'as are returned**: `content_type` is `crisis_resource_only` and the crisis resource is the whole response. Each block lists 24/7 lines first and states the hours of any limited-hours line. **If the context contains a crisis keyword (matched against the main app's `detectCrisis` keyword list), the response includes a mandatory `crisis_resource` block** with the appropriate hotline and prosocial directive.
+Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). Context is resolved against canonical category slugs, an alias map, and tag dimensions. A natural phrase ("grief after losing my mother") also resolves: the server normalises it and matches known category, alias, tag and synonym words and a few multi-word phrases inside it, deterministically and without AI. `content.matched_by` says how it resolved. **Grief (WO#386):** a query that names the querier's own grief ("I lost my mother", "grief after losing my mother", "my father passed away", "bereaved") resolves to context `bereaved`; a funeral rite or the person who has died ("funeral", "dua for the deceased", "visiting my mother's grave") stays `deceased`. **Parents (WO#430):** a query that names a parent (mother, mum, mom, father, dad, parent, parents) together with a death word (late, dead, passed, grave, burial, janaza, janazah, cemetery, funeral, died, death, deceased, lost) takes this grief route and never returns `mothers` or `fathers`; "miss" with a parent and no death word returns only the du'as that suit a living or a deceased parent; a plain parent query ("my mother", "parents") is unchanged. A death word on its own, such as "grave", resolves to nothing. `bereaved` returns seven du'as ruled by the fiqh reviewer (Gem 4), in its order, with a `teaching_note` on the masculine forms in the Arabic, and always carries at least the soft support note. Crisis detection runs first, on the full raw input. Self-harm and abuse get separate blocks (`crisis_type`): the abuse block carries domestic-abuse lines and an abuse-specific directive. **On any hard crisis (self-harm or abuse) no du'as are returned**: `content_type` is `crisis_resource_only` and the crisis resource is the whole response. Each block lists 24/7 lines first and states the hours of any limited-hours line. **If the context contains a crisis keyword (matched against the main app's `detectCrisis` keyword list), the response includes a mandatory `crisis_resource` block** with the appropriate hotline and prosocial directive.
 
 **Parameters**
 
@@ -108,13 +108,13 @@ Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). C
       /* … */
     ],
     "total_results": 12,
-    "grading_summary": { "quranic": 2, "graded": 0, "not_recorded": 10 }
+    "grading_summary": { "quranic": 2, "graded": 0, "not_a_narration": 0, "not_recorded": 10 }
   }
   // crisis_resource block added if context triggers the crisis keyword list
 }
 ```
 
-**Grading status.** Every du'a record carries `grading_status`: `quranic` (the text is a Quranic verse or clause), `graded` (a hadith grading is recorded), or `not_recorded` (the AskSakina corpus holds no grading for it). Most of the corpus is `not_recorded` today; the `Source` and `Grading` lines say so rather than implying a grading exists. Du'as whose Quranic reference has been verified carry `origin: "quran"` and a `quran_citation`, and their Arabic is the Tanzil Uthmani text resolved from AskSakina's scripture module at bundle time.
+**Grading status.** Every du'a record carries `grading_status`: `quranic` (the text is a Quranic verse or clause), `graded` (a hadith grading is recorded), `not_a_narration` (a general supplication, not a narration from the Prophet; it carries a `grading_directive` saying so), or `not_recorded` (the AskSakina corpus holds no grading for it). Most of the corpus is `not_recorded` today; the `Source` and `Grading` lines say so rather than implying a grading exists. Du'as whose Quranic reference has been verified carry `origin: "quran"` and a `quran_citation`, and their Arabic is the Tanzil Uthmani text resolved from AskSakina's scripture module at bundle time.
 
 ### `get_name_of_allah`
 
@@ -151,7 +151,7 @@ Topic lookup beside `get_quran_verse`'s reference lookup (WO#386). The query is 
 
 Each verse carries `reference` (surah:ayah), `arabic` (the full ayah from the scripture module, Tanzil Uthmani, byte for byte), `translation` (full-ayah Pickthall, fetched as `get_quran_verse` fetches it), the surah names, and a `relevance_note` saying which theme lists it. The note is not commentary. If the upstream is unreachable, the Arabic is still served and `translation` is `null` with a note.
 
-No match returns `content_type: "not_found"` with `verses: []`, `no_results: true` and the list of available themes, not an error. Crisis detection runs first, as on `get_dua`: an abuse disclosure returns `crisis_resource_only` with no verses, and any other crisis keyword returns its block with no verses inferred from the message.
+No match returns `content_type: "not_found"` with `verses: []`, `no_results: true` and the list of available themes, not an error. Crisis detection runs first, as on `get_dua`: any hard crisis (self-harm or abuse) returns `crisis_resource_only`, with no verses and no theme list.
 
 **Parameters**
 
@@ -187,7 +187,7 @@ Every tool returns the same shape:
     "educational_context": "…"
   },
   "content": { /* tool-specific record */ },
-  // get_dua only, when crisis keywords detected:
+  // get_dua and find_verses, when crisis keywords detected:
   "crisis_resource": { "level": "hard" | "soft", "crisis_type": "self-harm" | "abuse", "locale": "…", "directive": "…", "text": "…" }
 }
 ```
@@ -201,10 +201,10 @@ The envelope is the contract: `_sakina_meta.presentation_contract` tells the age
 ### Run via npx (no install)
 
 ```bash
-npx -y @asksakina/islamic-knowledge-mcp
+npx -y @asksakina/islamic-knowledge-mcp --stdio
 ```
 
-The package speaks MCP over stdio out of the box — wire it into any MCP client.
+With `--stdio` the package speaks MCP over stdin/stdout; wire it into any MCP client. Without the flag it starts the Streamable HTTP server on `$PORT` (default 3030, `POST /mcp`, `GET /health`), as the hosted endpoint runs. Before 2.1.0 the `sakina-mcp` command exited without starting either (WO#444).
 
 ### Connect via remote streamable HTTP
 
@@ -223,13 +223,13 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
   "mcpServers": {
     "sakina": {
       "command": "npx",
-      "args": ["-y", "@asksakina/islamic-knowledge-mcp"]
+      "args": ["-y", "@asksakina/islamic-knowledge-mcp", "--stdio"]
     }
   }
 }
 ```
 
-Restart Claude Desktop. The three tools and the `sakina://about` resource appear in the tool picker.
+Restart Claude Desktop. The four tools and the `sakina://about` resource appear in the tool picker.
 
 ### Cursor
 
@@ -240,7 +240,7 @@ Add to `~/.cursor/mcp.json` (or workspace `.cursor/mcp.json`):
   "mcpServers": {
     "sakina": {
       "command": "npx",
-      "args": ["-y", "@asksakina/islamic-knowledge-mcp"]
+      "args": ["-y", "@asksakina/islamic-knowledge-mcp", "--stdio"]
     }
   }
 }
@@ -255,7 +255,7 @@ Add to `.vscode/mcp.json` in your workspace:
   "servers": {
     "sakina-islamic-knowledge": {
       "command": "npx",
-      "args": ["-y", "@asksakina/islamic-knowledge-mcp"]
+      "args": ["-y", "@asksakina/islamic-knowledge-mcp", "--stdio"]
     }
   }
 }
@@ -278,29 +278,29 @@ Add to `.vscode/mcp.json` in your workspace:
 
 ## Use cases
 
-The MCP server is designed for any agent or application that needs verified Islamic source material with a hard guarantee against silent misrepresentation.
+The MCP server is designed for any agent or application that needs curated Islamic source material, returned with explicit instructions to quote it exactly rather than paraphrase it.
 
-- **Build an Islamic chatbot with verified sources.** Pipe `get_quran_verse` and `get_dua` into your conversation flow; the presentation contract keeps the agent honest about what is direct revelation, what is hadith with a grading, and what is editorial reflection.
+- **Build an Islamic chatbot with cited references where recorded.** Pipe `get_quran_verse` and `get_dua` into your conversation flow; the presentation contract instructs the agent to quote exactly and keep gradings attached, and each response states its content type and, for du'as, each record's grading status.
 - **Add prayer-time-aware spiritual content to your agent.** Combine the Quranic and du'a tools with a prayer-time API to surface Allah's words at the right moment of the day.
-- **Recommend du'as based on user context.** The crisis-keyword filter in `get_dua` handles the dangerous edge cases (self-harm language, abuse) so your assistant never replies with a generic du'a to a safety-critical message.
+- **Recommend du'as based on user context.** The crisis-keyword filter in `get_dua` handles the dangerous edge cases (self-harm language, abuse) so your assistant is directed not to reply with a generic du'a to a safety-critical message.
 - **Answer questions about the 99 Names.** `get_name_of_allah` returns the canonical Arabic, transliteration, meaning, and reflection — plus Quranic references — for both number-based and name-based lookups.
-- **Stay theologically inclusive.** Every record is reviewed across Hanafi, Maliki, Shafi'i, and Hanbali positions. The server never positions a contested ruling as the universal answer.
+- **Stay theologically inclusive.** The server is designed not to present a contested ruling as the universal answer.
 
 ---
 
 ## Content integrity
 
-Every piece of content surfaced by this server has been reviewed by AskSakina's "Gem" specialist-AI review chain before shipping. The chain has nine reviewers; four of them gate every Islamic-knowledge release:
+New and changed content is reviewed by AskSakina's "Gem" specialist-AI review chain before shipping. Four of its reviewers gate every Islamic-knowledge release:
 
-1. **Quran & Translation Verification.** Ayah accuracy, surah/ayah citation correctness, hadith grading, source authentication.
+1. **Quran & Translation Verification.** Ayah accuracy, surah/ayah citation correctness, hadith grading, source review.
 2. **Fiqh Diversity (Multi-Madhab).** Cross-school accuracy, no single-madhab framing on contested topics, inclusive language.
 3. **Islamic Psychology & Pastoral Care.** Comfort window safety, crisis filter coverage, no guilt-based motivation.
 4. **Explorer / New-to-Islam Accessibility.** Glossing of Arabic terms for non-Muslim audiences, plain-English fiqh, zero-assumed-belief reflections.
 
-Architectural guarantees enforced in code:
+Architectural behaviours implemented in code:
 
 - The Unicode prophet salutation (U+FDFA, ﷺ) is replaced with `(peace be upon him)` at every data-loader boundary. The response builder rejects any output containing the symbol.
-- Each du'a record carries a `grading_status` (`quranic`, `graded`, `not_recorded`). The `hadith` presentation contract sets `require_grading: true` only when every returned record is graded or Quranic, and `"per_record"` otherwise, so the envelope never claims a grading the data does not hold.
+- Each du'a record carries a `grading_status` (`quranic`, `graded`, `not_a_narration`, `not_recorded`). The `hadith` presentation contract sets `require_grading: true` only when every returned record is graded or Quranic, and `"per_record"` otherwise, so the envelope never claims a grading the data does not hold.
 - Crisis keyword detection runs on every `get_dua` request — the same keyword list used by the main app's safety gate.
 
 **Sacred Use License.** This server is distributed under a Sacred Use License (see [LICENSE](./LICENSE)). Permitted uses centre on dawah, education, personal worship, and respectful integration into Muslim-serving applications. The license forbids monetisation that frames Islamic knowledge as scarce or paywalled. A public summary of the license terms lives at `https://www.asksakina.com/en/mcp`.
@@ -400,10 +400,10 @@ The server no longer writes to the `/data` volume that `fly.toml` mounts; it was
 
 | Tool | Source |
 |---|---|
-| `get_quran_verse` | `alquran.cloud`, fetched at runtime: Tanzil-derived Uthmani Arabic plus the translation for the locale: `en` and `ar` Pickthall (`en.pickthall`), `ur` and `id` also Pickthall, with a note (their translations are parked pending licences; 1.4.1). A leading byte-order mark is removed. The upstream also prefixes the basmala to ayah 1 of each surah except 1 and 9. Per Gem 2 (the basmala is part of ayah 1 only at 1:1), that exact prefix is removed from ayah 1 of surahs 2–8 and 10–114, matched against the two byte forms the upstream sends. The rest of the ayah is served byte for byte. An unrecognised start is served unchanged and counted in `/stats` (`basmala_prefix_mismatch`). Everything is fetched verse by verse (`/ayah/{surah}:{ayah}`). Saheeh International is not served (removed in 1.2.0, WO#245). Cached in process for 24 h per verse + edition. |
-| `get_dua` | AskSakina's du'a corpus (445 entries at 1.4.0), snapshotted from `../src/data/duas` into `data/duas.json` by `npm run bundle-data`. Du'as with a verified Quranic reference take their Arabic from the scripture module (`../src/lib/scripture`, Tanzil Uthmani) at the same step. |
+| `get_quran_verse` | **English (2.1.0, WO#444):** AskSakina's corrected Pickthall, bundled as `data/pickthall.json` from the app's `public/quran/en.pickthall` (all 6,236 verses, the WO#442 corrections against the 1930 text included, no verse-final punctuation, as the app's reader shows it), for every locale: `ur` and `id` carry a note (their translations are parked pending licences; 1.4.1). **Arabic and surah names:** `alquran.cloud`, fetched at runtime (Tanzil-derived Uthmani). A leading byte-order mark is removed. The upstream also prefixes the basmala to ayah 1 of each surah except 1 and 9. Per Gem 2 (the basmala is part of ayah 1 only at 1:1), that exact prefix is removed from ayah 1 of surahs 2–8 and 10–114, matched against the two byte forms the upstream sends. The rest of the ayah is served byte for byte. An unrecognised start is served unchanged and counted in `/stats` (`basmala_prefix_mismatch`). Everything is fetched verse by verse (`/ayah/{surah}:{ayah}`). Saheeh International is not served (removed in 1.2.0, WO#245). Cached in process for 24 h per verse + edition. |
+| `get_dua` | AskSakina's du'a corpus (440 entries at 2.1.0), snapshotted from `../src/data/duas` into `data/duas.json` by `npm run bundle-data`. Du'as with a verified Quranic reference take their Arabic from the scripture module (`../src/lib/scripture`, Tanzil Uthmani) at the same step. |
 | `get_name_of_allah` | AskSakina's 99 Names, snapshotted from `../src/lib/data/99-names` by `npm run bundle-data`. |
-| `find_verses` | AskSakina's thematic verse index (`../src/lib/data/thematic-verses`), snapshotted into `data/thematic-verses.json` by `npm run bundle-data`. Only each verse's reference and themes are taken from the index; the Arabic comes from the scripture module at the same step, and the Pickthall translation from `alquran.cloud` at runtime (same cache as `get_quran_verse`). |
+| `find_verses` | AskSakina's thematic verse index (`../src/lib/data/thematic-verses`), snapshotted into `data/thematic-verses.json` by `npm run bundle-data`. Only each verse's reference and themes are taken from the index; the Arabic comes from the scripture module at the same step, and the Pickthall translation from the bundled `data/pickthall.json` (2.1.0; the surah names still come from `alquran.cloud` at runtime, same cache as `get_quran_verse`). |
 
 The du'a and Names data are snapshots of the main app's data files, so any update to them lands here on the next `npm run bundle-data` (the deploy workflow runs it). A published package carries the snapshot taken when it was built.
 
@@ -437,16 +437,21 @@ auth. The Architect triggers it from the repo **Actions** tab
 (`workflow_dispatch`) with two boolean inputs:
 
 - **`deploy_fly`** (default `true`) — build + `flyctl deploy` to `sakina-mcp.fly.dev`.
-- **`publish_npm`** (default `true`) — `npm publish` `@asksakina/islamic-knowledge-mcp`.
+- **`sync_mirror`** (default `true`) — push the built package to the public mirror
+  (github.com/yserrag/asksakina-mcp) and tag `v<version>` there. The mirror's own
+  workflow then publishes `@asksakina/islamic-knowledge-mcp` to npm with trusted
+  publishing and provenance (WO#444); this repository holds no npm token.
 
 The job runs the full Gem 10 runbook on `main`: `npm ci` → `npm run bundle-data`
 (load-bearing) → `flyctl deploy` → poll `/health` → **live Pickthall byte-check on
-2:255** → live Dhun-Nun check → rate-limiter probe (warn only) → **live publish guards** → agent evals (warn only; after the guards since WO#386, so the blocking guards get the rate-limit budget first) → `npm publish` → confirm the registry shows the published version. The
+2:255 and 9:129** → live Dhun-Nun check → rate-limiter probe (warn only) → **live publish guards** → agent evals (warn only; after the guards since WO#386, so the blocking guards get the rate-limit budget first) → mirror sync and tag (the mirror publishes). The
 byte-check runs the MCP `initialize` handshake + `tools/call get_quran_verse`
 against the live endpoint: `"save Him"` (Pickthall) passes; `"except Him"` (Saheeh
-International) or an unreachable `/mcp` **fails the job before `npm publish`**,
-dumps `flyctl status` + logs, and prints the manual rollback commands. Secrets
-`FLY_API_TOKEN` and `NPM_TOKEN` live in repo settings and are never echoed.
+International) or an unreachable `/mcp` **fails the job before the mirror sync**,
+dumps `flyctl status` + logs, and prints the manual rollback commands. 9:129 must
+read "There is no God save Him", which only the bundled corrected text carries.
+Secrets `FLY_API_TOKEN` and `ASKSAKINA_MCP_DEPLOY_KEY` live in repo settings and
+are never echoed.
 
 > Automated rollback-to-previous-image is the Gem 10 end-state but is a deferred
 > follow-up: the current live image is itself broken, so there is no known-good

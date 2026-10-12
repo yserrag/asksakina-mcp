@@ -212,3 +212,65 @@ export function griefRoute(input: string): 'bereaved' | 'deceased' {
   if (words.some((w) => FIRST_PERSON.has(w)) && words.some((w) => LOSS_EVENT_WORDS.has(w))) return 'bereaved'
   return 'deceased'
 }
+
+// ─── Parent + grief (WO#430, Gem 3 ruling, 7 Oct 2026) ───────────────
+
+/**
+ * A copy of the app's lists in src/data/duas/parent-grief.ts. The WO#430 test
+ * (scripts/test-wo430.ts) reads that file and fails if these differ.
+ *
+ * A query that names a parent with a death word goes to the grief route
+ * (bereaved / deceased) and never returns `mothers` or `fathers`; "miss" with
+ * a parent and no death word returns only the parent's 'both' du'as; a plain
+ * parent query is unchanged. Serving a long-life du'a to a bereaved user was
+ * ruled HARMFUL (HIGH) by Gem 3.
+ */
+export const PARENT_WORDS: readonly string[] = [
+  'mother', 'mothers', 'mum', 'mums', 'mom', 'moms',
+  'father', 'fathers', 'dad', 'dads',
+  'parent', 'parents',
+]
+export const DEATH_WORDS: readonly string[] = [
+  'late', 'dead', 'passed', 'grave', 'graves', 'burial', 'janaza', 'janazah',
+  'cemetery', 'funeral', 'died', 'death', 'deceased', 'lost',
+]
+export const MISS_WORDS: readonly string[] = ['miss', 'missing', 'missed', 'misses']
+
+const MOTHER_WORDS = new Set(['mother', 'mothers', 'mum', 'mums', 'mom', 'moms'])
+const FATHER_WORDS = new Set(['father', 'fathers', 'dad', 'dads'])
+const BOTH_PARENT_WORDS = new Set(['parent', 'parents'])
+
+export type ParentCategory = 'mothers' | 'fathers'
+export interface ParentQuery {
+  kind: 'death' | 'miss'
+  parents: ParentCategory[]
+}
+
+/** Lower case, apostrophes dropped, every other non-letter a space. */
+function parentQueryWords(input: string): string[] {
+  return input
+    .toLowerCase()
+    .replace(/['\u2019]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+}
+
+export function parentQuery(input: string): ParentQuery | null {
+  const words = parentQueryWords(input)
+  const parents = new Set<ParentCategory>()
+  for (const w of words) {
+    if (MOTHER_WORDS.has(w)) parents.add('mothers')
+    else if (FATHER_WORDS.has(w)) parents.add('fathers')
+    else if (BOTH_PARENT_WORDS.has(w)) {
+      parents.add('mothers')
+      parents.add('fathers')
+    }
+  }
+  if (parents.size === 0) return null
+  const ordered = (['mothers', 'fathers'] as const).filter((p) => parents.has(p))
+  if (words.some((w) => DEATH_WORDS.includes(w))) return { kind: 'death', parents: ordered }
+  if (words.some((w) => MISS_WORDS.includes(w))) return { kind: 'miss', parents: ordered }
+  return null
+}

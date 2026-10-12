@@ -1,0 +1,2 @@
+export const REFERENCE_GRADING_LINE = "Grading: As stated in the reference (Ṣaḥīḥ al-Bukhārī and Ṣaḥīḥ Muslim are inherently authenticated), including any qualifier in parentheses.";
+//# sourceMappingURL=gem4-wo424.js.map

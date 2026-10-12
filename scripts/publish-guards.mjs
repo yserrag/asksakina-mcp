@@ -34,6 +34,11 @@
  *   f. Pending-wording markers ("WORDING PENDING") in any crisis_resource
  *      block, offline (self-harm, abuse and soft, every locale) and live.
  *      WO#385: the abuse block's sentence waits for Gem 3's wording.
+ *   g. Live only (WO#391, P0): every live-confirmed crisis miss from 1.5.0
+ *      must return the crisis resource ALONE (content_type
+ *      crisis_resource_only, a crisis_resource block of the right type, no
+ *      du'a / verse / Name content). A deploy that regresses any of them
+ *      fails the job before npm publish.
  *   d. .mcp/server.json `description` longer than 100 characters. The MCP
  *      Registry rejects it with HTTP 422 (MCP Registry Publish run #2,
  *      25 Sep 2026: the 600-character description). Counted in Unicode
@@ -234,6 +239,34 @@ async function paced(input, init) {
   }
 }
 
+// WO#391 g. [tool, arguments, expected crisis_type]. The first two were
+// confirmed live on sakina-mcp.fly.dev 1.5.0 by the Architect (27 Sep 2026):
+// "my-husband-hits-me" served 7 marriage du'as; "kill-myself" returned
+// not_found. The rest are the same class, one per normalisation step.
+const CRISIS_VARIANTS = [
+  ['get_dua', { context: 'my-husband-hits-me' }, 'abuse'],
+  ['get_dua', { context: 'kill-myself' }, 'self-harm'],
+  ['get_dua', { context: 'husband-hits-me' }, 'abuse'],
+  ['get_dua', { context: 'killmyself' }, 'self-harm'],
+  ['get_dua', { context: 'sui\u200bcide' }, 'self-harm'],
+  ['find_verses', { query: 'kill-myself' }, 'self-harm'],
+  ['find_verses', { query: 'my-husband-hits-me' }, 'abuse'],
+  ['get_name_of_allah', { name: 'kill-myself' }, 'self-harm'],
+]
+const CONTENT_KEYS = ['duas', 'verses', 'arabic', 'name_block', 'matched_themes', 'translation', 'reflection']
+
+function checkCrisisVariant(name, a, parsed, where) {
+  const v = CRISIS_VARIANTS.find(([n, x]) => n === name && JSON.stringify(x) === JSON.stringify(a))
+  if (!v) return
+  const type = v[2]
+  const ct = parsed?._sakina_meta?.content_type
+  const cr = parsed?.crisis_resource
+  const leaked = CONTENT_KEYS.filter((k) => parsed?.content && k in parsed.content)
+  if (ct !== 'crisis_resource_only' || !cr || cr.crisis_type !== type || leaked.length) {
+    record('g. crisis variant not blocked (live)', where, `content_type ${ct}, crisis_type ${cr?.crisis_type ?? 'none'} (want ${type})${leaked.length ? `, content keys ${leaked.join(',')}` : ''}`)
+  }
+}
+
 async function live(url) {
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
   const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js')
@@ -253,9 +286,12 @@ async function live(url) {
     ['find_verses', { query: 'patience' }],
     ['find_verses', { query: 'I want to kill myself' }],
     ['find_verses', { query: 'my husband hits me' }],
+    // WO#391 g.: the live-confirmed 1.5.0 misses, one call per path.
+    ...CRISIS_VARIANTS.map(([name, a]) => [name, a]),
   ]
   touch('b. U+FDFA (live)')
   touch('c. banned crisis number')
+  touch('g. crisis variant not blocked (live)')
   try {
     await client.connect(transport, REQUEST_OPTS)
     for (const [name, a] of calls) {
@@ -269,7 +305,9 @@ async function live(url) {
         i = text.indexOf(FDFA, i + 1)
       }
       try {
-        const cr = JSON.parse(text)?.crisis_resource
+        const parsed = JSON.parse(text)
+        checkCrisisVariant(name, a, parsed, where)
+        const cr = parsed?.crisis_resource
         if (cr) {
           checkBannedNumbers(JSON.stringify(cr), `${where} crisis_resource`)
           checkPlaceholder(JSON.stringify(cr), `${where} crisis_resource`)

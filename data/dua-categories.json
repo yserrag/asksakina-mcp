@@ -1,0 +1,579 @@
+[
+  {
+    "slug": "gratitude",
+    "name": "Gratitude",
+    "nameAr": "الشُّكْر",
+    "order": 2,
+    "count": 16,
+    "icon": "Heart",
+    "description": "Thanks and praise after blessings",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "grateful",
+        "hopeful"
+      ]
+    }
+  },
+  {
+    "slug": "morning-adhkar",
+    "name": "Morning Adhkar (Remembrance)",
+    "nameAr": "أَذْكَارُ ٱلصَّبَاح",
+    "order": 3,
+    "count": 25,
+    "icon": "Sunrise",
+    "description": "Daily remembrances after Fajr",
+    "tags": {
+      "time": [
+        "morning"
+      ]
+    }
+  },
+  {
+    "slug": "evening-adhkar",
+    "name": "Evening Adhkar (Remembrance)",
+    "nameAr": "أَذْكَارُ ٱلْمَسَاء",
+    "order": 4,
+    "count": 24,
+    "icon": "Sunset",
+    "description": "Daily remembrances before Maghrib",
+    "tags": {
+      "time": [
+        "evening"
+      ]
+    }
+  },
+  {
+    "slug": "before-sleep",
+    "name": "Before Going to Bed",
+    "heading": "Du'as Before Going to Bed",
+    "nameAr": "دُعَاءُ ٱلنَّوْم",
+    "order": 5,
+    "count": 13,
+    "icon": "SevenStars",
+    "description": "Recite as the day closes",
+    "tags": {
+      "time": [
+        "before-sleep"
+      ]
+    }
+  },
+  {
+    "slug": "general",
+    "name": "General Du'as",
+    "heading": "General Du'as",
+    "order": 6,
+    "count": 21,
+    "icon": "BookOpen",
+    "description": "Universal supplications",
+    "tags": {
+      "time": [
+        "anytime"
+      ]
+    }
+  },
+  {
+    "slug": "mothers",
+    "name": "Mothers",
+    "nameAr": "لِلْأُمَّهَات",
+    "order": 7,
+    "count": 23,
+    "icon": "Heart",
+    "description": "For one's mother",
+    "noteKeys": [
+      "w.duas.note.parentDeceased"
+    ],
+    "noteLinks": {
+      "w.duas.note.parentDeceased": "/duas/deceased"
+    },
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "grateful",
+        "hopeful"
+      ],
+      "situation": [
+        "parenting"
+      ]
+    }
+  },
+  {
+    "slug": "fathers",
+    "name": "Fathers",
+    "nameAr": "لِلْآبَاء",
+    "order": 8,
+    "count": 19,
+    "icon": "Heart",
+    "description": "For one's father",
+    "noteKeys": [
+      "w.duas.note.parentDeceased"
+    ],
+    "noteLinks": {
+      "w.duas.note.parentDeceased": "/duas/deceased"
+    },
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "grateful",
+        "hopeful"
+      ],
+      "situation": [
+        "parenting"
+      ]
+    }
+  },
+  {
+    "slug": "health-healing",
+    "name": "Good Health & Healing",
+    "nameAr": "ٱلشِّفَاء",
+    "order": 9,
+    "count": 21,
+    "icon": "HeartPulse",
+    "description": "For wellness and recovery",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "anxious",
+        "sad"
+      ],
+      "situation": [
+        "illness"
+      ]
+    }
+  },
+  {
+    "slug": "stress-anxiety",
+    "name": "Stress & Anxiety",
+    "nameAr": "ٱلْهَمّ وَٱلْحَزَن",
+    "order": 10,
+    "count": 12,
+    "icon": "CloudRain",
+    "description": "Comfort in worry and overwhelm",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "anxious",
+        "sad",
+        "numb"
+      ]
+    }
+  },
+  {
+    "slug": "work-success",
+    "name": "Work & Success",
+    "nameAr": "ٱلرِّزْق",
+    "order": 11,
+    "count": 10,
+    "icon": "Briefcase",
+    "description": "For career and provision",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "seeking"
+      ],
+      "situation": [
+        "work"
+      ]
+    }
+  },
+  {
+    "slug": "exams-study",
+    "name": "Exams & Study",
+    "nameAr": "ٱلْعِلْم",
+    "order": 12,
+    "count": 14,
+    "icon": "GraduationCap",
+    "description": "For learning and tests",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "anxious"
+      ],
+      "situation": [
+        "exam"
+      ]
+    }
+  },
+  {
+    "slug": "wealth-debt",
+    "name": "Wealth & Paying off Debt",
+    "nameAr": "ٱلْمَال وَٱلدَّيْن",
+    "order": 13,
+    "count": 20,
+    "icon": "Coins",
+    "description": "Provision and freedom from debt",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "anxious"
+      ],
+      "situation": [
+        "debt"
+      ]
+    }
+  },
+  {
+    "slug": "powerful-duas",
+    "name": "Comprehensive Du'as",
+    "heading": "Comprehensive Du'as",
+    "order": 15,
+    "count": 2,
+    "icon": "Sparkles",
+    "description": "Comprehensive supplications",
+    "tags": {
+      "time": [
+        "anytime"
+      ]
+    }
+  },
+  {
+    "slug": "repentance",
+    "name": "Repentance",
+    "nameAr": "ٱلتَّوْبَة",
+    "order": 16,
+    "count": 20,
+    "icon": "Compass",
+    "description": "Turning back to Allah",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "guilty"
+      ]
+    }
+  },
+  {
+    "slug": "travel",
+    "name": "Travel & Journey",
+    "nameAr": "ٱلسَّفَر",
+    "order": 17,
+    "count": 9,
+    "icon": "Plane",
+    "description": "On journeys",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "situation": [
+        "travel"
+      ]
+    }
+  },
+  {
+    "slug": "istikhara",
+    "name": "Istikhara (Guidance Prayer)",
+    "nameAr": "ٱلِٱسْتِخَارَة",
+    "order": 18,
+    "count": 1,
+    "icon": "Compass",
+    "description": "Seeking guidance for a decision",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "anxious",
+        "seeking"
+      ]
+    }
+  },
+  {
+    "slug": "marriage",
+    "name": "Marriage",
+    "nameAr": "ٱلزَّوَاج",
+    "order": 19,
+    "count": 7,
+    "icon": "Heart",
+    "description": "Love, partnership, and family",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "hopeful"
+      ],
+      "situation": [
+        "marriage"
+      ]
+    }
+  },
+  {
+    "slug": "pregnancy",
+    "name": "Pregnancy",
+    "order": 20,
+    "count": 8,
+    "icon": "Sparkles",
+    "description": "For mother and child",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "hopeful",
+        "anxious"
+      ],
+      "situation": [
+        "pregnancy"
+      ]
+    }
+  },
+  {
+    "slug": "children",
+    "name": "Du'a for Children",
+    "heading": "Du'as for Children",
+    "nameAr": "لِلْأَوْلَاد",
+    "order": 21,
+    "count": 20,
+    "icon": "Users",
+    "description": "For one's children",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "hopeful"
+      ],
+      "situation": [
+        "parenting"
+      ]
+    }
+  },
+  {
+    "slug": "rabana-duas",
+    "name": "Rabana Du'as (Our Lord)",
+    "heading": "Rabana Du'as (Our Lord)",
+    "nameAr": "رَبَّنَا",
+    "order": 22,
+    "count": 40,
+    "icon": "Star",
+    "description": "Quranic 'Our Lord' supplications",
+    "tags": {
+      "time": [
+        "anytime"
+      ]
+    }
+  },
+  {
+    "slug": "friday",
+    "name": "Friday (Jumu'ah)",
+    "nameAr": "ٱلْجُمُعَة",
+    "order": 23,
+    "count": 1,
+    "icon": "Calendar",
+    "description": "Jumu'ah day",
+    "tags": {
+      "time": [
+        "friday"
+      ],
+      "seasonal": [
+        "friday"
+      ]
+    }
+  },
+  {
+    "slug": "quran-completion",
+    "name": "Completion of Quran",
+    "nameAr": "خَتْم ٱلْقُرْآن",
+    "order": 24,
+    "count": 6,
+    "icon": "BookOpen",
+    "description": "On completing the Quran",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "grateful"
+      ]
+    }
+  },
+  {
+    "slug": "allahs-names-duas",
+    "name": "Du'a Using Allah's Names",
+    "heading": "Du'as Using Allah's Names",
+    "nameAr": "بِأَسْمَاءِ ٱللَّه",
+    "order": 25,
+    "count": 36,
+    "icon": "Star",
+    "description": "Calling on Allah by His names",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "seeking"
+      ]
+    }
+  },
+  {
+    "slug": "99-names",
+    "name": "99 Names of Allah",
+    "heading": "Du'as with the 99 Names of Allah",
+    "nameAr": "ٱلْأَسْمَاء ٱلْحُسْنَىٰ",
+    "order": 26,
+    "count": 9,
+    "icon": "Star",
+    "description": "Asma'ul Husna",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "seeking"
+      ]
+    }
+  },
+  {
+    "slug": "ramadan",
+    "name": "Ramadan",
+    "nameAr": "رَمَضَان",
+    "order": 27,
+    "count": 6,
+    "icon": "Lantern",
+    "description": "The month of fasting",
+    "seasonal": true,
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "situation": [
+        "ramadan"
+      ],
+      "seasonal": [
+        "ramadan"
+      ]
+    }
+  },
+  {
+    "slug": "laylat-al-qadr",
+    "name": "Laylat al-Qadr",
+    "nameAr": "لَيْلَة ٱلْقَدْر",
+    "order": 28,
+    "count": 9,
+    "icon": "SingleStar",
+    "description": "The Night of Power",
+    "noteKeys": [
+      "w.duas.note.laylatAlQadr"
+    ],
+    "seasonal": true,
+    "tags": {
+      "time": [
+        "evening"
+      ],
+      "situation": [
+        "laylat-al-qadr"
+      ],
+      "seasonal": [
+        "ramadan"
+      ]
+    }
+  },
+  {
+    "slug": "umrah-hajj",
+    "name": "Umrah & Hajj",
+    "nameAr": "ٱلْحَجّ وَٱلْعُمْرَة",
+    "order": 29,
+    "count": 13,
+    "icon": "Mountain",
+    "description": "Pilgrimage and 'umrah",
+    "seasonal": true,
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "situation": [
+        "hajj"
+      ],
+      "seasonal": [
+        "dhul-hijjah"
+      ]
+    }
+  },
+  {
+    "slug": "deceased",
+    "name": "For the Deceased",
+    "heading": "Du'as for the Deceased",
+    "nameAr": "لِلْأَمْوَات",
+    "order": 30,
+    "count": 12,
+    "icon": "Cloud",
+    "description": "For those who have passed",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "sad"
+      ],
+      "situation": [
+        "funeral"
+      ]
+    }
+  },
+  {
+    "slug": "calamity",
+    "name": "In Times of Calamity",
+    "heading": "Du'as in Times of Calamity",
+    "nameAr": "ٱلْمُصِيبَة",
+    "order": 31,
+    "count": 19,
+    "icon": "CloudRain",
+    "description": "In times of hardship",
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "mood": [
+        "sad",
+        "anxious",
+        "angry"
+      ],
+      "situation": [
+        "illness"
+      ]
+    }
+  },
+  {
+    "slug": "fasting",
+    "name": "Fasting",
+    "nameAr": "ٱلصِّيَام",
+    "order": 32,
+    "count": 4,
+    "icon": "Sunset",
+    "description": "Breaking the fast (iftar)",
+    "metaDescription": "Du'as for fasting: the intention (niyyah) to fast, and du'as at iftar (breaking the fast), with Arabic text, transliteration, and translation.",
+    "noteKeys": [
+      "w.duas.note.fastingNiyyah",
+      "w.duas.note.fastingSupplication"
+    ],
+    "seasonal": true,
+    "tags": {
+      "time": [
+        "anytime"
+      ],
+      "situation": [
+        "ramadan"
+      ],
+      "seasonal": [
+        "ramadan"
+      ]
+    }
+  }
+]

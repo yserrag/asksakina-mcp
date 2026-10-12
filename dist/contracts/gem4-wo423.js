@@ -1,0 +1,2 @@
+export const QURAN_GRADED_REFERENCE_GRADING_LINE = "Grading: Quranic (the du'a text). The grading of the narration for its recitation is given in parentheses in the reference.";
+//# sourceMappingURL=gem4-wo423.js.map

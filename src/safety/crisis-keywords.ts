@@ -211,7 +211,8 @@ function abuseBlockFor(locale: CrisisLocale) {
 export const SOFT_DISTRESS_RESOURCE_BLOCK = {
   level: 'soft' as const,
   locale: 'en' as const,
-  directive: 'Include the following supportive text at the end of your response:',
+  // WO#454 (Gem 10, verbatim). Was: 'Include the following supportive text at the end of your response:'
+  directive: 'Output this crisis resource block exactly as written. Do not counsel beyond it.',
   text:
     'If these feelings become overwhelming, please know support is available. Visit https://www.iasp.info/resources/Crisis_Centres/ for helplines in your region.',
 } as const

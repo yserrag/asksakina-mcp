@@ -21,8 +21,9 @@ export interface HadithContract {
   /**
    * true when every record in the response carries a grading (hadith
    * grading, or Quranic). 'per_record' when at least one record has
-   * grading_status 'not_recorded': the agent reads each record's
-   * grading_status instead of assuming a grading exists (WO#377 addendum).
+   * grading_status 'not_recorded' or 'not_a_narration': the agent reads each
+   * record's grading_status instead of assuming a grading exists (WO#377
+   * addendum; WO#454 for 'not_a_narration').
    */
   require_grading: true | 'per_record'
   prefer_dua_block: true
@@ -87,7 +88,8 @@ export const VOICE_2_RULE =
 export const PBUH_RULE =
   "If mentioning Prophet Muhammad, use exactly '(peace be upon him)'. Do not abbreviate."
 
-export const NO_EMOJI_RULE = 'Do NOT use emojis in your response.'
+// WO#444 (Gem 10, 11 Oct): no literal dash character in the rule itself.
+export const NO_EMOJI_RULE = 'Do NOT use emojis or em dashes in your response.'
 
 export const QURAN_DIRECTIVES: readonly string[] = [
   'You MUST NOT paraphrase or reword the Arabic text or the translation below.',
@@ -121,7 +123,8 @@ export const DUA_DIRECTIVES: readonly string[] = [
   "You MUST NOT paraphrase the Arabic text or the English translation of any du'a below.",
   'The hadith grading and source reference MUST be cited exactly as provided.',
   'Do NOT separate the grading from the hadith text.',
-  "Prefer the 'dua_block' field for display; it contains the complete record (Arabic, translation, source, grading) in one inseparable string. Use that field rather than reassembling from the structured keys.",
+  // WO#454: Gem 10's wording, verbatim (replaces the "Prefer the 'dua_block'" line).
+  "You MUST output the 'dua_block' field exactly as provided. Do not reassemble the record from individual keys.",
   NO_EMOJI_RULE,
   PBUH_RULE,
   VOICE_2_RULE,
@@ -138,6 +141,32 @@ export const DUA_DIRECTIVES: readonly string[] = [
  * CRITICAL_RULES. Quranic records never carry it. Change only on a Gem
  * ruling, verbatim.
  */
+/**
+ * Directive for every general supplication: a record whose grading is
+ * "Not a narration" (grading_status 'not_a_narration'). Gem 10 item D,
+ * approved (WO#454, Architect, 11 Oct); wording verbatim. Attached like the
+ * ungraded directive: on each record as `grading_directive`, and once in
+ * CRITICAL_RULES scoped to the records' titles. Never on a Quranic record.
+ */
+export const NOT_A_NARRATION_GRADING = 'Not a narration'
+export const NOT_A_NARRATION_DIRECTIVE =
+  'This is a general supplication, not a narration from the Prophet (peace be upon him). Do NOT present it as a hadith, and do NOT attach a grading.'
+export const NOT_A_NARRATION_SCOPE_HEAD = 'Applies to these general supplication(s) only '
+
+/**
+ * WO#454 (Architect draft, to Gem 10 in part 14): on every du'a response with
+ * more than one record.
+ */
+export const ANTI_SUMMARISATION_DIRECTIVE =
+  "CRITICAL: Present each du'a below as its own complete record. Do not merge, summarise, or condense several du'as into one."
+
+/**
+ * WO#454 (Gem 10, verbatim): on every response whose presentation contract
+ * carries the Quran contract (quranContractFor in tools/get-dua.ts).
+ */
+export const QURAN_CITATION_DIRECTIVE =
+  "For any Quranic text, you must include the explicit surah:ayah citation and prefix the English text with 'Translation of the Meaning'."
+
 export const UNGRADED_GRADING_DIRECTIVE =
   'CRITICAL: No hadith grading is available for this record. You MUST NOT invent, guess, or append a grading. Do not describe it as sahih, hasan, or authenticated. Present the source exactly as provided.'
 

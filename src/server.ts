@@ -1,7 +1,9 @@
 /**
  * Sakina Islamic Knowledge MCP Server v1 (WO#102).
  *
- * Streamable HTTP transport. Four lookup tools, one canonical
+ * Streamable HTTP transport (the default; Fly) or, with `--stdio`, the
+ * stdio transport (WO#444: `npx @asksakina/islamic-knowledge-mcp --stdio`,
+ * the npm package's declared transport). Four lookup tools, one canonical
  * resource (`sakina://about`), per-IP rate limiting (60 req/min,
  * Upstash Redis when configured, in-memory fallback otherwise).
  *
@@ -13,8 +15,11 @@
  */
 
 import http from 'node:http'
+import { realpathSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import {
   GET_QURAN_VERSE_DESCRIPTION,
@@ -41,6 +46,7 @@ import {
   findVersesHandler,
 } from './tools/find-verses.js'
 import { ABOUT_RESOURCE_BODY } from './contracts/educational.js'
+import { AUDIENCE_JSON_SCHEMA } from './teach/audience.js'
 import {
   RATE_LIMIT_BUDGET,
   RATE_LIMIT_WINDOW_MS,
@@ -54,9 +60,9 @@ import { handleStatsRequest } from './logging/stats.js'
 import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
-const SERVER_VERSION = '1.5.0'
+const SERVER_VERSION = '2.1.0'
 const SERVER_DESCRIPTION =
-  "Verified Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a collection (supplications), and the 99 Names of Allah. All content is reviewed through AskSakina's structured specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
+  "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
 // WO#129 Task 1 — Smithery server-card.json. Mirrors the MCP registry
 // entry at `.mcp/server.json` but adds JSON-Schema-shaped descriptors
@@ -89,6 +95,8 @@ const SERVER_CARD = {
       registryType: 'npm',
       identifier: '@asksakina/islamic-knowledge-mcp',
       transport: 'stdio',
+      // WO#444: the package serves stdio only with this flag (HTTP otherwise)
+      packageArguments: [{ type: 'positional', value: '--stdio' }],
     },
   ],
   tools: [
@@ -110,6 +118,7 @@ const SERVER_CARD = {
             enum: ['en', 'id', 'ur', 'ar'],
             description: 'Translation locale; defaults to "en" (Pickthall).',
           },
+          audience: AUDIENCE_JSON_SCHEMA,
         },
         required: ['surah', 'ayah'],
       },
@@ -120,14 +129,19 @@ const SERVER_CARD = {
       inputSchema: {
         type: 'object',
         properties: {
-          context: { type: 'string', description: 'Free-form life context' },
+          context: { type: 'string', description: 'Free-form life context. Send this or id, not both.' },
+          id: {
+            type: 'string',
+            pattern: '^[A-Za-z0-9-]{3,40}$',
+            description: "A du'a id from a related reference in an earlier response. Send this or context, not both.",
+          },
           locale: {
             type: 'string',
             enum: ['en', 'id', 'ur', 'ar'],
             description: 'Translation locale; defaults to "en".',
           },
+          audience: AUDIENCE_JSON_SCHEMA,
         },
-        required: ['context'],
       },
     },
     {
@@ -146,6 +160,7 @@ const SERVER_CARD = {
             enum: ['en', 'id', 'ur', 'ar'],
             description: 'Translation locale; defaults to "en".',
           },
+          audience: AUDIENCE_JSON_SCHEMA,
         },
       },
     },
@@ -167,6 +182,7 @@ const SERVER_CARD = {
             enum: ['en', 'id', 'ur', 'ar'],
             description: 'Selects in-country crisis resources if needed; defaults to "en".',
           },
+          audience: AUDIENCE_JSON_SCHEMA,
         },
         required: ['query'],
       },
@@ -454,14 +470,43 @@ export async function startHttpServer(port: number = Number(process.env.PORT ?? 
   })
 }
 
+// ─── stdio transport (WO#444) ───────────────────────────────────────
+
+/**
+ * Serve MCP over stdin/stdout for a local client (`sakina-mcp --stdio`). One
+ * process serves one client, so there is no per-IP rate limiter and no HTTP
+ * listener. stdout carries the protocol only: every log line goes to stderr.
+ */
+export async function startStdioServer(): Promise<McpServer> {
+  console.log = (...args: unknown[]) => console.error(...args)
+  const server = createMcpServer()
+  await server.connect(new StdioServerTransport())
+  console.error('[sakina-mcp] serving MCP over stdio')
+  return server
+}
+
 // ── Entrypoint ───────────────────────────────────────────────────────
 
-const isMainModule =
-  import.meta.url === `file://${process.argv[1]}` ||
-  process.argv[1]?.endsWith('server.ts')
+/**
+ * WO#444: true when this file is the process entry point. The npm `bin`
+ * (`node_modules/.bin/sakina-mcp`) is a symlink, so `argv[1]` is compared
+ * with this module's path after resolving links on both sides. Before
+ * WO#444 the comparison used the unresolved path, and the bin exited at
+ * once without starting anything.
+ */
+export function isEntryPoint(entry: string | undefined = process.argv[1], moduleUrl: string = import.meta.url): boolean {
+  if (!entry) return false
+  if (entry.endsWith('server.ts')) return true
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(moduleUrl))
+  } catch {
+    return false
+  }
+}
 
-if (isMainModule) {
-  startHttpServer().catch((err) => {
+if (isEntryPoint()) {
+  const start: Promise<unknown> = process.argv.includes('--stdio') ? startStdioServer() : startHttpServer()
+  start.catch((err) => {
     console.error('[sakina-mcp] failed to start:', err)
     process.exit(1)
   })

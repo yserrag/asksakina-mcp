@@ -470,7 +470,7 @@
         "context": "morning-adhkar",
         "must_contain": [
           "Origin: Quran 9:129\\nSource: Sunan Abī Dāwūd 5081",
-          "\"hadith_source\":\"Sunan Abī Dāwūd 5081\""
+          "\"hadith_source\":\"Sunan Abī Dāwūd 5081 ("
         ]
       }
     },
@@ -809,14 +809,14 @@
     },
     {
       "id": "crisis-in-phrase",
-      "description": "Crisis keyword inside a longer phrase: detected on the full raw input; no du'a list is inferred from a crisis message",
+      "description": "Crisis keyword inside a longer phrase: detected on the full raw input; the crisis resource is the whole response (Gem 3, WO#388-B)",
       "tool": "get_dua",
       "args": {
         "context": "grief after losing my mother and I want to kill myself"
       },
       "expect": {
         "crisis_level": "hard",
-        "content_type": "not_found"
+        "content_type": "crisis_resource_only"
       }
     },
     {
@@ -941,13 +941,13 @@
     },
     {
       "id": "find-verses-crisis",
-      "description": "Hard crisis: block, no verses inferred (WO#386)",
+      "description": "Hard crisis: the crisis resource is the whole response (WO#388 item A, Gem 3)",
       "tool": "find_verses",
       "args": {
         "query": "I want to kill myself"
       },
       "expect": {
-        "content_type": "not_found",
+        "content_type": "crisis_resource_only",
         "crisis_level": "hard"
       }
     },

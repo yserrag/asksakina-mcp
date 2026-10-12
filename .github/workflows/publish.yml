@@ -1,0 +1,71 @@
+name: Publish to npm
+
+# WO#444 (Architect, 11 Oct): the npm package is published from this public
+# mirror, with npm trusted publishing (GitHub Actions OIDC) and provenance.
+# The AskSakina repository builds the package, commits it here with
+# release.json and pushes a v<version> tag; this workflow publishes exactly
+# what is committed. It does not build: dist/ and data/ are committed, and
+# lifecycle scripts are not run (they need the AskSakina source tree).
+#
+# npm docs (trusted-publishers): npm CLI 11.5.1 or later and Node 22.14.0 or
+# later; the id-token: write permission; package.json repository.url must
+# match this repository. Provenance is generated automatically from a
+# public repository.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: npm 11.5.1 or later (trusted publishing)
+        run: |
+          npm install -g npm@11
+          npm --version
+
+      # The tag, package.json, .mcp/server.json and release.json agree, and
+      # the tarball npm would publish is byte for byte the one the AskSakina
+      # repository built and tested (release.json records its integrity).
+      - name: Release checks
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          node - "$TAG" <<'NODE'
+          const fs = require('node:fs')
+          const { execFileSync } = require('node:child_process')
+          const tag = process.argv[2]
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+          const card = JSON.parse(fs.readFileSync('.mcp/server.json', 'utf8'))
+          const rel = JSON.parse(fs.readFileSync('release.json', 'utf8'))
+          const fail = (m) => { console.error(`::error::${m}`); process.exit(1) }
+          if (pkg.version !== tag) fail(`tag v${tag} but package.json says ${pkg.version}`)
+          if (card.version !== tag || card.packages?.[0]?.version !== tag) fail('.mcp/server.json version differs from the tag')
+          if (rel.version !== tag) fail('release.json version differs from the tag')
+          if (pkg.repository?.url !== 'https://github.com/yserrag/asksakina-mcp') fail(`repository.url is ${pkg.repository?.url}`)
+          const [packed] = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { encoding: 'utf8' }))
+          if (packed.integrity !== rel.integrity) fail(`tarball integrity ${packed.integrity} is not the built one ${rel.integrity}`)
+          console.log(`v${tag}: ${packed.entryCount} files, integrity matches the AskSakina build (${rel.sakinaCommit})`)
+          NODE
+
+      - name: npm publish (trusted publishing, provenance)
+        run: npm publish --access public --ignore-scripts

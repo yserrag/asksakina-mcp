@@ -13,6 +13,9 @@ import {
   type SupportedLocale,
 } from '../data/names.js'
 import { buildResponse, type SakinaResponse } from '../meta/response-builder.js'
+import { distressBlockFor, evaluateDistress } from '../safety/crisis-keywords.js'
+import { audienceArg } from '../teach/audience.js'
+import { withTeach } from '../teach/attach.js'
 
 export const getNameOfAllahShape = {
   name: z
@@ -33,6 +36,7 @@ export const getNameOfAllahShape = {
     .enum(['en', 'id', 'ur', 'ar'])
     .optional()
     .describe('Locale for meaning + reflection. Defaults to "en".'),
+  audience: audienceArg,
 } as const
 
 export const getNameOfAllahSchema = z
@@ -53,6 +57,29 @@ export async function getNameOfAllahHandler(
 ): Promise<SakinaResponse<unknown>> {
   const locale: SupportedLocale = input.locale ?? 'en'
 
+  // WO#391 (addendum item 10): `name` is free text, so it goes through the
+  // same detector as get_dua and find_verses, BEFORE any lookup. A hard crisis
+  // is the crisis resource alone (Gem 3 zero-content ruling, WO#388). A soft
+  // match attaches the support block beside the result. `number` carries no
+  // text and is not checked.
+  let extras: Record<string, unknown> | undefined
+  if (input.name !== undefined) {
+    const distress = evaluateDistress(input.name)
+    const block = distressBlockFor(distress, locale)
+    extras = block ? { crisis_resource: block } : undefined
+    if (distress.level === 'hard') {
+      return buildResponse({
+        contentType: 'crisis_resource_only',
+        content: {
+          requested: { name: input.name },
+          withheld: 'name_of_allah',
+          reason: 'The Names of Allah are not shown when a message carries a crisis keyword. The crisis resource is the whole response.',
+        },
+        extras,
+      })
+    }
+  }
+
   const record = input.number
     ? getNameByNumber(input.number, locale)
     : input.name
@@ -67,11 +94,20 @@ export async function getNameOfAllahHandler(
         reason:
           'No matching Name found. Provide a recognisable transliteration (e.g. "Al-Hakam"), the Arabic, the English meaning, or a number between 1 and 99.',
       },
+      extras,
     })
   }
 
   return buildResponse({
     contentType: 'name_of_allah',
-    content: record,
+    // WO#405: teach and related appended only when audience was sent; WO#407:
+    // nothing attaches when a support block is attached (a soft keyword in
+    // `name`).
+    content: withTeach(record, `name:${record.number}`, {
+      audience: input.audience,
+      locale,
+      withhold: Boolean(extras),
+    }),
+    extras,
   })
 }

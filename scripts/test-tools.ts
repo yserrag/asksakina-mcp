@@ -26,15 +26,17 @@ import { GET_DUA_DESCRIPTION } from '../src/tools/get-dua.js'
 import { THEMATIC_INDEX } from '../src/data/thematic.js'
 import { griefRoute } from '../src/data/context-matcher.js'
 import { BEREAVED_DUAS, BEREAVED_EXCLUDED, BEREAVED_GENDER_NOTE } from '../src/data/bereaved-duas.js'
-import { TOTAL_DUAS, selectAbuseSafeDuas, isEnduranceDua } from '../src/data/duas.js'
+import { TOTAL_DUAS, selectAbuseSafeDuas, isEnduranceDua, hasGradeToken } from '../src/data/duas.js'
+import { NOT_A_NARRATION_DIRECTIVE, UNGRADED_GRADING_DIRECTIVE } from '../src/contracts/presentation.js'
+import { UNGRADED_SCOPE_HEAD } from '../src/contracts/gem4-wo418.js'
 import { ABUSE_SAFE_DUAS } from '../src/data/abuse-safe-duas.js'
 import { abuseResponse, ABUSE_ORDER_DIRECTIVE } from '../src/tools/get-dua.js'
 import { distressBlockFor, US_988_FOUNDER_VERIFIED, ABUSE_SENTENCE } from '../src/safety/crisis-keywords.js'
-import { stripPrependedBasmala, STRIP_PREFIXED_BASMALA, BASMALA_PREFIX_PLAIN, BASMALA_PREFIX_SHADDA, getBasmalaPrefixMismatchCount } from '../src/data/quran.js'
+import { stripPrependedBasmala, STRIP_PREFIXED_BASMALA, BASMALA_PREFIX_PLAIN, BASMALA_PREFIX_SHADDA, getBasmalaPrefixMismatchCount, bundledPickthall } from '../src/data/quran.js'
 import { TOTAL_NAMES } from '../src/data/names.js'
 import { readFileSync } from 'node:fs'
-import { getVerseArabic } from '../../src/lib/scripture/index.js'
-import { skeleton } from './quranic-labels.js'
+import { getVerseArabic, getVerseClause } from '../../src/lib/scripture/index.js'
+import { skeleton, FASTTRACK_RATIFIED, QURANIC_LABELS } from './quranic-labels.js'
 
 const BUNDLED_FULL = JSON.parse(
   readFileSync(new URL('../data/duas.json', import.meta.url), 'utf-8'),
@@ -242,56 +244,67 @@ async function testDuaAnxiety() {
       : fail('origin=quran citation', JSON.stringify(quranLabelled.map((d) => d.quran_citation))),
   )
 
-  // WO#385 (Gem 4, 1.4.1): records whose source AND grading are unrecorded
-  // carry Gem 4's directive; records with a recorded source but no grading
-  // keep the held Gem 10 interim directive. Each distinct directive is also
-  // stated once in CRITICAL_RULES. The anxiety records are all unsourced.
-  const GEM4_DIRECTIVE =
-    "CRITICAL: This du'a's source and hadith grading are unrecorded in the AskSakina corpus. You MUST NOT invent, guess, or append a grading. The absence of a grading does not mean the du'a is weak or invalid. Present the text exactly as provided without implying formal authentication."
-  const INTERIM_DIRECTIVE =
-    'CRITICAL: No grading is provided for this record. You MUST NOT invent, guess, or append a grading. Present the source exactly as provided without implying authentication.'
-  type DirRec = { grading_status?: string; grading_directive?: string; dua_block?: string; source?: string }
-  const rulesNow = getDirectives(response)
+  // WO#388 (Gem 4): ONE locked directive on every ungraded hadith du'a,
+  // sourced or not; never on a graded or Quranic record. It replaces both
+  // WO#385 directives, which must no longer appear anywhere.
+  const UNGRADED_DIRECTIVE =
+    'CRITICAL: No hadith grading is available for this record. You MUST NOT invent, guess, or append a grading. Do not describe it as sahih, hasan, or authenticated. Present the source exactly as provided.'
+  const RETIRED = [
+    "CRITICAL: This du'a's source and hadith grading are unrecorded in the AskSakina corpus.",
+    'CRITICAL: No grading is provided for this record.',
+  ]
+  type DirRec = { title?: string; grading_status?: string; grading_directive?: string; dua_block?: string; source?: string }
   results.push(
-    rulesNow.includes(GEM4_DIRECTIVE) && !rulesNow.includes(INTERIM_DIRECTIVE)
-      ? pass('anxiety: Gem 4 directive in CRITICAL_RULES; interim absent (no sourced ungraded record)')
-      : fail('anxiety CRITICAL_RULES directives', JSON.stringify(rulesNow.filter((r) => r.startsWith('CRITICAL')))),
+    UNGRADED_GRADING_DIRECTIVE === UNGRADED_DIRECTIVE
+      ? pass('UNGRADED_GRADING_DIRECTIVE is Gem 4\'s locked string, verbatim')
+      : fail('locked directive text', JSON.stringify(UNGRADED_GRADING_DIRECTIVE)),
   )
-  const recsWithDirective = recs as DirRec[]
-  const directiveOk = recsWithDirective.every((d) =>
-    d.grading_status === 'not_recorded'
-      ? d.grading_directive === GEM4_DIRECTIVE
-      : d.grading_directive === undefined,
-  )
-  results.push(
-    directiveOk
-      ? pass('anxiety: Gem 4 grading_directive on every unsourced ungraded record, and on no graded one')
-      : fail('per-record grading_directive', 'missing on an ungraded record or present on a graded one'),
-  )
-  results.push(
-    recsWithDirective.every((d) => !(d.dua_block ?? '').includes('CRITICAL'))
-      ? pass('directive is not inside dua_block (display text)')
-      : fail('directive in dua_block', 'the agent-facing directive leaked into the display block'),
-  )
-  // Sourced but ungraded (morning adhkar: countSource names the hadith):
-  // the held interim directive, never Gem 4's "source ... unrecorded" text.
-  const morning = await getDuaHandler({ context: 'morning' })
-  const morningRecs = (morning.content as { duas?: DirRec[] }).duas ?? []
-  const morningRules = getDirectives(morning)
-  const sourced = morningRecs.filter((d) => d.grading_status === 'not_recorded' && d.source && !/Source not recorded/.test(d.source))
-  results.push(
-    sourced.length > 0 &&
-      sourced.every((d) => d.grading_directive === INTERIM_DIRECTIVE) &&
-      morningRules.includes(INTERIM_DIRECTIVE) &&
-      !morningRecs.some((d) => d.source && !/Source not recorded/.test(d.source) && d.grading_directive === GEM4_DIRECTIVE)
-      ? pass(`morning: ${sourced.length} sourced-but-ungraded records carry the held interim directive, never Gem 4's`)
-      : fail('sourced-but-ungraded directive', `sourced=${sourced.length}, directives=${JSON.stringify([...new Set(sourced.map((d) => d.grading_directive?.slice(0, 40)))])}`),
-  )
+  for (const ctx of ['anxiety', 'morning', 'evening', 'fasting', 'forgiveness', 'travel']) {
+    const r = await getDuaHandler({ context: ctx })
+    const rs = (r.content as { duas?: DirRec[] }).duas ?? []
+    const rules = getDirectives(r)
+    const ungraded = rs.filter((d) => d.grading_status === 'not_recorded')
+    const json = JSON.stringify(r)
+    // WO#418 B1 (Gem 4 Reply 2 item 1): the response-level copy names the
+    // ungraded records' titles; the bare locked string is never a rule alone.
+    const scoped = `${UNGRADED_SCOPE_HEAD}(${[...new Set(ungraded.map((d) => d.title))].join(', ')}): ${UNGRADED_DIRECTIVE}`
+    const ok =
+      // WO#454: a general supplication carries its own directive, never the ungraded one.
+      rs.every((d) =>
+        d.grading_status === 'not_recorded'
+          ? d.grading_directive === UNGRADED_DIRECTIVE
+          : d.grading_status === 'not_a_narration'
+            ? d.grading_directive === NOT_A_NARRATION_DIRECTIVE
+            : d.grading_directive === undefined,
+      ) &&
+      rules.includes(scoped) === ungraded.length > 0 &&
+      !rules.includes(UNGRADED_DIRECTIVE) &&
+      !RETIRED.some((t) => json.includes(t)) &&
+      rs.every((d) => !(d.dua_block ?? '').includes('CRITICAL'))
+    results.push(
+      ok
+        ? pass(`${ctx}: directive on all ${ungraded.length} ungraded of ${rs.length}, none on graded/Quranic; CRITICAL_RULES carries it scoped to their titles; retired wordings absent`)
+        : fail(`${ctx} ungraded directive`, JSON.stringify(rs.map((d) => [d.grading_status, d.grading_directive?.slice(0, 30)]))),
+    )
+  }
+  // Grade detection (WO#388): accented forms count; a person's-name-free
+  // source without a token does not; countSource never counts.
+  const tokenCases: Array<[string, boolean]> = [
+    ['Sahih al-Bukhari 5675', true],
+    ['\u1E62a\u1E25\u012B\u1E25 Muslim 810', true],
+    ['Sunan Abi Dawud 2357 \u2014 \u1E24asan (Al-Albani)', true],
+    ["\u1E0Ca\u02BF\u012Bf (weak chain)", true],
+    ["Da'if (weak chain, though widely practiced)", true],
+    ['Sunan at-Tirmidhi 3524', false],
+    ['Source not recorded in AskSakina corpus', false],
+  ]
+  const tokenBad = tokenCases.filter(([t, want]) => hasGradeToken(t) !== want)
+  results.push(tokenBad.length ? fail('hasGradeToken', JSON.stringify(tokenBad)) : pass(`hasGradeToken: ${tokenCases.length} cases incl. accented forms`))
   // All-graded category: no directive at all, require_grading stays true.
   const fasting = await getDuaHandler({ context: 'fasting' })
   const fastingRules = getDirectives(fasting)
   const fastingHadith = (fasting._sakina_meta.presentation_contract as { hadith?: { require_grading?: unknown } }).hadith
-  const anyDirective = fastingRules.includes(GEM4_DIRECTIVE) || fastingRules.includes(INTERIM_DIRECTIVE)
+  const anyDirective = fastingRules.includes(UNGRADED_DIRECTIVE)
   results.push(
     !anyDirective && fastingHadith?.require_grading === true
       ? pass('all-graded response (fasting): no grading directive, require_grading true')
@@ -327,7 +340,14 @@ async function testDuaCrisis() {
 
   results.push(assertMetaIntact('dua crisis meta intact', response))
   results.push(assertNoUnicodeHonorific('dua crisis no unicode honorific', response))
-  results.push(assertVoice2('dua crisis Voice 2 directive present', response))
+  // WO#388-B: a self-harm crisis is crisis_resource_only, like abuse. Voice 2
+  // frames Islamic content and this response carries none, so the check is
+  // that the no-religious-content directive is present instead.
+  results.push(
+    getDirectives(response).some((r) => r.startsWith("Do NOT add du'as, Quranic verses, hadith"))
+      ? pass('dua crisis carries the no-religious-content directive')
+      : fail('dua crisis no-religious-content directive', JSON.stringify(getDirectives(response))),
+  )
   results.push(assertPBUH('dua crisis PBUH directive present', response))
 
   const cr = (response as Record<string, unknown>).crisis_resource as
@@ -712,7 +732,14 @@ async function testQuranParkedLocales() {
   }
   const field = (key: string, i: 0 | 1) => (JSON.parse(recorded(key).toString('utf-8')) as { data: Array<{ text: string }> }).data[i].text
   const AR: Record<string, string> = { '2:286': field('2:286', 0), '97:1': field('97:1', 0), '1:1': field('1:1', 0) }
-  const EN: Record<string, string> = { '2:286': field('2:286', 1), '97:1': field('97:1', 1), '1:1': field('1:1', 1) }
+  // WO#444: the English is the bundled Pickthall (data/pickthall.json), not the
+  // upstream's. The recorded upstream English differs at the verse end (control).
+  const EN: Record<string, string> = { '2:286': bundledPickthall(2, 286)!, '97:1': bundledPickthall(97, 1)!, '1:1': bundledPickthall(1, 1)! }
+  results.push(
+    Object.keys(EN).every((k) => EN[k] && EN[k] !== field(k, 1))
+      ? pass('control: the recorded upstream English differs from the bundled Pickthall for 2:286, 97:1 and 1:1 (so a match below proves the bundle is served)')
+      : fail('control: upstream vs bundled English', JSON.stringify(Object.keys(EN).map((k) => [k, EN[k], field(k, 1)]))),
+  )
   const requested: string[] = []
   const realFetch = globalThis.fetch
   globalThis.fetch = (async (url: string | URL) => {
@@ -807,12 +834,61 @@ async function testDuaPhrases() {
       ? pass('phrase with a crisis keyword still carries the hard crisis block')
       : fail('phrase crisis', JSON.stringify(crisis.crisis_resource)),
   )
-  for (const [q, ct] of [['grief after losing my mother and I want to kill myself', 'not_found'], ['my husband hits me', 'crisis_resource_only']] as const) {
+  for (const [q, ct] of [['grief after losing my mother and I want to kill myself', 'crisis_resource_only'], ['my husband hits me', 'crisis_resource_only']] as const) {
     const r = (await getDuaHandler({ context: q })) as unknown as { _sakina_meta: { content_type: string }; crisis_resource?: { level?: string } }
     results.push(
       r._sakina_meta.content_type === ct && r.crisis_resource?.level === 'hard'
         ? pass(`hard crisis "${q}": crisis block, no du'a list inferred from the phrase`)
         : fail(`hard crisis "${q}"`, `got ${r._sakina_meta.content_type}`),
+    )
+  }
+}
+
+// WO#388-B (Gem 3, 27 Sep 2026): get_dua returns the crisis block alone on
+// EVERY hard crisis. Zero leakage: exact key sets, no du'a-shaped key
+// anywhere, no du'a Arabic in the payload, no grading directive; a safe
+// query still returns du'as.
+async function testDuaCrisisOnly() {
+  console.log("\n=== get_dua hard crisis: block only (WO#388-B) ===")
+  type R = { _sakina_meta: { content_type: string; llm_directives: { CRITICAL_RULES: string[] } }; content: Record<string, unknown>; crisis_resource?: { level?: string; crisis_type?: string } }
+  const DUA_KEYS = ['duas', 'dua_block', 'title', 'arabic', 'transliteration', 'translation', 'source', 'grading', 'grading_status', 'grading_directive', 'grading_summary', 'context', 'matched_by', 'teaching_note', 'total_results', 'no_records_yet', 'see_also']
+  const keysDeep = (o: unknown, acc: string[] = []): string[] => {
+    if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { acc.push(k); keysDeep(v, acc) }
+    return acc
+  }
+  const safe = (await getDuaHandler({ context: 'anxiety' })) as unknown as R
+  const safeDuas = (safe.content.duas as Array<{ arabic: string }> | undefined) ?? []
+  results.push(
+    safe._sakina_meta.content_type === 'dua_collection' && safeDuas.length > 0
+      ? pass(`safe query "anxiety" -> dua_collection, ${safeDuas.length} du'as (WO#388-B control)`)
+      : fail('safe control', JSON.stringify(safe.content)),
+  )
+  // Crisis phrases whose words would otherwise resolve to a du'a category.
+  for (const [label, q, type] of [
+    ['self-harm', 'I want to kill myself', 'self-harm'],
+    ['self-harm + anxiety words', 'my anxiety is so bad I want to kill myself', 'self-harm'],
+    ['self-harm + grief words', 'grief after losing my mother and I want to kill myself', 'self-harm'],
+    ['abuse', 'my husband hits me', 'abuse'],
+  ] as const) {
+    const r = (await getDuaHandler({ context: q })) as unknown as R
+    const json = JSON.stringify(r)
+    const problems: string[] = []
+    if (r._sakina_meta.content_type !== 'crisis_resource_only') problems.push(`content_type ${r._sakina_meta.content_type}`)
+    if (r.crisis_resource?.level !== 'hard' || r.crisis_resource?.crisis_type !== type) problems.push(`crisis_resource ${JSON.stringify(r.crisis_resource)}`)
+    if (Object.keys(r).sort().join() !== '_sakina_meta,content,crisis_resource') problems.push(`top-level ${Object.keys(r)}`)
+    if (Object.keys(r.content).sort().join() !== 'reason,requested,withheld') problems.push(`content ${Object.keys(r.content)}`)
+    // requested echoes the caller's own input and nothing else.
+    const { requested, ...rest } = r.content
+    if (JSON.stringify(requested) !== JSON.stringify({ context: q })) problems.push(`requested ${JSON.stringify(requested)}`)
+    const hit = keysDeep(rest).filter((k) => DUA_KEYS.includes(k))
+    if (hit.length) problems.push(`du'a keys ${hit}`)
+    const arabicHit = safeDuas.find((d) => json.includes(d.arabic))
+    if (arabicHit) problems.push("du'a Arabic in payload")
+    if (r._sakina_meta.llm_directives.CRITICAL_RULES.some((d) => /grading/i.test(d))) problems.push('grading directive present')
+    results.push(
+      !problems.length
+        ? pass(`${label} crisis -> crisis_resource_only, zero du'a leakage (WO#388-B)`)
+        : fail(`${label} crisis leakage`, problems.join('; ')),
     )
   }
 }
@@ -853,55 +929,86 @@ async function testAbuseAllowlist() {
 // records carry origin "quran" and the module's clause bytes. Each resolved
 // clause is an exact byte slice of the module ayah (a suffix: the clause
 // runs to the end of the ayah), and D00154/D00179 keep their hadith source.
+//
+// WO#392: no word index is hard-coded here. The plan is FASTTRACK_RATIFIED
+// itself; the expected bytes are each label's own resolver; and the ground
+// truth that does not move with the resolver is Gem 2's ruled first and last
+// words (anchors), compared by skeleton. The old hard-coded plan split the
+// STRIPPED ayah (getVerseArabic) with indexes authored against the STORED
+// text (getVerseClause), so WO#387's seat-space strip shifted 3:173 by one
+// word and failed D00003/D00504 although the bundle was right.
 async function testFastTrackLabels() {
   console.log('\n=== WO#377 fast-track Quranic labels (Gem 2 ruling) ===')
   const bundled = JSON.parse(readFileSync(new URL('../data/duas.json', import.meta.url), 'utf-8')) as Array<{
-    id: string; arabic: string; origin?: string; quran_ref?: string; countSource?: string
+    id: string; arabic: string; category: string; origin?: string; quran_ref?: string; countSource?: string
   }>
-  const plan: Array<[string, string, number]> = [
-    ['D00003', '3:173', 14], ['D00504', '3:173', 14], ['D00330', '7:23', 1],
-    ['D00154', '9:129', 3], ['D00179', '9:129', 3], ['D00308', '25:74', 2],
-  ]
-  for (const [id, ref, from] of plan) {
+  const EXPECTED_IDS = ['D00003', 'D00504', 'D00330', 'D00154', 'D00179', 'D00308']
+  const planIds = FASTTRACK_RATIFIED.map((l) => l.id)
+  results.push(
+    JSON.stringify([...planIds].sort()) === JSON.stringify([...EXPECTED_IDS].sort())
+      ? pass('fast-track plan is the six Gem 2 labels (D00091 held)')
+      : fail('fast-track plan', JSON.stringify(planIds)),
+  )
+  for (const label of FASTTRACK_RATIFIED) {
+    const { id, ref } = label
     const d = bundled.find((x) => x.id === id)!
-    const ayah = Buffer.from(getVerseArabic(ref), 'utf-8')
+    const expected = label.resolve()
+    const ayahText = getVerseArabic(ref)
+    const ayah = Buffer.from(ayahText, 'utf-8')
     const clause = Buffer.from(d.arabic, 'utf-8')
-    const words = getVerseArabic(ref).split(' ')
-    const expected = words.slice(from).join(' ')
     const isSlice = ayah.length > clause.length && ayah.subarray(ayah.length - clause.length).equals(clause)
-    const ok = d.origin === 'quran' && d.quran_ref === ref && d.arabic === expected && isSlice && !d.arabic.includes('ࣰ')
+    // Where the clause starts in the ayah as served, derived, not assumed.
+    const ayahWords = ayahText.split(' ')
+    const clauseWords = d.arabic.split(' ')
+    const startWord = ayahWords.length - clauseWords.length
+    const wholeWords = startWord > 0 && ayahWords.slice(startWord).join(' ') === d.arabic
+    const [first, last] = label.anchors ?? ['', '']
+    const anchored =
+      !!label.anchors &&
+      skeleton(clauseWords[0]) === skeleton(first) &&
+      skeleton(clauseWords[clauseWords.length - 1]) === skeleton(last)
+    const ok =
+      d.origin === 'quran' && d.quran_ref === ref && d.arabic === expected && isSlice && wholeWords && anchored &&
+      !d.arabic.includes('\u08F0')
     results.push(
       ok
-        ? pass(`${id}: origin quran, Quran ${ref} clause from module word ${from} to the end, an exact byte slice of the ayah`)
-        : fail(`${id} label`, JSON.stringify({ origin: d.origin, ref: d.quran_ref, same: d.arabic === expected, isSlice })),
+        ? pass(`${id}: origin quran, Quran ${ref} clause from served word ${startWord} to the end, an exact byte slice of the ayah, starting and ending on Gem 2's ruled words`)
+        : fail(`${id} label`, JSON.stringify({ origin: d.origin, ref: d.quran_ref, same: d.arabic === expected, isSlice, wholeWords, anchored, startWord })),
     )
   }
   results.push(
-    bundled.filter((x) => x.origin === 'quran').length === 9
-      ? pass('9 records labelled origin quran (3 tier-1 + 6 fast-track)')
+    // WO#413 — the registry is the count: 3 tier-1 + 6 fast-track + the WO#413 A/B rows
+    bundled.filter((x) => x.origin === 'quran').length === QURANIC_LABELS.length
+      ? pass(`${QURANIC_LABELS.length} records labelled origin quran (every registry row)`)
       : fail('labelled count', String(bundled.filter((x) => x.origin === 'quran').length)),
   )
+  // WO#413: the D00091/D00092 title swap was ruled (D00092 class C, replaced
+  // with 3:38), so D00091 carries Gem 2's standing ruling: 25:74 from word 2.
   const d91 = bundled.find((x) => x.id === 'D00091')!
   results.push(
-    !d91.origin && !d91.quran_ref
-      ? pass('D00091 held: no Quran label until the collection owner rules on its title (corpus Arabic and title as stored)')
-      : fail('D00091 held', JSON.stringify({ origin: d91.origin, ref: d91.quran_ref })),
+    d91.origin === 'quran' && d91.quran_ref === '25:74' && d91.arabic === getVerseClause('25:74', 2)
+      ? pass('D00091 labelled 25:74 from word 2 (Gem 2, WO#377; released by the WO#413 title ruling)')
+      : fail('D00091 label', JSON.stringify({ origin: d91.origin, ref: d91.quran_ref })),
   )
   for (const [ctx, title] of [['morning', 'Morning Dua/ Athkar (Recite Seven Times)'], ['evening', 'Evening Dua/ Athkar (Recite Seven Times)']] as const) {
     const r = (await getDuaHandler({ context: ctx })) as unknown as {
       content: { duas: Array<{ title: string; dua_block: string; source: string; quran_citation?: string; hadith_source?: string; hadith_grading_status?: string }> }
     }
     const d = r.content.duas.find((x) => x.title === title)!
+    // WO#423: the reference is Gem 4's locked string (it carries its grading
+    // in parentheses), read from the bundle rather than retyped here.
+    const ref = bundled.find((x) => x.category === `${ctx}-adhkar` && x.quran_ref === '9:129')?.countSource ?? ''
     const ok =
+      ref.startsWith('Sunan Abī Dāwūd 5081 (') &&
       d.quran_citation === 'Quran 9:129' &&
-      d.hadith_source === 'Sunan Abī Dāwūd 5081' &&
-      d.hadith_grading_status === 'not_recorded' &&
+      d.hadith_source === ref &&
+      d.hadith_grading_status === 'graded' &&
       d.dua_block.includes('Origin: Quran 9:129') &&
-      d.dua_block.includes('Source: Sunan Abī Dāwūd 5081') &&
+      d.dua_block.includes(`Source: ${ref}`) &&
       !d.dua_block.includes('Source: Quran 9:129')
     results.push(
       ok
-        ? pass(`${ctx}: 9:129 record shows Origin Quran 9:129 AND Source Sunan Abi Dawud 5081 (labelling rule)`)
+        ? pass(`${ctx}: 9:129 record shows Origin Quran 9:129 AND Source Sunan Abi Dawud 5081, graded (labelling rule; WO#423)`)
         : fail(`${ctx} hadith source`, d.dua_block.split('\n').filter((l) => !l.startsWith('Arabic')).join(' || ')),
     )
   }
@@ -916,7 +1023,9 @@ const GEM4_BEREAVED_ARABIC: readonly string[] = [
   "اَللّٰهُمَّ رَحْمَتَكَ أَرْجُوْا فَلَا تَكِلْنِيْ إِلٰى نَفْسِيْ طَرْفَةَ عَيْنٍ وَّأَصْلِحْ لِيْ شَأْنِيْ كُلَّهُۥ لَآ إِلٰهَ إِلَّآ أَنْتَ",
   "لَآ إِلٰهَ إِلَّا اللهُ الْعَظِيْمُ الْحَلِيْمُ لَآ إِلٰهَ إِلَّا اللهُ رَبُّ الْعَرْشِ الْعَظِيْمِ لَآ إِلٰهَ إِلَّا اللهُ رَبُّ السَّمٰوٰتِ وَرَبُّ الْأَرْضِ وَ رَبُّ الْعَرْشِ الْكَرِيْمِ",
   "حَسۡبُنَا ٱللَّهُ وَنِعۡمَ ٱلۡوَكِيلُ",
-  "حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيم",
+  // WO#413: D00518 now serves the 9:129 clause from the module (as D00504's
+  // 3:173 entry above already does since WO#377); same words, Uthmani bytes.
+  getVerseClause('9:129', 3),
   "لَاحَوْلَ وَلَا قُوَّةَ إِلَّا بِاللهِ"
 ]
 const GEM4_EXCLUDED_ARABIC = "لَآ إِلٰهَ إِلَّا اَنْتَ سُبْحَانَكَ إِنِّيْ كُنْتُ مِنَ الظَّالِمِيْنَ"
@@ -924,16 +1033,24 @@ const GEM4_GENDER_NOTE = "These du'as use the masculine form in the Arabic; the 
 
 async function testBereavedRoute() {
   console.log('\n=== get_dua: bereaved route (WO#386) ===')
-  const k = (x: string) => skeleton(x).replace(/\s+/g, '')
+  // WO#435: alef-agnostic, as the WO#412 scan's rasm. Gem 2's batch 3 text
+  // spells D00503 أَرْجُو (not أَرْجُوْا) and D00502 إِلَهَ (no dagger alef):
+  // the same words, a different alef count. Every other letter must match.
+  const k = (x: string) => skeleton(x).replace(/\s+/g, '').replace(/\u0627/g, '')
   const byId = new Map(BUNDLED_FULL.map((d) => [d.id, d]))
+  // control: the key still tells two different du'as apart (D00501 is not D00503's du'a)
+  results.push(k(byId.get('D00501')!.arabic) !== k(GEM4_BEREAVED_ARABIC[2]) ? pass('BEREAVED key control: a different du\'a (D00501) does not match Gem 4\'s D00503 Arabic') : fail('BEREAVED key control', 'D00501 matched'))
   const idsOk =
     BEREAVED_DUAS.length === GEM4_BEREAVED_ARABIC.length &&
     BEREAVED_DUAS.every((id, i) => byId.get(id)?.category === 'calamity' && k(byId.get(id)!.arabic) === k(GEM4_BEREAVED_ARABIC[i]))
   results.push(idsOk ? pass('BEREAVED_DUAS: 7 calamity records, each matching Gem 4\'s Arabic, in Gem 4\'s order') : fail('BEREAVED_DUAS', JSON.stringify(BEREAVED_DUAS.map((id) => [id, byId.get(id)?.category]))))
+  // WO#413: the excluded Yunus du'a (21:87 clause) now serves the same module
+  // text in four records (calamity, pregnancy, repentance, health); none may be
+  // in the bereaved set, and the calamity one Gem 4 named stays excluded.
   const excl = BUNDLED_FULL.filter((d) => k(d.arabic) === k(GEM4_EXCLUDED_ARABIC))
   results.push(
-    excl.length === 1 && BEREAVED_EXCLUDED.includes(excl[0].id) && !BEREAVED_DUAS.includes(excl[0].id)
-      ? pass(`Gem 4 exclusion ${excl[0].id} not in bereaved`)
+    excl.length >= 1 && excl.some((d) => BEREAVED_EXCLUDED.includes(d.id)) && excl.every((d) => !BEREAVED_DUAS.includes(d.id))
+      ? pass(`Gem 4 exclusion ${BEREAVED_EXCLUDED.join(', ')} not in bereaved (nor its ${excl.length - 1} same-text records)`)
       : fail('exclusion', JSON.stringify(excl.map((d) => d.id))),
   )
   results.push(BEREAVED_GENDER_NOTE === GEM4_GENDER_NOTE ? pass('teaching note is Gem 4\'s wording, verbatim') : fail('teaching note', String(BEREAVED_GENDER_NOTE)))
@@ -949,7 +1066,6 @@ async function testBereavedRoute() {
     ['I was widowed last year', 'bereaved'],
     ['funeral', 'deceased'],
     ['dua at the funeral of my father', 'deceased'],
-    ['visiting my mothers grave', 'deceased'],
     ['deceased', 'deceased'],
     ['death', 'deceased'],
     ['loss', 'deceased'],
@@ -979,13 +1095,22 @@ async function testBereavedRoute() {
   }
   const cal = (await getDuaHandler({ context: 'calamity' })) as unknown as R
   results.push(
-    cal.content.context === 'calamity' && (cal.content.duas?.length ?? 0) === 21 && cal.content.teaching_note === undefined
-      ? pass('calamity unchanged: 21 records (D00499 included), no teaching note')
+    // WO#435: 19 since D00516 and D00517 were withdrawn (was 21); the context
+    // returns every bundled calamity record, D00499 among them
+    cal.content.context === 'calamity' && (cal.content.duas?.length ?? 0) === 19 &&
+    BUNDLED_FULL.filter((d) => d.category === 'calamity').length === 19 &&
+    (cal.content.duas as { arabic?: string }[]).some((d) => !!d.arabic && d.arabic === BUNDLED_FULL.find((x: { id: string }) => x.id === 'D00499')?.arabic) &&
+    cal.content.teaching_note === undefined
+      ? pass('calamity: 19 records (D00499 included; D00516, D00517 withdrawn in WO#435), no teaching note')
       : fail('calamity', `${cal.content.context} ${cal.content.duas?.length}`),
   )
   const deceased = (await getDuaHandler({ context: 'deceased' })) as unknown as R
   results.push(deceased.content.teaching_note === undefined ? pass('deceased carries no teaching note') : fail('deceased note', String(deceased.content.teaching_note)))
-  for (const q of ['funeral', 'dua for the deceased', 'deceased']) {
+  // WO#430: "visiting my mothers grave" is asserted end to end here, through
+  // get_dua, not through griefRoute() alone: before WO#430 the full lookup sent
+  // it to `mothers` (the parent word won), so a griefRoute-only test passed
+  // while users were served the living-parent du'as.
+  for (const q of ['funeral', 'dua for the deceased', 'deceased', 'visiting my mothers grave']) {
     const res = (await getDuaHandler({ context: q })) as unknown as R
     results.push(
       res._sakina_meta.content_type === 'dua_collection' && res.content.context === 'deceased' && (res.content.duas?.length ?? 0) === 12
@@ -995,7 +1120,7 @@ async function testBereavedRoute() {
   }
   const hard = (await getDuaHandler({ context: 'grief after losing my mother and I want to kill myself' })) as unknown as R
   results.push(
-    hard._sakina_meta.content_type === 'not_found' && hard.crisis_resource?.level === 'hard' && hard.content.context === undefined
+    hard._sakina_meta.content_type === 'crisis_resource_only' && hard.crisis_resource?.level === 'hard' && hard.content.context === undefined
       ? pass('hard crisis with grief words keeps the hard block and infers no context')
       : fail('hard crisis grief', JSON.stringify({ ct: hard._sakina_meta.content_type, cr: hard.crisis_resource?.level, ctx: hard.content.context })),
   )
@@ -1041,8 +1166,8 @@ async function testFindVerses() {
         : fail('patience', JSON.stringify(p.content)),
     )
     results.push(
-      vs.every((v) => v.arabic === getVerseArabic(v.reference) && v.translation === `Pickthall ${v.reference}` && v.surah_name_english === 'Surah-En')
-        ? pass('each verse: Arabic byte-equal to getVerseArabic, translation and surah name from upstream')
+      vs.every((v) => v.arabic === getVerseArabic(v.reference) && v.translation === bundledPickthall(+v.reference.split(':')[0], +v.reference.split(':')[1]) && v.surah_name_english === 'Surah-En')
+        ? pass('each verse: Arabic byte-equal to getVerseArabic, translation from the bundled Pickthall (WO#444), surah name from upstream')
         : fail('verse fields', JSON.stringify(vs.map((v) => [v.reference, v.arabic === getVerseArabic(v.reference), v.translation]))),
     )
     results.push(
@@ -1056,6 +1181,11 @@ async function testFindVerses() {
         : fail('directive', JSON.stringify(p._sakina_meta.llm_directives)),
     )
     results.push(assertNoUnicodeHonorific('find_verses no unicode honorific', p))
+    results.push(
+      !JSON.stringify(p).includes('No hadith grading is available')
+        ? pass('find_verses: Quranic verses never carry the ungraded-hadith directive (WO#388)')
+        : fail('find_verses ungraded directive', 'directive present on a verse response'),
+    )
     const big = (await findVersesHandler({ query: 'anxiety gratitude patience trust', limit: 10 })) as unknown as R
     const refs = (big.content.verses ?? []).map((v) => v.reference)
     results.push(
@@ -1083,11 +1213,47 @@ async function testFindVerses() {
         ? pass('no match -> empty verses array with no_results flag, not an error')
         : fail('no match', JSON.stringify(none.content)),
     )
-    const hard = (await findVersesHandler({ query: 'I want to kill myself' })) as unknown as R
+    // WO#388 item A (Gem 3): ANY hard crisis returns the crisis block alone.
+    // Zero leakage: exact key sets, no verse-shaped field anywhere, no
+    // index Arabic in the payload, and no upstream fetch during the call.
+    const VERSE_KEYS = ['verses', 'reference', 'arabic', 'translation', 'translation_source', 'relevance_note', 'surah_name_english', 'surah_name_arabic', 'matched_themes', 'available_themes', 'no_results', 'total_results']
+    const keysDeep = (o: unknown, acc: string[] = []): string[] => {
+      if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { acc.push(k); keysDeep(v, acc) }
+      return acc
+    }
+    const leaks = async (q: string) => {
+      const before = calls
+      const r = (await findVersesHandler({ query: q })) as unknown as R
+      const json = JSON.stringify(r)
+      const problems: string[] = []
+      if (r._sakina_meta.content_type !== 'crisis_resource_only') problems.push(`content_type ${r._sakina_meta.content_type}`)
+      if (r.crisis_resource?.level !== 'hard') problems.push('no hard crisis_resource')
+      if (Object.keys(r).sort().join() !== '_sakina_meta,content,crisis_resource') problems.push(`top-level ${Object.keys(r)}`)
+      if (Object.keys(r.content).sort().join() !== 'reason,requested,withheld') problems.push(`content ${Object.keys(r.content)}`)
+      const hit = keysDeep({ content: r.content }).filter((k) => VERSE_KEYS.includes(k))
+      if (hit.length) problems.push(`verse keys ${hit}`)
+      const arabicHit = THEMATIC_INDEX.find((v) => json.includes(v.arabic))
+      if (arabicHit) problems.push(`index Arabic of ${arabicHit.ref} in payload`)
+      if (calls !== before) problems.push(`${calls - before} upstream fetches`)
+      return { r, problems }
+    }
+    for (const [label, q, type] of [
+      ['self-harm', 'I want to kill myself', 'self-harm'],
+      ['abuse', 'my husband hits me', 'abuse'],
+    ] as const) {
+      const { r, problems } = await leaks(q)
+      results.push(
+        !problems.length && r.crisis_resource?.crisis_type === type
+          ? pass(`${label} crisis -> crisis_resource_only, zero verse leakage, no lookup (WO#388 A)`)
+          : fail(`${label} crisis leakage`, problems.join('; ') + ' ' + JSON.stringify(r)),
+      )
+    }
+    // Control: the safe query in the same run still returns verses.
+    const safe = (await findVersesHandler({ query: 'patience' })) as unknown as R
     results.push(
-      hard.crisis_resource?.level === 'hard' && (hard.content.verses ?? []).length === 0
-        ? pass('hard crisis -> hard block, no verses inferred')
-        : fail('hard crisis', JSON.stringify(hard)),
+      safe._sakina_meta.content_type === 'verse_collection' && (safe.content.verses ?? []).length > 0
+        ? pass('safe query after crisis checks -> verse_collection as normal (WO#388 A control)')
+        : fail('safe control', JSON.stringify(safe.content)),
     )
     const abuse = (await findVersesHandler({ query: 'my husband hits me' })) as unknown as R
     results.push(
@@ -1139,6 +1305,7 @@ async function main() {
   await testDuaAnxiety()
   await testDuaPhrases()
   await testDuaCrisis()
+  await testDuaCrisisOnly()
   await testDuaCrisisLocales()
   await testCrisisOrderingAndHours()
   await testAbuseBlock()
