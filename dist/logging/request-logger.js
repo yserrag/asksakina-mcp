@@ -1,3 +1,4 @@
+import { getDailyStore } from './daily-store.js';
 const TOOLS = ['get_quran_verse', 'get_dua', 'get_name_of_allah', 'find_verses'];
 function emptyCounter() {
     return { ok: 0, not_found: 0, error: 0, total: 0, duration_ms_sum: 0 };
@@ -24,6 +25,7 @@ export function logRequest(entry) {
         c.not_found += 1;
     else
         c.error += 1;
+    getDailyStore()?.record(entry.tool, entry.status, entry.duration_ms);
 }
 export function getAggregateSnapshot() {
     let total = 0;

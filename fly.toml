@@ -15,6 +15,9 @@ primary_region = "lhr"  # London Heathrow — closest to the Architect
   NODE_ENV = "production"
   PORT = "3030"
   LOG_DIR = "/data/logs"
+  # WO#456: daily per-tool totals (ok / not_found / error / summed duration per
+  # UTC day; nothing else) on the mounted volume, kept at most 90 days.
+  MCP_USAGE_DIR = "/data/usage"
 
 # WO#137 — persistent volume for JSONL analytics logs. One-time setup
 # on a new machine:

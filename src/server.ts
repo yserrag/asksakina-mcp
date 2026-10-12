@@ -57,10 +57,11 @@ import {
 import { serialiseResponse, type SakinaResponse } from './meta/response-builder.js'
 import { logRequest, type ToolName, type RequestStatus } from './logging/request-logger.js'
 import { handleStatsRequest } from './logging/stats.js'
+import { enableDailyStore } from './logging/daily-store.js'
 import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
-const SERVER_VERSION = '2.1.0'
+const SERVER_VERSION = '2.1.1'
 const SERVER_DESCRIPTION =
   "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
@@ -348,6 +349,9 @@ function resolveClientIp(req: http.IncomingMessage): string {
  */
 export async function startHttpServer(port: number = Number(process.env.PORT ?? 3030)): Promise<http.Server> {
   const limiter = getRateLimiter()
+  // WO#456: daily per-tool totals on disk, only where MCP_USAGE_DIR is set
+  // (the Fly volume). Local and stdio runs write nothing.
+  if (process.env.MCP_USAGE_DIR) enableDailyStore(process.env.MCP_USAGE_DIR)
   // WO#385: a real reachability check at startup (PING), logged with its
   // result, instead of assuming Upstash works because its secrets are set.
   await probeRateLimiter().catch((err) =>

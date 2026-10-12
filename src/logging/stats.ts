@@ -16,6 +16,7 @@ import http from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 
 import { getAggregateSnapshot, type ToolName } from './request-logger.js'
+import { getDailyStore, RETENTION_DAYS } from './daily-store.js'
 import { getLimiterStatus, type LimiterStatus } from '../safety/rate-limiter.js'
 import { getBasmalaPrefixMismatchCount } from '../data/quran.js'
 
@@ -58,7 +59,49 @@ interface StatsPayload {
   /** WO#385: ayah-1 texts that started with neither recorded basmala
    *  prefix and were served unchanged. Aggregate only; no verse references. */
   basmala_prefix_mismatch: number
+  /** WO#456: per-tool totals per UTC day from disk plus today's unwritten
+   *  increments, newest first; null when the daily store is off. */
+  daily: DailyPayload | null
 }
+
+interface DailyToolPayload {
+  total: number
+  ok: number
+  not_found: number
+  error: number
+  avg_response_ms: number
+}
+
+interface DailyPayload {
+  retention_days: number
+  days: { date: string; total: number; by_tool: Record<string, DailyToolPayload> }[]
+}
+
+function buildDaily(): DailyPayload | null {
+  const store = getDailyStore()
+  if (!store) return null
+  return {
+    retention_days: RETENTION_DAYS,
+    days: store.days().map((d) => {
+      const by_tool: Record<string, DailyToolPayload> = {}
+      let total = 0
+      for (const t of ALL_TOOLS) {
+        const c = d.by_tool[t]
+        const n = c.ok + c.not_found + c.error
+        total += n
+        by_tool[t] = { total: n, ok: c.ok, not_found: c.not_found, error: c.error, avg_response_ms: n > 0 ? Math.round(c.duration_ms_sum / n) : 0 }
+      }
+      return { date: d.date, total, by_tool }
+    }),
+  }
+}
+
+/** The /stats privacy line when nothing is kept on disk (unchanged since WO#360). */
+export const PRIVACY_MEMORY_ONLY =
+  'aggregate-only in-memory counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; resets on restart'
+/** WO#456 (proposed; Gem 8 and Gem 10 to approve): the line when daily totals are kept on disk. */
+export const PRIVACY_WITH_DAILY =
+  'aggregate-only counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; since-start totals reset on restart; daily per-tool totals (ok, not_found, error, summed duration) kept on the server\'s own disk for at most 90 days'
 
 function buildPayload(): StatsPayload {
   const snap = getAggregateSnapshot()
@@ -74,13 +117,13 @@ function buildPayload(): StatsPayload {
     }
   }
   return {
-    privacy:
-      'aggregate-only in-memory counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; resets on restart',
+    privacy: getDailyStore() ? PRIVACY_WITH_DAILY : PRIVACY_MEMORY_ONLY,
     since: snap.since,
     total_requests: snap.total,
     by_tool,
     rate_limiter: getLimiterStatus(),
     basmala_prefix_mismatch: getBasmalaPrefixMismatchCount(),
+    daily: buildDaily(),
   }
 }
 

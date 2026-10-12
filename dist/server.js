@@ -15,9 +15,10 @@ import { RATE_LIMIT_BUDGET, RATE_LIMIT_WINDOW_MS, getRateLimiter, probeRateLimit
 import { serialiseResponse } from './meta/response-builder.js';
 import { logRequest } from './logging/request-logger.js';
 import { handleStatsRequest } from './logging/stats.js';
+import { enableDailyStore } from './logging/daily-store.js';
 import { extractClientIp } from './logging/geo.js';
 const SERVER_NAME = 'sakina-islamic-knowledge';
-const SERVER_VERSION = '2.1.0';
+const SERVER_VERSION = '2.1.1';
 const SERVER_DESCRIPTION = "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar.";
 const SERVER_CARD = {
     schemaVersion: '2025-07-09',
@@ -236,6 +237,8 @@ function resolveClientIp(req) {
 }
 export async function startHttpServer(port = Number(process.env.PORT ?? 3030)) {
     const limiter = getRateLimiter();
+    if (process.env.MCP_USAGE_DIR)
+        enableDailyStore(process.env.MCP_USAGE_DIR);
     await probeRateLimiter().catch((err) => console.error('[rate-limiter] startup check threw:', err instanceof Error ? err.message : String(err)));
     const server = http.createServer(async (req, res) => {
         if (!req.url) {

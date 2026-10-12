@@ -17,6 +17,8 @@
 // them — was removed in WO#360, so the privacy claim now holds without
 // qualification.
 
+import { getDailyStore } from './daily-store.js'
+
 export type ToolName = 'get_quran_verse' | 'get_dua' | 'get_name_of_allah' | 'find_verses'
 export type RequestStatus = 'ok' | 'not_found' | 'error'
 
@@ -74,6 +76,9 @@ export function logRequest(entry: LogRequestInput): void {
   if (entry.status === 'ok') c.ok += 1
   else if (entry.status === 'not_found') c.not_found += 1
   else c.error += 1
+  // WO#456: the same three outcomes and duration, added to today's total on
+  // disk when the HTTP server enabled the daily store. Nothing else is passed.
+  getDailyStore()?.record(entry.tool, entry.status, entry.duration_ms)
 }
 
 /** Read-only snapshot for the `/stats` endpoint. */

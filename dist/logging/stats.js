@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getAggregateSnapshot } from './request-logger.js';
+import { getDailyStore, RETENTION_DAYS } from './daily-store.js';
 import { getLimiterStatus } from '../safety/rate-limiter.js';
 import { getBasmalaPrefixMismatchCount } from '../data/quran.js';
 const ALL_TOOLS = [
@@ -23,6 +24,27 @@ function authorise(req) {
         return false;
     return timingSafeEqual(a, b);
 }
+function buildDaily() {
+    const store = getDailyStore();
+    if (!store)
+        return null;
+    return {
+        retention_days: RETENTION_DAYS,
+        days: store.days().map((d) => {
+            const by_tool = {};
+            let total = 0;
+            for (const t of ALL_TOOLS) {
+                const c = d.by_tool[t];
+                const n = c.ok + c.not_found + c.error;
+                total += n;
+                by_tool[t] = { total: n, ok: c.ok, not_found: c.not_found, error: c.error, avg_response_ms: n > 0 ? Math.round(c.duration_ms_sum / n) : 0 };
+            }
+            return { date: d.date, total, by_tool };
+        }),
+    };
+}
+export const PRIVACY_MEMORY_ONLY = 'aggregate-only in-memory counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; resets on restart';
+export const PRIVACY_WITH_DAILY = 'aggregate-only counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; since-start totals reset on restart; daily per-tool totals (ok, not_found, error, summed duration) kept on the server\'s own disk for at most 90 days';
 function buildPayload() {
     const snap = getAggregateSnapshot();
     const by_tool = {};
@@ -37,12 +59,13 @@ function buildPayload() {
         };
     }
     return {
-        privacy: 'aggregate-only in-memory counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; resets on restart',
+        privacy: getDailyStore() ? PRIVACY_WITH_DAILY : PRIVACY_MEMORY_ONLY,
         since: snap.since,
         total_requests: snap.total,
         by_tool,
         rate_limiter: getLimiterStatus(),
         basmala_prefix_mismatch: getBasmalaPrefixMismatchCount(),
+        daily: buildDaily(),
     };
 }
 export function handleStatsRequest(req, res) {

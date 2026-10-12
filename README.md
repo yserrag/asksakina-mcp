@@ -341,12 +341,13 @@ v1 ships unauthenticated. An optional `X-Sakina-App-Id` header is accepted but n
 
 ## Privacy & Analytics
 
-This service operates with an aggregate-only, memory-bound data model (implemented in WO#360). For each tool, the server maintains a running count of calls by outcome (`ok`, `not_found`, `error`) and the summed handler time to report operational averages via the `/stats` endpoint.
+This service operates with an aggregate-only data model (WO#360; daily totals WO#456). For each tool, the server maintains a running count of calls by outcome (`ok`, `not_found`, `error`) and the summed handler time to report operational averages via the `/stats` endpoint.
 
 - **No persistent tracking:** No per-request logs or client identifiers are written to disk or any database by the application.
 - **Ephemeral IP handling:** Client IP addresses are used only to enforce the rate limit. Each is held as a rate-limit key in Upstash Redis for the rate-limit window (60 seconds), then expired. If Upstash is unavailable, the in-memory fallback holds it in process memory for the same window, then discards it. Raw IP addresses are never persisted by the application, and never written to logs.
 - **No payload logging:** Request parameters (such as `context` values or verse references) and response payloads are never captured or logged.
-- **Memory-only retention:** All aggregate counters exist only in RAM and are reset when the server process restarts.
+- **Since-start counters:** The totals `/stats` reports under `by_tool` exist only in RAM and are reset when the server process restarts.
+- **Daily totals on the server's own disk:** On the hosted server, the number of calls to each tool on each UTC day, by outcome (`ok`, `not_found`, `error`), and their summed handler time are written to the server's own disk so that they survive restarts. They are kept for at most 90 days; older days are deleted. They contain no IP addresses, user agents, client identifiers, times of individual calls, parameters or payloads, and cannot be linked to any request or person. They are written only where `MCP_USAGE_DIR` is set: a local `npx` or `--stdio` run writes nothing.
 
 *Regulatory Note (UK GDPR): Because nothing identifiable is held beyond the rate-limit window, there are no records that could be accessed or erased. Note that while the application itself does not persist personal data, our infrastructure provider (Fly.io) transiently processes IP addresses at the edge layer for standard network routing and platform security.*
 
@@ -364,7 +365,7 @@ Payload shape:
 
 ```json
 {
-  "privacy": "aggregate-only in-memory counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; resets on restart",
+  "privacy": "aggregate-only counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; since-start totals reset on restart; daily per-tool totals (ok, not_found, error, summed duration) kept on the server's own disk for at most 90 days",
   "since": "2026-09-25T…",
   "total_requests": N,
   "by_tool": {
@@ -381,9 +382,18 @@ Payload shape:
     "last_success_at": "2026-09-25T…",
     "startup_check": "Upstash reachable (PING ok, 12 ms); state: upstash"
   },
-  "basmala_prefix_mismatch": 0
+  "basmala_prefix_mismatch": 0,
+  "daily": {
+    "retention_days": 90,
+    "days": [
+      { "date": "2026-10-12", "total": N,
+        "by_tool": { "get_dua": { "total": N, "ok": N, "not_found": N, "error": N, "avg_response_ms": N }, … } }
+    ]
+  }
 }
 ```
+
+`daily` lists the stored days, newest first, with today's not-yet-written calls included; it is `null` when `MCP_USAGE_DIR` is unset, and the `privacy` line then reads as before WO#456 ("aggregate-only in-memory counters; … resets on restart").
 
 `rate_limiter.state` is `upstash` (Upstash answering), `degraded` (Upstash configured but failing: requests are limited by the in-memory fallback, never allowed through) or `memory` (Upstash not configured). Failure reasons carry the HTTP status or error, never a client IP. `basmala_prefix_mismatch` counts ayah-1 texts from the upstream that started with neither recorded basmala form and were served unchanged. It is an aggregate count only; the log line for it carries no verse reference.
 
@@ -394,7 +404,7 @@ fly secrets set MCP_STATS_TOKEN=$(openssl rand -hex 32)
 fly deploy
 ```
 
-The server no longer writes to the `/data` volume that `fly.toml` mounts; it was the log volume before WO#360.
+The server writes one thing to the `/data` volume that `fly.toml` mounts: the daily totals, one file per UTC day in `/data/usage` (`MCP_USAGE_DIR`), written every 5 minutes and when Fly stops the machine. `LOG_DIR` (`/data/logs`) has been unused since WO#360.
 
 ## Data sources
 

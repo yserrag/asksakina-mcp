@@ -12,10 +12,16 @@ name: Publish to npm
 # match this repository. Provenance is generated automatically from a
 # public repository.
 
+# WO#456 (Architect, 12 Oct): workflow_dispatch as well as the tag push. On
+# 12 Oct the v2.1.0 tag push did not start this workflow. A missed trigger is
+# re-run from the Actions tab with "Use workflow from" set to the tag (for
+# example v2.1.1). A run on a branch fails the release checks: the ref must be
+# a tag, and the tag must equal the package version.
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -49,6 +55,10 @@ jobs:
       - name: Release checks
         run: |
           set -euo pipefail
+          if [ "${GITHUB_REF_TYPE:-}" != "tag" ]; then
+            echo "::error::run this on a v* tag, not the ${GITHUB_REF_TYPE:-unknown} ${GITHUB_REF_NAME:-}"
+            exit 1
+          fi
           TAG="${GITHUB_REF_NAME#v}"
           node - "$TAG" <<'NODE'
           const fs = require('node:fs')

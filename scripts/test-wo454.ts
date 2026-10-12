@@ -182,7 +182,8 @@ async function testStatus() {
     duaStatus: () => status,
     verseExists: () => true,
     nameExists: () => true,
-  } as TeachLookups)
+    glossaryHas: () => true,
+  })
   const base = TEACH_ENTRIES['dua:D00060'] as TeachEntry
   const fallback = { ...base, context: { kind: 'not_recorded', text: 'Source not recorded in the AskSakina corpus. Not attributed to the Prophet (peace be upon him) or the Companions.', reviewedBy: base.context!.reviewedBy } } as TeachEntry
   for (const [label, entry] of [['cited Field 2', base], ['fallback Field 2', fallback]] as const) {

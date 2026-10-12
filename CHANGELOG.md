@@ -2,6 +2,28 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 2.1.1 (unreleased; Gem 8 and Gem 10 passed, 12 Oct)
+
+WO#456: daily usage totals that survive a restart (hosted server only). A
+version of its own so the README's privacy wording ships to npm and the mirror
+together with the Fly deploy that starts writing the totals.
+
+### Added
+
+- **Daily per-tool totals on disk** where `MCP_USAGE_DIR` is set (the Fly
+  volume): per tool and UTC day, `ok`, `not_found`, `error` and summed handler
+  time; nothing else. Written every 5 minutes and on SIGINT/SIGTERM; at most 90
+  days kept. `/stats` gains `daily`. Local `npx` and `--stdio` runs write
+  nothing.
+
+### Changed
+
+- **README "Privacy & Analytics"**: the since-start counters stay in memory;
+  the daily totals, their fields and the 90-day retention are now stated.
+- **Mirror publish workflow** also runs on `workflow_dispatch`, so a missed tag
+  trigger can be re-run on the tag from the Actions tab. A run on a branch
+  fails the release checks before anything is published.
+
 ## 2.1.0 (unreleased: waiting on Gem 10)
 
 WO#444: the Pickthall English is AskSakina's corrected text; the package runs.
