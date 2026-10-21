@@ -73,6 +73,16 @@ export const THEME_SYNONYMS: Readonly<Record<string, string>> = {
   sin: 'forgiveness', sins: 'forgiveness', mercy: 'forgiveness',
 }
 
+/**
+ * WO#478 (Architect, 20 Oct 2026, phrase fixes only): a word inside one of
+ * these phrases must not route to its theme. "loss of faith" is not grief;
+ * "fear of Allah" is not anxiety. Checked on the normalised query.
+ */
+export const PHRASE_EXCLUSIONS: ReadonlyArray<{ phrase: string; word: string }> = [
+  { phrase: 'loss of faith', word: 'loss' },
+  { phrase: 'fear of allah', word: 'fear' },
+]
+
 export interface ThemeMatch {
   theme: string
   /** The query word that matched. */
@@ -84,8 +94,11 @@ export function matchThemes(query: string): ThemeMatch[] {
   const known = new Set(AVAILABLE_THEMES)
   const lookup = (w: string): string | undefined => (known.has(w) ? w : undefined) ?? THEME_SYNONYMS[w]
   const out: ThemeMatch[] = []
-  for (const word of normalisePhrase(query).split(' ')) {
+  const normalised = normalisePhrase(query)
+  const excluded = new Set(PHRASE_EXCLUSIONS.filter((e) => normalised.includes(e.phrase)).map((e) => e.word))
+  for (const word of normalised.split(' ')) {
     if (!word) continue
+    if (excluded.has(word)) continue
     const theme = lookup(word) ?? (word.length > 3 && word.endsWith('s') ? lookup(word.slice(0, -1)) : undefined)
     if (theme && known.has(theme) && !out.some((m) => m.theme === theme)) out.push({ theme, via: word })
   }

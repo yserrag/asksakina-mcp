@@ -43,6 +43,23 @@ import type { Audience } from '../teach/types.js'
 /** Shape of a du'a id: "D00068", "fasting-iftar-2357". */
 export const DUA_ID_PATTERN = /^[A-Za-z0-9-]{3,40}$/
 
+/**
+ * WO#478 (Architect, 20 Oct 2026; review fix 2, paging): a context lookup
+ * returns `limit` records (default GET_DUA_DEFAULT_LIMIT, at most
+ * GET_DUA_MAX_LIMIT) of the route's existing order, starting at `offset`
+ * (default 0), so every record stays reachable by context. The bereaved set
+ * (Gem 4's fixed order) and the abuse allowlist are always returned whole,
+ * offset ignored. When more follow the page, the response says so, in
+ * `content.more` and in CRITICAL_RULES.
+ */
+export const GET_DUA_DEFAULT_LIMIT = 3
+export const GET_DUA_MAX_LIMIT = 10
+
+/** The note on a page with more after it; exact wording from the Architect. */
+export function moreDuasNote(remaining: number): string {
+  return `${remaining} more ${remaining === 1 ? "du'a" : "du'as"} for this context; call get_dua with offset and limit to see them.`
+}
+
 export const getDuaShape = {
   context: z
     .string()
@@ -62,6 +79,21 @@ export const getDuaShape = {
     .optional()
     .describe('Translation locale; defaults to "en". v1 returns English content for all locales.'),
   audience: audienceArg,
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(GET_DUA_MAX_LIMIT)
+    .optional()
+    .describe(
+      `Number of du'as to return for a context; default ${GET_DUA_DEFAULT_LIMIT}, max ${GET_DUA_MAX_LIMIT}. The response says how many more exist. Ignored with id.`,
+    ),
+  offset: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe("Number of du'as to skip before the page, for paging with limit; default 0. Ignored with id, and on the bereaved set."),
 } as const
 
 export const getDuaSchema = z.object(getDuaShape)
@@ -159,22 +191,28 @@ export async function getDuaHandler(
   // WO#377 addendum: the envelope reports what the records hold. If any
   // record has no recorded grading, require_grading becomes 'per_record'
   // and the agent reads each record's grading_status.
-  const unrecorded = result.duas.filter((d) => d.grading_status === 'not_recorded').length
+  // WO#478: the bereaved set is returned whole; every other context is paged
+  // by `offset` and `limit` (default GET_DUA_DEFAULT_LIMIT) in the route's
+  // existing order.
+  const whole = result.resolvedCategory === BEREAVED_CONTEXT
+  const offset = whole ? 0 : (input.offset ?? 0)
+  const limit = whole ? result.duas.length : (input.limit ?? GET_DUA_DEFAULT_LIMIT)
+  const shown = result.duas.slice(offset, offset + limit)
+  const shownIds = result.ids.slice(offset, offset + limit)
+  const remaining = Math.max(0, result.duas.length - offset - shown.length)
+  const unrecorded = shown.filter((d) => d.grading_status === 'not_recorded').length
   // WO#454: a general supplication carries no grading either.
-  const general = result.duas.filter((d) => d.grading_status === 'not_a_narration').length
-  // WO#405: teach attaches per record, after lookup, only when audience was
-  // sent. WO#407 (Gem 10): nothing attaches on grief routes or under any
-  // support block.
+  const general = shown.filter((d) => d.grading_status === 'not_a_narration').length
+  // WO#405: teach attaches per record, after lookup; WO#478: whenever an
+  // entry exists, audience or not. WO#407 (Gem 10): nothing attaches on
+  // grief routes or under any support block.
   const withhold = Boolean(extras?.crisis_resource) || GRIEF_CONTEXTS.has(result.resolvedCategory)
-  const duas = input.audience
-    ? result.duas.map((d, i) =>
-        withTeach(d, `dua:${result.ids[i]}`, { audience: input.audience, locale: input.locale, withhold }),
-      )
-    : result.duas
-  const contractOverride = contractOverrideFor(result.duas)
+  const duas = shown.map((d, i) => withTeach(d, `dua:${shownIds[i]}`, { audience: input.audience, locale: input.locale, withhold }))
+  const contractOverride = contractOverrideFor(shown)
   // WO#385: each distinct per-record directive in this response is also
   // stated once in CRITICAL_RULES; WO#418 B1 scopes the ungraded one.
-  const recordDirectives = collectionDirectivesFor(result.duas)
+  // WO#478: the "more" note is mandatory whenever records were cut.
+  const recordDirectives = [...collectionDirectivesFor(shown), ...(remaining > 0 ? [moreDuasNote(remaining)] : [])]
   const extraDirectives = recordDirectives.length ? recordDirectives : undefined
 
   return buildResponse({
@@ -187,10 +225,14 @@ export async function getDuaHandler(
         ? { teaching_note: BEREAVED_GENDER_NOTE }
         : {}),
       duas,
-      total_results: result.duas.length,
+      total_results: shown.length,
+      total_available: result.duas.length,
+      ...(offset > 0 ? { offset } : {}),
+      truncated: remaining > 0,
+      ...(remaining > 0 ? { more: moreDuasNote(remaining) } : {}),
       grading_summary: {
-        quranic: result.duas.filter((d) => d.grading_status === 'quranic').length,
-        graded: result.duas.filter((d) => d.grading_status === 'graded').length,
+        quranic: shown.filter((d) => d.grading_status === 'quranic').length,
+        graded: shown.filter((d) => d.grading_status === 'graded').length,
         not_a_narration: general,
         not_recorded: unrecorded,
       },
@@ -198,6 +240,7 @@ export async function getDuaHandler(
     extras,
     contractOverride,
     extraDirectives,
+    withholdTeach: withhold,
   })
 }
 
@@ -307,6 +350,8 @@ export function abuseResponse(
     extras,
     contractOverride: contractOverrideFor(duas),
     extraDirectives: [ABUSE_ORDER_DIRECTIVE, ...recordDirectives],
+    // WO#478 (Gem 3): the hard abuse block withholds teach and the no-teach clause alike.
+    withholdTeach: true,
   })
 }
 
@@ -364,8 +409,8 @@ export function duaByIdResponse(
       extras,
     })
   }
-  // WO#405: the same attachment as a context lookup; WO#407: nothing attaches
-  // under a support block (a soft keyword in the id).
+  // WO#405: the same attachment as a context lookup; WO#478: audience or not;
+  // WO#407: nothing attaches under a support block (a soft keyword in the id).
   const duas = [withTeach(record, `dua:${id}`, { audience, locale, withhold: Boolean(extras) })]
   const unrecorded = duas.filter((d) => d.grading_status === 'not_recorded').length
   const recordDirectives = collectionDirectivesFor([record])
@@ -385,5 +430,6 @@ export function duaByIdResponse(
     extras,
     contractOverride: contractOverrideFor([record]),
     extraDirectives: recordDirectives.length ? recordDirectives : undefined,
+    withholdTeach: Boolean(extras),
   })
 }

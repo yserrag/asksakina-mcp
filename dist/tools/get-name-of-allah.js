@@ -72,6 +72,7 @@ export async function getNameOfAllahHandler(input) {
             withhold: Boolean(extras),
         }),
         extras,
+        withholdTeach: Boolean(extras),
     });
 }
 //# sourceMappingURL=get-name-of-allah.js.map

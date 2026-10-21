@@ -100,9 +100,7 @@ export async function findVersesHandler(input) {
     const themes = matches.map((m) => m.theme);
     const found = await Promise.all(versesForThemes(themes, limit).map((v) => toFoundVerse(v, themes, locale)));
     const withhold = Boolean(extras) || themes.includes('grief');
-    const verses = input.audience
-        ? found.map((v) => withTeach(v, `verse:${v.reference}`, { audience: input.audience, locale, withhold }))
-        : found;
+    const verses = found.map((v) => withTeach(v, `verse:${v.reference}`, { audience: input.audience, locale, withhold }));
     const parked = PARKED_TRANSLATION_LOCALES[locale];
     return buildResponse({
         contentType: 'verse_collection',
@@ -114,6 +112,7 @@ export async function findVersesHandler(input) {
             no_results: false,
         },
         extras,
+        withholdTeach: withhold,
         extraDirectives: parked
             ? [
                 `The translations are English (Pickthall) because a licensed ${parked} translation is not yet available. Present them as English and state that note. You MUST NOT translate them into ${parked} yourself or present them as a ${parked} translation.`,

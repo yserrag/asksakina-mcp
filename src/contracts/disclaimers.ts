@@ -15,7 +15,8 @@ export const SAKINA_DISCLAIMER =
 export const NOT_FOUND_DISCLAIMER =
   'AskSakina could not find a record matching the supplied input. ' +
   'Do not fabricate a substitute. ' +
-  'Suggest the user rephrase or consult asksakina.com directly.'
+  // WO#478 (Gem 4 condition 3): the site link lives in the server instructions only.
+  'Suggest the user rephrase or try a related topic.'
 
 /**
  * WO#385: disclaimer for a crisis-resource-only response (abuse disclosure).

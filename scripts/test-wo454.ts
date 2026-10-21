@@ -30,6 +30,7 @@ import {
 import { abuseResponse, ABUSE_ORDER_DIRECTIVE, duaByIdResponse, getDuaHandler, quranContractFor } from '../src/tools/get-dua.js'
 import {
   ANTI_SUMMARISATION_DIRECTIVE,
+  DUA_BLOCK_DIRECTIVE,
   DUA_DIRECTIVES,
   NOT_A_NARRATION_DIRECTIVE,
   NOT_A_NARRATION_SCOPE_HEAD,
@@ -196,10 +197,14 @@ async function testStatus() {
 // ---- 3. DUA_DIRECTIVES ----------------------------------------------------------
 async function testDuaBlockLine() {
   console.log('\n=== 3. DUA_DIRECTIVES: the dua_block line ===')
-  const line = "You MUST output the 'dua_block' field exactly as provided. Do not reassemble the record from individual keys."
-  check(DUA_DIRECTIVES.includes(line), 'Gem 10\'s line is in DUA_DIRECTIVES, verbatim')
+  // WO#478 (P2): Gem 10's WO#454 hand-off line ("You MUST output the
+  // 'dua_block' field exactly as provided. Do not reassemble the record from
+  // individual keys.") is retired; the record is still quoted whole, and the
+  // explanation follows it. The old "Prefer the 'dua_block'" line stays gone.
+  const line = DUA_BLOCK_DIRECTIVE
+  check(DUA_DIRECTIVES.includes(line) && line.startsWith("Quote each du'a from its 'dua_block' field exactly as provided; it is the complete record."), 'the WO#478 dua_block line (P2) is in DUA_DIRECTIVES, verbatim')
   const r = await byContext('mothers')
-  check(rules(r).includes(line) && !rules(r).some((x) => x.startsWith("Prefer the 'dua_block'")), 'a get_dua response carries it, and the old "Prefer the \'dua_block\'" line is gone')
+  check(rules(r).includes(line) && !rules(r).some((x) => x.startsWith("Prefer the 'dua_block'") || x.startsWith("You MUST output the 'dua_block'")), 'a get_dua response carries it, and both older dua_block lines are gone')
 }
 
 // ---- 4. crisis_resource directive ------------------------------------------------
@@ -224,7 +229,8 @@ async function testCrisis() {
 // ---- 5. anti-summarisation ---------------------------------------------------------
 async function testAntiSummarisation() {
   console.log('\n=== 5. anti-summarisation ===')
-  check(ANTI_SUMMARISATION_DIRECTIVE === "CRITICAL: Present each du'a below as its own complete record. Do not merge, summarise, or condense several du'as into one.", 'the Architect\'s draft, verbatim')
+  // WO#478 (P3): "summarise" dropped, after-not-instead added; the emission rule below is unchanged.
+  check(ANTI_SUMMARISATION_DIRECTIVE === "CRITICAL: Present each du'a below as its own complete record, quoted exactly. Do not merge or condense several du'as into one. Explain, where a teach block is supplied, after each record and never instead of it.", 'the WO#478 wording (P3), verbatim')
   const r = await byContext('mothers')
   check((r.content.total_results ?? 0) > 1 && count(rules(r), ANTI_SUMMARISATION_DIRECTIVE) === 1, 'on a du\'a response with more than one record, once')
   check(!rules(byId('D00406')).includes(ANTI_SUMMARISATION_DIRECTIVE), 'control: absent on a one-record response')

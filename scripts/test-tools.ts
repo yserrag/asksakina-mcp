@@ -26,7 +26,7 @@ import { GET_DUA_DESCRIPTION } from '../src/tools/get-dua.js'
 import { THEMATIC_INDEX } from '../src/data/thematic.js'
 import { griefRoute } from '../src/data/context-matcher.js'
 import { BEREAVED_DUAS, BEREAVED_EXCLUDED, BEREAVED_GENDER_NOTE } from '../src/data/bereaved-duas.js'
-import { TOTAL_DUAS, selectAbuseSafeDuas, isEnduranceDua, hasGradeToken } from '../src/data/duas.js'
+import { TOTAL_DUAS, selectAbuseSafeDuas, isEnduranceDua, hasGradeToken, getDuaRecordById } from '../src/data/duas.js'
 import { NOT_A_NARRATION_DIRECTIVE, UNGRADED_GRADING_DIRECTIVE } from '../src/contracts/presentation.js'
 import { UNGRADED_SCOPE_HEAD } from '../src/contracts/gem4-wo418.js'
 import { ABUSE_SAFE_DUAS } from '../src/data/abuse-safe-duas.js'
@@ -148,7 +148,9 @@ async function testQuranVerse() {
 
 async function testDuaAnxiety() {
   console.log('\n=== get_dua ({ context: "anxiety" }) — soft distress trigger ===')
-  const response = await getDuaHandler({ context: 'anxiety' })
+  // WO#478: limit 10 so the Dhun-Nun record (9th of 12 in stress-anxiety) is
+  // in the response; the default is 3.
+  const response = await getDuaHandler({ context: 'anxiety', limit: 10 })
   console.log(JSON.stringify(response, null, 2))
 
   results.push(assertMetaIntact('dua anxiety meta intact', response))
@@ -524,10 +526,10 @@ async function testCrisisOrderingAndHours() {
   // [type, locale, 24/7 numbers, limited-hours numbers with their hours]
   const plan: Array<['self-harm' | 'abuse', 'en' | 'id' | 'ur' | 'ar', string[], Array<[string, string]>]> = [
     ['self-harm', 'id', ['119 ext 8'], [['1500-567', 'Monday to Friday, office hours']]],
-    ['self-harm', 'ur', ['0311-7786264'], [['0800-22444', 'business hours']]],
+    ['self-harm', 'ur', ['0311-7786264'], [['0304-111-1741', 'business hours']]],
     ['self-harm', 'ar', ['1564'], [['920033360', '8am to 8pm daily; Saturday 1pm to 8pm'], ['800-HOPE (4673)', '8am to 8pm']]],
     ['abuse', 'id', ['129 ('], [['021-3903963', 'Monday to Friday, office hours']]],
-    ['abuse', 'ur', ['1098'], [['0800-22444', 'business hours']]],
+    ['abuse', 'ur', ['1098'], [['0304-111-1741', 'business hours']]],
     ['abuse', 'ar', ['1919', '800-111', '15115', ' 110 '], [['0801 00 47 47', 'office hours']]],
   ]
   for (const [type, l, always, limited] of plan) {
@@ -566,7 +568,7 @@ async function testAbuseBlock() {
   const DV: Record<string, string[]> = {
     en: ['0808 2000 247'],
     id: ['129', '021-3903963'],
-    ur: ['1098', '0800-22444'],
+    ur: ['1098', '0304-111-1741'],
     ar: ['1919', '800-111', '15115', '110', '0801 00 47 47'],
   }
   const cases: Array<[string, 'en' | 'id' | 'ur' | 'ar']> = [
@@ -851,7 +853,7 @@ async function testDuaPhrases() {
 async function testDuaCrisisOnly() {
   console.log("\n=== get_dua hard crisis: block only (WO#388-B) ===")
   type R = { _sakina_meta: { content_type: string; llm_directives: { CRITICAL_RULES: string[] } }; content: Record<string, unknown>; crisis_resource?: { level?: string; crisis_type?: string } }
-  const DUA_KEYS = ['duas', 'dua_block', 'title', 'arabic', 'transliteration', 'translation', 'source', 'grading', 'grading_status', 'grading_directive', 'grading_summary', 'context', 'matched_by', 'teaching_note', 'total_results', 'no_records_yet', 'see_also']
+  const DUA_KEYS = ['duas', 'dua_block', 'title', 'arabic', 'transliteration', 'translation', 'source', 'grading', 'grading_status', 'grading_directive', 'grading_summary', 'context', 'matched_by', 'teaching_note', 'total_results', 'total_available', 'truncated', 'more', 'no_records_yet', 'see_also']
   const keysDeep = (o: unknown, acc: string[] = []): string[] => {
     if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { acc.push(k); keysDeep(v, acc) }
     return acc
@@ -991,10 +993,14 @@ async function testFastTrackLabels() {
       : fail('D00091 label', JSON.stringify({ origin: d91.origin, ref: d91.quran_ref })),
   )
   for (const [ctx, title] of [['morning', 'Morning Dua/ Athkar (Recite Seven Times)'], ['evening', 'Evening Dua/ Athkar (Recite Seven Times)']] as const) {
-    const r = (await getDuaHandler({ context: ctx })) as unknown as {
+    // WO#478 (review fix 2): the 9:129 record is the 12th of morning-adhkar
+    // and the 11th of evening-adhkar, reached by context through paging
+    // (offset 10, limit 10), as an agent would.
+    const r = (await getDuaHandler({ context: ctx, offset: 10, limit: 10 })) as unknown as {
       content: { duas: Array<{ title: string; dua_block: string; source: string; quran_citation?: string; hadith_source?: string; hadith_grading_status?: string }> }
     }
     const d = r.content.duas.find((x) => x.title === title)!
+    results.push(d ? pass(`${ctx}: the 9:129 record "${title}" is reached by context at offset 10`) : fail(`${ctx}: 9:129 record not on the page at offset 10`, r.content.duas.map((x) => x.title)))
     // WO#423: the reference is Gem 4's locked string (it carries its grading
     // in parentheses), read from the bundle rather than retyped here.
     const ref = bundled.find((x) => x.category === `${ctx}-adhkar` && x.quran_ref === '9:129')?.countSource ?? ''
@@ -1093,16 +1099,17 @@ async function testBereavedRoute() {
     results.push(ok ? pass(`get_dua("${q}") -> bereaved: 7 du'as in Gem 4's order, teaching note, soft note kept`) : fail(`get_dua("${q}")`, JSON.stringify({ ct: res._sakina_meta.content_type, ctx: res.content.context, n: got.length, note: res.content.teaching_note, cr: res.crisis_resource })))
     results.push(assertNoUnicodeHonorific(`get_dua("${q}") no unicode honorific`, res))
   }
-  const cal = (await getDuaHandler({ context: 'calamity' })) as unknown as R
+  const cal = (await getDuaHandler({ context: 'calamity', limit: 10 })) as unknown as R & { content: { total_available?: number } }
   results.push(
-    // WO#435: 19 since D00516 and D00517 were withdrawn (was 21); the context
-    // returns every bundled calamity record, D00499 among them
-    cal.content.context === 'calamity' && (cal.content.duas?.length ?? 0) === 19 &&
+    // WO#435: 19 since D00516 and D00517 were withdrawn (was 21). WO#478: the
+    // context serves at most 10 by call and reports 19 available; D00499 is
+    // checked as the handler would serve it (getDuaRecordById).
+    cal.content.context === 'calamity' && (cal.content.duas?.length ?? 0) === 10 && cal.content.total_available === 19 &&
     BUNDLED_FULL.filter((d) => d.category === 'calamity').length === 19 &&
-    (cal.content.duas as { arabic?: string }[]).some((d) => !!d.arabic && d.arabic === BUNDLED_FULL.find((x: { id: string }) => x.id === 'D00499')?.arabic) &&
+    getDuaRecordById('D00499')?.arabic === BUNDLED_FULL.find((x: { id: string }) => x.id === 'D00499')?.arabic &&
     cal.content.teaching_note === undefined
-      ? pass('calamity: 19 records (D00499 included; D00516, D00517 withdrawn in WO#435), no teaching note')
-      : fail('calamity', `${cal.content.context} ${cal.content.duas?.length}`),
+      ? pass('calamity: 19 available, 10 served at limit 10 (D00499 bundled; D00516, D00517 withdrawn in WO#435), no teaching note')
+      : fail('calamity', `${cal.content.context} ${cal.content.duas?.length} of ${cal.content.total_available}`),
   )
   const deceased = (await getDuaHandler({ context: 'deceased' })) as unknown as R
   results.push(deceased.content.teaching_note === undefined ? pass('deceased carries no teaching note') : fail('deceased note', String(deceased.content.teaching_note)))
@@ -1113,8 +1120,8 @@ async function testBereavedRoute() {
   for (const q of ['funeral', 'dua for the deceased', 'deceased', 'visiting my mothers grave']) {
     const res = (await getDuaHandler({ context: q })) as unknown as R
     results.push(
-      res._sakina_meta.content_type === 'dua_collection' && res.content.context === 'deceased' && (res.content.duas?.length ?? 0) === 12
-        ? pass(`get_dua("${q}") -> deceased, 12 records unchanged`)
+      res._sakina_meta.content_type === 'dua_collection' && res.content.context === 'deceased' && (res.content as { total_available?: number }).total_available === 12 && (res.content.duas?.length ?? 0) === 3
+        ? pass(`get_dua("${q}") -> deceased, 12 available, 3 served by default (WO#478)`)
         : fail(`get_dua("${q}")`, `${res._sakina_meta.content_type} ${res.content.context} ${res.content.duas?.length}`),
     )
   }

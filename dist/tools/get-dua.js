@@ -11,6 +11,11 @@ import { DUA_ID_ALLOWLIST } from '../data/dua-id-allowlist.js';
 import { audienceArg } from '../teach/audience.js';
 import { withTeach } from '../teach/attach.js';
 export const DUA_ID_PATTERN = /^[A-Za-z0-9-]{3,40}$/;
+export const GET_DUA_DEFAULT_LIMIT = 3;
+export const GET_DUA_MAX_LIMIT = 10;
+export function moreDuasNote(remaining) {
+    return `${remaining} more ${remaining === 1 ? "du'a" : "du'as"} for this context; call get_dua with offset and limit to see them.`;
+}
 export const getDuaShape = {
     context: z
         .string()
@@ -27,6 +32,19 @@ export const getDuaShape = {
         .optional()
         .describe('Translation locale; defaults to "en". v1 returns English content for all locales.'),
     audience: audienceArg,
+    limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(GET_DUA_MAX_LIMIT)
+        .optional()
+        .describe(`Number of du'as to return for a context; default ${GET_DUA_DEFAULT_LIMIT}, max ${GET_DUA_MAX_LIMIT}. The response says how many more exist. Ignored with id.`),
+    offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Number of du'as to skip before the page, for paging with limit; default 0. Ignored with id, and on the bereaved set."),
 };
 export const getDuaSchema = z.object(getDuaShape);
 export const GET_DUA_TITLE = 'get_dua';
@@ -90,14 +108,18 @@ export async function getDuaHandler(input) {
             extras,
         });
     }
-    const unrecorded = result.duas.filter((d) => d.grading_status === 'not_recorded').length;
-    const general = result.duas.filter((d) => d.grading_status === 'not_a_narration').length;
+    const whole = result.resolvedCategory === BEREAVED_CONTEXT;
+    const offset = whole ? 0 : (input.offset ?? 0);
+    const limit = whole ? result.duas.length : (input.limit ?? GET_DUA_DEFAULT_LIMIT);
+    const shown = result.duas.slice(offset, offset + limit);
+    const shownIds = result.ids.slice(offset, offset + limit);
+    const remaining = Math.max(0, result.duas.length - offset - shown.length);
+    const unrecorded = shown.filter((d) => d.grading_status === 'not_recorded').length;
+    const general = shown.filter((d) => d.grading_status === 'not_a_narration').length;
     const withhold = Boolean(extras?.crisis_resource) || GRIEF_CONTEXTS.has(result.resolvedCategory);
-    const duas = input.audience
-        ? result.duas.map((d, i) => withTeach(d, `dua:${result.ids[i]}`, { audience: input.audience, locale: input.locale, withhold }))
-        : result.duas;
-    const contractOverride = contractOverrideFor(result.duas);
-    const recordDirectives = collectionDirectivesFor(result.duas);
+    const duas = shown.map((d, i) => withTeach(d, `dua:${shownIds[i]}`, { audience: input.audience, locale: input.locale, withhold }));
+    const contractOverride = contractOverrideFor(shown);
+    const recordDirectives = [...collectionDirectivesFor(shown), ...(remaining > 0 ? [moreDuasNote(remaining)] : [])];
     const extraDirectives = recordDirectives.length ? recordDirectives : undefined;
     return buildResponse({
         contentType: 'dua_collection',
@@ -108,10 +130,14 @@ export async function getDuaHandler(input) {
                 ? { teaching_note: BEREAVED_GENDER_NOTE }
                 : {}),
             duas,
-            total_results: result.duas.length,
+            total_results: shown.length,
+            total_available: result.duas.length,
+            ...(offset > 0 ? { offset } : {}),
+            truncated: remaining > 0,
+            ...(remaining > 0 ? { more: moreDuasNote(remaining) } : {}),
             grading_summary: {
-                quranic: result.duas.filter((d) => d.grading_status === 'quranic').length,
-                graded: result.duas.filter((d) => d.grading_status === 'graded').length,
+                quranic: shown.filter((d) => d.grading_status === 'quranic').length,
+                graded: shown.filter((d) => d.grading_status === 'graded').length,
                 not_a_narration: general,
                 not_recorded: unrecorded,
             },
@@ -119,6 +145,7 @@ export async function getDuaHandler(input) {
         extras,
         contractOverride,
         extraDirectives,
+        withholdTeach: withhold,
     });
 }
 const GRIEF_CONTEXTS = new Set([BEREAVED_CONTEXT, 'deceased']);
@@ -180,6 +207,7 @@ export function abuseResponse(context, extras, allowlist) {
         extras,
         contractOverride: contractOverrideFor(duas),
         extraDirectives: [ABUSE_ORDER_DIRECTIVE, ...recordDirectives],
+        withholdTeach: true,
     });
 }
 function oneOfRefusal(input) {
@@ -236,6 +264,7 @@ export function duaByIdResponse(id, locale, allowlist, audience) {
         extras,
         contractOverride: contractOverrideFor([record]),
         extraDirectives: recordDirectives.length ? recordDirectives : undefined,
+        withholdTeach: Boolean(extras),
     });
 }
 //# sourceMappingURL=get-dua.js.map

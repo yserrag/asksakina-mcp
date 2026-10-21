@@ -272,11 +272,15 @@ async function live(url) {
   const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js')
   const client = new Client({ name: 'ci-publish-guards', version: '1.0.0' })
   const transport = new StreamableHTTPClientTransport(new URL(url), { fetch: paced })
+  // WO#478 follow-up: since 2.2.0 a context lookup returns 3 records unless
+  // paged, so each context scan asks for 10 and pages by offset until
+  // total_available is covered (see pagedCalls below); the scan reaches
+  // every record of the context, as it did before the limit.
   const calls = [
-    ['get_dua', { context: 'anxiety' }],
-    ['get_dua', { context: 'morning' }],
-    ['get_dua', { context: 'laylat al qadr' }],
-    ['get_dua', { context: 'ramadan' }],
+    ['get_dua', { context: 'anxiety', limit: 10 }],
+    ['get_dua', { context: 'morning', limit: 10 }],
+    ['get_dua', { context: 'laylat al qadr', limit: 10 }],
+    ['get_dua', { context: 'ramadan', limit: 10 }],
     ...['en', 'id', 'ur', 'ar'].map((locale) => ['get_dua', { context: 'I want to kill myself', locale }]),
     ...['en', 'id', 'ur', 'ar'].map((locale) => ['get_dua', { context: 'my husband hits me', locale }]),
     ['get_name_of_allah', { number: 1 }],
@@ -294,11 +298,24 @@ async function live(url) {
   touch('g. crisis variant not blocked (live)')
   try {
     await client.connect(transport, REQUEST_OPTS)
-    for (const [name, a] of calls) {
+    // A get_dua context call with `limit` is followed by its further pages
+    // (offset += limit) while total_available says more exist.
+    const queue = [...calls]
+    for (let qi = 0; qi < queue.length; qi++) {
+      const [name, a] = queue[qi]
       const res = await client.callTool({ name, arguments: a }, undefined, REQUEST_OPTS)
       const text = res?.content?.[0]?.text ?? ''
       const where = `live ${name} ${JSON.stringify(a)}`
       if (!text) record('setup', where, 'empty response')
+      if (name === 'get_dua' && a.context && a.limit) {
+        try {
+          const c = JSON.parse(text)?.content ?? {}
+          const next = (a.offset ?? 0) + a.limit
+          if (typeof c.total_available === 'number' && next < c.total_available) queue.push([name, { ...a, offset: next }])
+        } catch {
+          // the JSON check below records it
+        }
+      }
       let i = text.indexOf(FDFA)
       while (i >= 0) {
         record('b. U+FDFA (live)', where, context(text, i, 1))

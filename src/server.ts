@@ -15,6 +15,7 @@
  */
 
 import http from 'node:http'
+import { SERVER_INSTRUCTIONS } from './contracts/instructions.js'
 import { realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
@@ -61,7 +62,7 @@ import { enableDailyStore } from './logging/daily-store.js'
 import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
-const SERVER_VERSION = '2.1.1'
+const SERVER_VERSION = '2.2.0'
 const SERVER_DESCRIPTION =
   "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
@@ -205,8 +206,9 @@ const SERVER_CARD = {
     privacy: {
       tracking: 'none',
       analytics: 'aggregate-only',
+      // WO#478 (Gem 8 passed, 20 Oct 2026): daily totals on disk since WO#456.
       logging:
-        'in-memory aggregate counters only — per-tool call + status totals. No per-request records, no IPs, no client identifiers, no user-agents, no geolocation, no params, no response payloads. Counters reset on restart.',
+        'aggregate counters only: per-tool call and status totals. No per-request records, no IPs, no client identifiers, no user-agents, no geolocation, no params, no response payloads. Since-start totals reset on restart; on the hosted server, per-tool daily totals are kept on disk for at most 90 days.',
     },
   },
 } as const
@@ -241,11 +243,15 @@ function withLogging<Args extends Record<string, unknown>>(
 }
 
 export function createMcpServer(): McpServer {
-  const server = new McpServer({
-    name: SERVER_NAME,
-    version: SERVER_VERSION,
-    description: SERVER_DESCRIPTION,
-  })
+  // WO#478: `instructions` reaches every client in the initialize result.
+  const server = new McpServer(
+    {
+      name: SERVER_NAME,
+      version: SERVER_VERSION,
+      description: SERVER_DESCRIPTION,
+    },
+    { instructions: SERVER_INSTRUCTIONS },
+  )
 
   // ── Tools ─────────────────────────────────────────────────────────
 

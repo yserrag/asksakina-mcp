@@ -147,15 +147,14 @@ export async function findVersesHandler(input: FindVersesInput): Promise<SakinaR
   }
   const themes = matches.map((m) => m.theme)
   const found = await Promise.all(versesForThemes(themes, limit).map((v) => toFoundVerse(v, themes, locale)))
-  // WO#405: teach per verse, only when audience was sent. WO#407 (Gem 10):
-  // nothing attaches on the grief theme or whenever a support block is
-  // attached.
+  // WO#405: teach per verse; WO#478: whenever an entry exists, audience or
+  // not. WO#407 (Gem 10): nothing attaches on the grief theme or whenever a
+  // support block is attached.
   const withhold = Boolean(extras) || themes.includes('grief')
-  const verses = input.audience
-    ? found.map((v) =>
-        withTeach(v, `verse:${v.reference}` as `verse:${number}:${number}`, { audience: input.audience, locale, withhold }),
-      )
-    : found
+  // (withholdTeach below cuts the no-teach clause under the same condition, Gem 3.)
+  const verses = found.map((v) =>
+    withTeach(v, `verse:${v.reference}` as `verse:${number}:${number}`, { audience: input.audience, locale, withhold }),
+  )
   const parked = PARKED_TRANSLATION_LOCALES[locale]
 
   return buildResponse({
@@ -168,6 +167,7 @@ export async function findVersesHandler(input: FindVersesInput): Promise<SakinaR
       no_results: false,
     },
     extras,
+    withholdTeach: withhold,
     // Same rule as get_quran_verse (WO#385 item 4).
     extraDirectives: parked
       ? [

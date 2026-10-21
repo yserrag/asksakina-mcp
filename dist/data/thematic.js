@@ -31,12 +31,20 @@ export const THEME_SYNONYMS = {
     repentance: 'forgiveness', tawbah: 'forgiveness', istighfar: 'forgiveness',
     sin: 'forgiveness', sins: 'forgiveness', mercy: 'forgiveness',
 };
+export const PHRASE_EXCLUSIONS = [
+    { phrase: 'loss of faith', word: 'loss' },
+    { phrase: 'fear of allah', word: 'fear' },
+];
 export function matchThemes(query) {
     const known = new Set(AVAILABLE_THEMES);
     const lookup = (w) => (known.has(w) ? w : undefined) ?? THEME_SYNONYMS[w];
     const out = [];
-    for (const word of normalisePhrase(query).split(' ')) {
+    const normalised = normalisePhrase(query);
+    const excluded = new Set(PHRASE_EXCLUSIONS.filter((e) => normalised.includes(e.phrase)).map((e) => e.word));
+    for (const word of normalised.split(' ')) {
         if (!word)
+            continue;
+        if (excluded.has(word))
             continue;
         const theme = lookup(word) ?? (word.length > 3 && word.endsWith('s') ? lookup(word.slice(0, -1)) : undefined);
         if (theme && known.has(theme) && !out.some((m) => m.theme === theme))

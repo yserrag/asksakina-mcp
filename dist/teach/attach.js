@@ -52,8 +52,6 @@ function teachWire(key, entry, audience) {
     return block;
 }
 export function withTeach(record, key, opts) {
-    if (!opts.audience)
-        return record;
     if (opts.withhold)
         return record;
     if ((opts.locale ?? 'en') !== 'en')
@@ -64,7 +62,7 @@ export function withTeach(record, key, opts) {
     const related = (entry.related?.refs ?? []).map(relatedWire).filter((r) => r !== null);
     return {
         ...record,
-        teach: teachWire(key, entry, opts.audience),
+        teach: teachWire(key, entry, opts.audience ?? 'unknown'),
         ...(related.length ? { related } : {}),
     };
 }

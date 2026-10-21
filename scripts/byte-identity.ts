@@ -7,6 +7,10 @@
  * checkouts and compare: with `audience` omitted the output must be identical
  * to main.
  *
+ * WO#478: teach attaches with audience omitted too, so the output is no
+ * longer identical to 1.5.1; the baseline is re-taken per release and the
+ * number of calls carrying teach is printed.
+ *
  * Run: npm run bundle-data && npx tsx scripts/byte-identity.ts [--audience curious|revert|practising] [--out file]
  */
 
@@ -55,6 +59,7 @@ async function main() {
     ...Array.from({ length: 99 }, (_, i) => ({ tool: 'get_name_of_allah', args: { number: i + 1 } })),
   ]
   const parts: string[] = []
+  const withTeach: string[] = []
   for (const c of calls) {
     const args = AUDIENCE ? { ...c.args, audience: AUDIENCE } : c.args
     let out: unknown
@@ -63,12 +68,16 @@ async function main() {
     } catch (err) {
       out = { threw: String(err) }
     }
-    parts.push(JSON.stringify({ tool: c.tool, args: c.args, out }, null, 2))
+    const text = JSON.stringify({ tool: c.tool, args: c.args, out }, null, 2)
+    if (/"teach": \{/.test(text)) withTeach.push(`${c.tool} ${JSON.stringify(c.args)}`)
+    parts.push(text)
   }
   const text = parts.join('\n')
   if (OUT) writeFileSync(OUT, text)
   const sha = createHash('sha256').update(text).digest('hex')
   console.log(`calls ${calls.length}  bytes ${Buffer.byteLength(text)}  sha256 ${sha}${AUDIENCE ? `  audience ${AUDIENCE}` : ''}`)
+  // WO#478: how many calls carry a teach block, and which.
+  console.log(`teach on ${withTeach.length} of ${calls.length} calls${withTeach.length ? `: ${withTeach.join('; ')}` : ''}`)
 }
 
 main()

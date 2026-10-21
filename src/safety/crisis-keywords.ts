@@ -51,11 +51,25 @@ const SOFT_DISTRESS_KEYWORDS = [
 
 const WORD_BOUNDARY = /\W+/
 
+/**
+ * WO#478 (Architect, 20 Oct 2026, phrase fixes only): a soft keyword inside
+ * one of these phrases is not a distress signal. "loss of faith" is a
+ * question about belief, not a bereavement; "fear of Allah" is taqwa, not
+ * anxiety. Only the named keywords are skipped; any other keyword in the
+ * same input still counts.
+ */
+export const SOFT_PHRASE_EXCLUSIONS: ReadonlyArray<{ phrase: string; keywords: readonly string[] }> = [
+  { phrase: 'loss of faith', keywords: ['loss', 'loss of'] },
+  { phrase: 'fear of allah', keywords: ['fear'] },
+]
+
 function softDistressKeyword(input: string): string | undefined {
   const lower = input.toLowerCase()
+  const excluded = new Set(SOFT_PHRASE_EXCLUSIONS.filter((e) => lower.includes(e.phrase)).flatMap((e) => e.keywords))
   // Substring match is fine for short keywords like "anxiety", and the
   // input to get_dua is typically a short context query.
   for (const keyword of SOFT_DISTRESS_KEYWORDS) {
+    if (excluded.has(keyword)) continue
     if (keyword.includes(' ')) {
       if (lower.includes(keyword)) return keyword
       continue
@@ -113,7 +127,7 @@ const SELF_HARM_LINES: Record<CrisisLocale, string> = {
     ? 'Samaritans (UK: 116 123, 24/7) or 988 (US/Canada, 24/7)'
     : 'Samaritans (UK: 116 123, 24/7)',
   id: 'Sehat Jiwa (Indonesia: 119 ext 8, 24/7) or Halo Kemenkes (1500-567, Monday to Friday, office hours)',
-  ur: 'Umang Helpline (Pakistan: 0311-7786264, 24/7) or Rozan Counselling (0800-22444, business hours)',
+  ur: 'Umang Helpline (Pakistan: 0311-7786264, 24/7) or Rozan Counselling (0304-111-1741, business hours)',
   ar: 'Lebanon Embrace 1564 (24/7), Saudi Arabia 920033360 (8am to 8pm daily; Saturday 1pm to 8pm), UAE 800-HOPE (4673) (8am to 8pm)',
 }
 
@@ -176,7 +190,7 @@ const ABUSE_LINES: Record<CrisisLocale, string> = {
   // id-sapa, id-komnas
   id: 'SAPA 129 (Indonesia: 129, 24/7) or Komnas Perempuan (021-3903963, Monday to Friday, office hours)',
   // ur-madadgaar, ur-rozan
-  ur: 'Madadgaar National Helpline (Pakistan: 1098, 24/7) or Rozan Counselling (0800-22444, business hours)',
+  ur: 'Madadgaar National Helpline (Pakistan: 1098, 24/7) or Rozan Counselling (0304-111-1741, business hours)',
   // ar-saudi-1919, ar-uae-dfwac, ar-egypt-ncw, ar-jordan-fpd, ar-morocco-sos-femmes
   ar: 'Saudi Arabia Family Violence Reporting Center 1919 (24/7), UAE Dubai Foundation for Women and Children 800-111 (24/7), Egypt National Council for Women Complaints Office 15115 (24/7), Jordan Family Protection Department 110 (24/7), Morocco SOS Femmes 0801 00 47 47 (office hours)',
 }

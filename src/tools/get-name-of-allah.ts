@@ -109,5 +109,6 @@ export async function getNameOfAllahHandler(
       withhold: Boolean(extras),
     }),
     extras,
+    withholdTeach: Boolean(extras),
   })
 }

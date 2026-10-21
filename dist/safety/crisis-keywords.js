@@ -11,9 +11,16 @@ const SOFT_DISTRESS_KEYWORDS = [
     'distress', 'distressed', 'distressing',
 ];
 const WORD_BOUNDARY = /\W+/;
+export const SOFT_PHRASE_EXCLUSIONS = [
+    { phrase: 'loss of faith', keywords: ['loss', 'loss of'] },
+    { phrase: 'fear of allah', keywords: ['fear'] },
+];
 function softDistressKeyword(input) {
     const lower = input.toLowerCase();
+    const excluded = new Set(SOFT_PHRASE_EXCLUSIONS.filter((e) => lower.includes(e.phrase)).flatMap((e) => e.keywords));
     for (const keyword of SOFT_DISTRESS_KEYWORDS) {
+        if (excluded.has(keyword))
+            continue;
         if (keyword.includes(' ')) {
             if (lower.includes(keyword))
                 return keyword;
@@ -44,7 +51,7 @@ const SELF_HARM_LINES = {
         ? 'Samaritans (UK: 116 123, 24/7) or 988 (US/Canada, 24/7)'
         : 'Samaritans (UK: 116 123, 24/7)',
     id: 'Sehat Jiwa (Indonesia: 119 ext 8, 24/7) or Halo Kemenkes (1500-567, Monday to Friday, office hours)',
-    ur: 'Umang Helpline (Pakistan: 0311-7786264, 24/7) or Rozan Counselling (0800-22444, business hours)',
+    ur: 'Umang Helpline (Pakistan: 0311-7786264, 24/7) or Rozan Counselling (0304-111-1741, business hours)',
     ar: 'Lebanon Embrace 1564 (24/7), Saudi Arabia 920033360 (8am to 8pm daily; Saturday 1pm to 8pm), UAE 800-HOPE (4673) (8am to 8pm)',
 };
 const HARD_CRISIS_TEXT = {
@@ -76,7 +83,7 @@ const ABUSE_DIRECTIVE = "CRITICAL: The user's message indicates they may be expe
 const ABUSE_LINES = {
     en: 'the National Domestic Abuse Helpline (UK: 0808 2000 247, 24/7, free)',
     id: 'SAPA 129 (Indonesia: 129, 24/7) or Komnas Perempuan (021-3903963, Monday to Friday, office hours)',
-    ur: 'Madadgaar National Helpline (Pakistan: 1098, 24/7) or Rozan Counselling (0800-22444, business hours)',
+    ur: 'Madadgaar National Helpline (Pakistan: 1098, 24/7) or Rozan Counselling (0304-111-1741, business hours)',
     ar: 'Saudi Arabia Family Violence Reporting Center 1919 (24/7), UAE Dubai Foundation for Women and Children 800-111 (24/7), Egypt National Council for Women Complaints Office 15115 (24/7), Jordan Family Protection Department 110 (24/7), Morocco SOS Femmes 0801 00 47 47 (office hours)',
 };
 const ABUSE_TEXT = {

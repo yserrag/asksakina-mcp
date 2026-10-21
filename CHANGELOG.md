@@ -2,6 +2,108 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 2.2.0 (unreleased; Gem 3, Gem 4, Gem 8 and Gem 10 passed the built text on 20 Oct 2026, delegated rulings by the Architect, with their conditions applied)
+
+WO#478, "teach, don't hand off" (Architect rulings of 20 Oct 2026, under the
+[GEM4-DAWAH] ruling recorded in `docs/mcp-teach-phase0/00-architect.md`). The
+spec and evidence are WO#477, `docs/mcp-teach-phase0/`. Not published, not
+deployed; the registry entry is unchanged apart from the version number.
+
+### Added
+
+- **Server `instructions`** (SDK `ServerOptions.instructions`, returned in the
+  initialize result): the quoting and teaching rules in one place, the
+  ruling's da'wah adab block (534 characters as ruled; 566 with Gem 4's
+  condition ", without hiding difficult texts" after "(Sahih al-Bukhari
+  69)"), and the open-door line (116 characters) verbatim with its
+  conditions (interest in Islam, at most once, never in distress, never as a
+  condition, never after a decline). 1,529 characters, under the 1,801 the
+  Architect set. `src/contracts/instructions.ts`.
+- **`get_dua` `limit` and `offset`** (`limit` 1 to 10, default 3; `offset`
+  0 or more, default 0): a context lookup returns one page of the route's
+  existing order, so every record stays reachable by paging. The bereaved
+  set (Gem 4's fixed order) and the abuse allowlist are always returned
+  whole, offset ignored. When more follow the page,
+  `content.total_available`, `content.truncated` and `content.more` say so,
+  and CRITICAL_RULES carries the same note: "N more du'as for this context;
+  call get_dua with offset and limit to see them." `content.offset` is
+  present when it is not 0.
+- `scripts/test-wo478.ts` (`npm run test:wo478`, in `prepublishOnly`).
+
+### Changed
+
+- **Teach attaches whenever an entry exists**, with or without `audience`.
+  The WO#390 flag 1 ruling ("audience omitted = 1.5.0 output byte for byte")
+  is superseded. `teach.audience` is the sent value or `"unknown"`; unknown
+  serves the base text. Withhold (support block, grief route, crisis), the
+  en-only rule and the entry lookup are unchanged; the by_audience variants
+  are still not applied. Three checks in `scripts/test-teach.ts` that
+  asserted the old promise are inverted (the reasons are in
+  `docs/wo478-sg-report.md`).
+- **The four hand-off directives are retired** (WO#477 inventory A18, A20,
+  A33, A37): "You MUST output the 'dua_block' field exactly as provided...",
+  the anti-summarisation line's "summarise", "Prefer the 'name_block' field
+  for display..." and the WO#407 teach contract. In their place, the teaching
+  order (P1, P1c, both tools' P2 and P4, and new P5 and P6 on
+  `get_quran_verse` and `find_verses`): quote the record first, exactly;
+  then explain only from the teach block as context from AskSakina's notes,
+  not tafsir or a ruling; where the notes end, say so and point to a
+  recognised tafsir or a qualified scholar; the reflection question
+  verbatim, unanswered; at most one related next step; nothing under a
+  crisis block or after a disclosure of distress. Where no teach block is
+  supplied, explanation only from the record's own supplied fields,
+  attributed, then the same hand-over. Every scripture-integrity rule (exact
+  Arabic, exact translation, citation, grading never separated, softened or
+  inflated) and every safety directive is unchanged.
+- **Phrase fixes:** "loss of faith" no longer routes to the grief theme or
+  the soft support block, and "fear of Allah" no longer routes to anxiety or
+  the soft support block (`PHRASE_EXCLUSIONS`, `SOFT_PHRASE_EXCLUSIONS`). No
+  synonym map in this release.
+- `audience` argument description: from the user's own self-description
+  only; omit when unknown.
+- **No no-teach clause under a support block** (Gem 3): under the same
+  condition that withholds teach (a support block in the response, a grief
+  route, the abuse allowlist path), the "Where no teach block is supplied,
+  you may explain only from..." clause is cut from every directive that
+  carries it, so a response under a support block invites no explanation.
+- **not_found** (Gem 4): the directive and the disclaimer end "Suggest the
+  user rephrase or try a related topic."; the site link stays in the
+  server instructions only.
+- **Server card privacy line** (Gem 8): "aggregate counters only: per-tool
+  call and status totals. No per-request records, no IPs, no client
+  identifiers, no user-agents, no geolocation, no params, no response
+  payloads. Since-start totals reset on restart; on the hosted server,
+  per-tool daily totals are kept on disk for at most 90 days." (It had
+  described in-memory counters only since WO#456 added the daily totals.)
+
+### Release (Gem 10 condition 6)
+
+1. Merge to `main`.
+2. `mcp-deploy` (npm via the mirror, and Fly).
+3. **Before the MCP Registry Publish**, the Architect verifies live on Fly:
+   `get_quran_verse` 39:53 carries its teach block (`verse:39:53`,
+   `audience: "unknown"` when omitted), and 2:255 is clean (no teach, no
+   block). The sandbox could not reach alquran.cloud and no fixture exists
+   for either verse, so these two are verified live, not from a replay.
+4. MCP Registry Publish.
+
+Deploy run 16 (2.2.0) failed at the live Dhun-Nun check, exit 2: it called
+`get_dua({ context: 'anxiety' })` and D00068 is the 9th record, beyond the
+default page of 3. Not a content failure (the Architect verified D00068,
+39:53 and 2:255 live). The check now looks the record up by id first and
+pages the context as a fallback; the live publish guards page their context
+scans the same way. No version change.
+
+## 2.1.2 (unreleased; Gem 10 reviewing the two ur lines, 20 Oct)
+
+### Changed
+
+- **Rozan Counselling (Pakistan) number** in the `ur` self-harm and abuse
+  crisis lines is `0304-111-1741` (was `0800-22444`), the number on
+  rozan.org's site header, verified by the Architect on 20 Oct 2026. Hours
+  unchanged (business hours). The app's `src/data/helplines.ts` carries the
+  same number, which `test:tools` cross-checks.
+
 ## 2.1.1 (unreleased; Gem 8 and Gem 10 passed, 12 Oct)
 
 WO#456: daily usage totals that survive a restart (hosted server only). A

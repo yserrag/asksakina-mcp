@@ -33,6 +33,13 @@ export type Audience = 'curious' | 'revert' | 'practising'
 
 export const AUDIENCES: readonly Audience[] = ['curious', 'revert', 'practising']
 
+/**
+ * What `teach.audience` carries on the wire (WO#478): the sent value, or
+ * 'unknown' when the caller omitted `audience`. 'unknown' serves the base
+ * text; it is never an input value and never a by_audience key.
+ */
+export type WireAudience = Audience | 'unknown'
+
 // ─── Record keys ─────────────────────────────────────────────────────
 
 /** What a teach entry attaches to. One kind per tool family. */
@@ -204,14 +211,14 @@ export interface CitationWire {
 
 /**
  * Attached to a record (the quran_verse / name_of_allah content, each du'a
- * in duas[], each verse in verses[]) as `teach`, ONLY when the caller sent
- * `audience`, an entry exists for that record and locale, and the response
- * is not crisis_resource_only. Absent otherwise, so JSON.stringify output is
- * unchanged byte for byte.
+ * in duas[], each verse in verses[]) as `teach` whenever an entry exists for
+ * that record and locale and nothing withholds it (a support block, a grief
+ * route, a crisis response). WO#478: no longer conditional on `audience`;
+ * `audience` is the sent value or 'unknown'. Absent otherwise.
  */
 export interface TeachBlockWire {
   record_id: TeachKey
-  audience: Audience
+  audience: WireAudience
   key_word: { words: Array<{ arabic: string; transliteration: string }>; root: string; root_transliteration: string; gloss: string }
   context?:
     | { attributed: true; text: string; citations: CitationWire[] }

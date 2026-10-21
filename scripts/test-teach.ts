@@ -408,20 +408,24 @@ async function testIdLookup() {
       ? pass('tools/list: audience on all four tools; get_dua has id, context no longer required')
       : fail('tools/list', tools.map((t) => [t.name, Object.keys(t.inputSchema.properties ?? {}), t.inputSchema.required]))
     const text = (r: unknown) => (r as { content: Array<{ text: string }> }).content[0].text
-    // WO#407: D00068 by id (no support block) now carries the Gem 10 directive
-    // and contract as well; removing those and the teach/related keys must
-    // give the plain response back byte for byte.
+    // WO#478 (teach by default; the WO#390 flag 1 byte-for-byte promise is
+    // superseded): D00068 by id (no support block) carries teach with or
+    // without `audience`. The two responses differ only at teach.audience
+    // ("revert" against "unknown"); with teach, related and the teach strings
+    // removed they are the same bytes, and neither carries a teach key then.
     const plain = text(await c.callTool({ name: 'get_dua', arguments: { id: 'D00068' } }))
     const withAud = text(await c.callTool({ name: 'get_dua', arguments: { id: 'D00068', audience: 'revert' } }))
-    const stripped = JSON.stringify(
-      JSON.parse(withAud),
-      (k, v) =>
-        k === 'teach' || k === 'related' ? undefined : k === 'CRITICAL_RULES' ? (v as string[]).filter((d) => d !== TEACH_DIRECTIVE) : v,
-      2,
-    )
-    plain !== withAud && stripped === plain
-      ? pass('over MCP: D00068 with audience = plain response plus teach/related keys and the two Gem 10 strings only')
-      : fail('audience diff over MCP')
+    const strip = (s: string) =>
+      JSON.stringify(
+        JSON.parse(s),
+        (k, v) =>
+          k === 'teach' || k === 'related' ? undefined : k === 'CRITICAL_RULES' ? (v as string[]).filter((d) => d !== TEACH_DIRECTIVE) : k === 'teach' ? undefined : v,
+        2,
+      )
+    const audienceOf = (s: string) => (JSON.parse(s) as { content: { duas: Array<{ teach?: { audience?: string } }> } }).content.duas[0]?.teach?.audience
+    plain !== withAud && strip(plain) === strip(withAud) && audienceOf(plain) === 'unknown' && audienceOf(withAud) === 'revert' && !strip(plain).includes('"teach"')
+      ? pass('over MCP: D00068 with and without audience differ only at teach.audience (revert / unknown); stripped of teach, related and the teach strings they are the same bytes')
+      : fail('audience diff over MCP', { plain: audienceOf(plain), withAud: audienceOf(withAud) })
     // Under a support block nothing attaches, so audience changes nothing.
     const soft = text(await c.callTool({ name: 'get_dua', arguments: { context: 'anxiety' } }))
     const softAud = text(await c.callTool({ name: 'get_dua', arguments: { context: 'anxiety', audience: 'revert' } }))
@@ -429,8 +433,8 @@ async function testIdLookup() {
       ? pass('over MCP: anxiety (support block) with audience is byte-identical to without (WO#407)')
       : fail('anxiety with audience differs over MCP')
     const byId = JSON.parse(text(await c.callTool({ name: 'get_dua', arguments: { id: 'D00068' } }))) as Resp
-    byId._sakina_meta.content_type === 'dua_collection' && byId.content.duas?.[0]?.arabic === arabicOf('D00068') && !text(await c.callTool({ name: 'get_dua', arguments: { id: 'D00068' } })).includes('"teach"')
-      ? pass('get_dua {id: D00068} over MCP: allowlisted, record returned, no teach without audience')
+    byId._sakina_meta.content_type === 'dua_collection' && byId.content.duas?.[0]?.arabic === arabicOf('D00068') && (byId.content.duas?.[0] as { teach?: { audience?: string } }).teach?.audience === 'unknown'
+      ? pass('get_dua {id: D00068} over MCP: allowlisted, record returned, teach attached with audience unknown (WO#478)')
       : fail('id over MCP', byId)
     const refused = JSON.parse(text(await c.callTool({ name: 'get_dua', arguments: { id: 'D00003' } }))) as Resp
     refused._sakina_meta.content_type === 'not_found' && !leaksCorpus(refused)
@@ -479,13 +483,18 @@ function teachDirectivesExact(r: unknown): boolean {
   return m.llm_directives.CRITICAL_RULES.filter((d) => d === TEACH_DIRECTIVE).length === 1 && m.presentation_contract.teach === TEACH_CONTRACT
 }
 
-/** Gem 10's two strings (WO#407), pinned by hash so an edit cannot pass silently. */
+/**
+ * The two teach strings, pinned by hash so an edit cannot pass silently.
+ * WO#407 (Gem 10) wrote them; WO#478 (P1, P1c; Architect rulings of 20 Oct
+ * 2026) replaced them with the teaching order, re-pinned here. Gem 3 and
+ * Gem 10 review the built text before any release.
+ */
 function testTeachDirectivePins() {
-  console.log('\n=== WO#407: Gem 10 teach strings, byte-pinned ===')
+  console.log('\n=== WO#407 / WO#478: teach strings, byte-pinned ===')
   const sha = (t: string) => createHash('sha256').update(t, 'utf8').digest('hex')
   const pins: Array<[string, string, string]> = [
-    ['CRITICAL_RULES teach directive', TEACH_DIRECTIVE, 'b4db4bd24fdeaade374c906ed723d203e4980affc1c2658b2dcb0761337e7218'],
-    ['presentation_contract.teach', TEACH_CONTRACT, 'cc4fa7303bc48f837ecfc929f34282848a194cda6bfbb31c7aaeb836269f6c31'],
+    ['CRITICAL_RULES teach directive', TEACH_DIRECTIVE, 'ee032942f2bc602a000401ca56d3df23187f81249dad482314416f70e4ffda2b'],
+    ['presentation_contract.teach', TEACH_CONTRACT, '68cea585544c427ccddea244020738279cc1ebdd4ba18a850ed6d53bbb6450d7'],
   ]
   for (const [label, text, want] of pins) sha(text) === want ? pass(`${label}: sha256 ${want.slice(0, 12)}…`) : fail(`${label} changed`, sha(text))
 }
@@ -528,9 +537,12 @@ async function testAttachment() {
       : fail(`${key} teach`, blocks)
   }
   {
-    const byAud = await Promise.all((['curious', 'revert', 'practising'] as const).map((a) => getNameOfAllahHandler({ number: 34, audience: a })))
+    const byAud = await Promise.all([...(['curious', 'revert', 'practising'] as const).map((a) => getNameOfAllahHandler({ number: 34, audience: a })), getNameOfAllahHandler({ number: 34 })])
     const norm = byAud.map((r) => JSON.stringify(r, (k, v) => (k === 'audience' ? undefined : v)))
-    new Set(norm).size === 1 ? pass('no audience variants: the three audiences differ only in teach.audience') : fail('audience variants')
+    const auds = byAud.map((r) => teachBlocks(r)[0]?.audience)
+    new Set(norm).size === 1 && JSON.stringify(auds) === '["curious","revert","practising","unknown"]'
+      ? pass('no audience variants: the three audiences and omitted (unknown) differ only in teach.audience (WO#478)')
+      : fail('audience variants', auds)
     const ctxOk = byAud.every((r) => (teachBlocks(r)[0] as unknown as { context?: { attributed: boolean; citations: unknown[] } }).context?.citations.length === 2)
     ctxOk ? pass('name:34 Field 2 carries both citations') : fail('name:34 citations')
   }
@@ -563,17 +575,33 @@ async function testAttachment() {
     stray === 0
       ? pass(`all ${categories.length} du'a categories, 99 Names, every theme and 5 other verses: teach only on the six (${[...seen].sort().join(', ')})`)
       : fail(`${stray} teach blocks outside the six`)
-    let leaked = 0
+    // WO#478 (teach by default): with `audience` omitted, the entries that are
+    // reachable without a support block attach with audience "unknown":
+    // Names 1 and 34, and 39:53. The two du'a entries sit in stress-anxiety,
+    // which always carries a soft block, so every category stays bare.
+    const unknownOn = new Set<string>()
+    let strayUnknown = 0
     const noTeach = (r: unknown) => teachBlocks(r).length + (teachDirectivesPresent(r) ? 1 : 0)
-    for (const slug of categories) leaked += noTeach(await getDuaHandler({ context: slug }))
-    for (let n = 1; n <= 99; n++) leaked += noTeach(await getNameOfAllahHandler({ number: n }))
-    leaked += noTeach(await getQuranVerseHandler({ surah: 39, ayah: 53 }))
+    const tally = (r: unknown) => {
+      for (const b of teachBlocks(r)) {
+        if (b!.audience === 'unknown' && SIX.includes(b!.record_id)) unknownOn.add(b!.record_id)
+        else strayUnknown++
+      }
+    }
+    for (const slug of categories) tally(await getDuaHandler({ context: slug }))
+    for (let n = 1; n <= 99; n++) tally(await getNameOfAllahHandler({ number: n }))
+    tally(await getQuranVerseHandler({ surah: 39, ayah: 53 }))
+    JSON.stringify([...unknownOn].sort()) === '["name:1","name:34","verse:39:53"]' && strayUnknown === 0
+      ? pass('audience omitted: teach with audience unknown on exactly name:1, name:34 and verse:39:53 across every category, 99 Names and 39:53; nothing else (WO#478; baseline in scripts/byte-identity.ts)')
+      : fail('audience omitted', { unknownOn: [...unknownOn], strayUnknown })
     // WO#407: a response whose records carry no teach carries no teach directive.
-    leaked += noTeach(await getQuranVerseHandler({ surah: 2, ayah: 255, audience: 'revert' }))
-    leaked === 0 ? pass('audience omitted, or a record with no entry: no teach and no teach directives (full byte identity: scripts/byte-identity.ts)') : fail(`${leaked} teach blocks without audience`)
+    const noEntry = noTeach(await getQuranVerseHandler({ surah: 2, ayah: 255, audience: 'revert' })) + noTeach(await getQuranVerseHandler({ surah: 2, ayah: 255 })) + noTeach(await getNameOfAllahHandler({ number: 2 }))
+    noEntry === 0 ? pass('a record with no entry, with or without audience: no teach and no teach directives') : fail(`${noEntry} teach blocks on records with no entry`)
     const ur = noTeach(await getNameOfAllahHandler({ number: 34, locale: 'ur', audience: 'revert' })) +
-      noTeach(await getDuaHandler({ id: 'D00068', locale: 'ar', audience: 'revert' }))
-    ur === 0 ? pass('non-en locale with audience: no teach (entries are English only)') : fail('teach on a non-en locale')
+      noTeach(await getDuaHandler({ id: 'D00068', locale: 'ar', audience: 'revert' })) +
+      noTeach(await getNameOfAllahHandler({ number: 34, locale: 'ur' })) +
+      noTeach(await getDuaHandler({ id: 'D00068', locale: 'ar' }))
+    ur === 0 ? pass('non-en locale, with or without audience: no teach (entries are English only)') : fail('teach on a non-en locale')
   }
 
   console.log('\n=== WO#405: every related ref resolves ===')

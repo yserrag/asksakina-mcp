@@ -1,13 +1,17 @@
 /**
- * Runtime attachment of teach content (WO#405).
+ * Runtime attachment of teach content (WO#405; WO#478 teach by default).
  *
  * Adds `teach` and `related` to ONE record, and only when:
- *   - the caller sent `audience`,
  *   - the request locale is 'en' (entries are English only), and
  *   - an entry exists for the record.
- * Otherwise the record is returned untouched, so a call without `audience`
- * serialises byte for byte as before. The keys are appended after every
- * existing key, never replacing one.
+ * Otherwise the record is returned untouched. The keys are appended after
+ * every existing key, never replacing one.
+ *
+ * WO#478 (Architect, 20 Oct 2026): the WO#390 flag 1 ruling ("audience
+ * omitted = 1.5.0 output byte for byte") is superseded. Teach attaches
+ * whenever an entry exists; `audience` is optional and, when omitted, the
+ * block carries `audience: "unknown"` and the base text. The by_audience
+ * variants (types.ts) are still not applied in this release.
  *
  * Callers never reach this on a crisis_resource_only response: the hard
  * crisis paths return before any record exists (Gem 3, WO#388).
@@ -24,7 +28,7 @@
 
 import { getNameByNumber } from '../data/names.js'
 import { TEACH_ENTRIES } from './entries.js'
-import type { Audience, RelatedRef, RelatedRefWire, TeachBlockWire, TeachEntry, TeachKey } from './types.js'
+import type { Audience, RelatedRef, RelatedRefWire, TeachBlockWire, TeachEntry, TeachKey, WireAudience } from './types.js'
 
 export interface AttachOptions {
   audience?: Audience
@@ -52,7 +56,7 @@ function relatedWire(ref: RelatedRef): RelatedRefWire | null {
   }
 }
 
-function teachWire(key: TeachKey, entry: TeachEntry, audience: Audience): TeachBlockWire {
+function teachWire(key: TeachKey, entry: TeachEntry, audience: WireAudience): TeachBlockWire {
   const ctx = entry.context
   const block: TeachBlockWire = {
     record_id: key,
@@ -90,7 +94,6 @@ function teachWire(key: TeachKey, entry: TeachEntry, audience: Audience): TeachB
 
 /** The record with `teach` and `related` appended, or the same record. */
 export function withTeach<T extends object>(record: T, key: TeachKey, opts: AttachOptions): T {
-  if (!opts.audience) return record
   if (opts.withhold) return record
   if ((opts.locale ?? 'en') !== 'en') return record
   const entry = TEACH_ENTRIES[key]
@@ -98,7 +101,7 @@ export function withTeach<T extends object>(record: T, key: TeachKey, opts: Atta
   const related = (entry.related?.refs ?? []).map(relatedWire).filter((r): r is RelatedRefWire => r !== null)
   return {
     ...record,
-    teach: teachWire(key, entry, opts.audience),
+    teach: teachWire(key, entry, opts.audience ?? 'unknown'),
     ...(related.length ? { related } : {}),
   }
 }

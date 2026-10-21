@@ -460,10 +460,12 @@
     },
     {
       "id": "dua-label-9-129-hadith",
-      "description": "WO#377 fast-track: D00154 is labelled Quran 9:129 and keeps Sunan Abi Dawud 5081 as its Source (labelling rule)",
+      "description": "WO#377 fast-track: D00154 (12th of 25 morning adhkar) is labelled Quran 9:129 and keeps Sunan Abi Dawud 5081 as its Source (labelling rule); reached by context through paging (WO#478: offset 10, limit 10)",
       "tool": "get_dua",
       "args": {
-        "context": "morning"
+        "context": "morning",
+        "offset": 10,
+        "limit": 10
       },
       "expect": {
         "content_type": "dua_collection",
@@ -476,16 +478,33 @@
     },
     {
       "id": "dua-label-7-23-25-74",
-      "description": "WO#377 fast-track: rabana du'as D00330 and D00308 are labelled Quran 7:23 and Quran 25:74 (clauses)",
+      "description": "WO#377 fast-track: rabana du'a D00330 (32nd of 40) is labelled Quran 7:23 (clause); reached by context through paging (WO#478: offset 30, limit 10)",
       "tool": "get_dua",
       "args": {
-        "context": "rabana-duas"
+        "context": "rabana-duas",
+        "offset": 30,
+        "limit": 10
       },
       "expect": {
         "content_type": "dua_collection",
         "context": "rabana-duas",
         "must_contain": [
-          "Origin: Quran 7:23",
+          "Origin: Quran 7:23"
+        ]
+      }
+    },
+    {
+      "id": "dua-label-25-74",
+      "description": "WO#377 fast-track: rabana du'a D00308 (10th of 40) is labelled Quran 25:74 (clause); on the first page at limit 10 (WO#478)",
+      "tool": "get_dua",
+      "args": {
+        "context": "rabana-duas",
+        "limit": 10
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "context": "rabana-duas",
+        "must_contain": [
           "Origin: Quran 25:74"
         ]
       }
@@ -751,7 +770,7 @@
         "must_contain": [
           "What you are experiencing is oppression (dhulm), and you are not to blame. Your first duty is to protect your safety, not to endure harm. Professional support is available to help you navigate this safely.",
           "1098",
-          "0800-22444"
+          "0304-111-1741"
         ],
         "must_not_contain": [
           "harming yourself",

@@ -91,11 +91,31 @@ export const PBUH_RULE =
 // WO#444 (Gem 10, 11 Oct): no literal dash character in the rule itself.
 export const NO_EMOJI_RULE = 'Do NOT use emojis or em dashes in your response.'
 
+/**
+ * WO#478 ("teach, don't hand off", Architect rulings of 20 Oct 2026, under
+ * the [GEM4-DAWAH] ruling; Gem 3 and Gem 10 review the built text before any
+ * release). The clause every tool carries for a record without a teach block:
+ * explanation only from the record's own supplied fields, attributed, then
+ * the hand-over to a tafsir or a scholar.
+ */
+export const NO_TEACH_CLAUSE =
+  "Where no teach block is supplied, you may explain only from this record's own supplied fields (meaning, reflection, source, grading, relevance note), attributed to AskSakina's notes, then say the notes end there and point to a recognised tafsir or a qualified scholar for more."
+
+/** WO#478 (P2): get_dua, every dua_collection. */
+export const DUA_BLOCK_DIRECTIVE =
+  `Quote each du'a from its 'dua_block' field exactly as provided; it is the complete record. Do not reassemble it from individual keys or alter it. Any explanation comes after the quoted record, follows the teaching order, and draws only on that record's teach block. ${NO_TEACH_CLAUSE}`
+
+/** WO#478 (P4): get_name_of_allah, every name_of_allah. */
+export const NAME_BLOCK_DIRECTIVE =
+  `Quote the 'name_block' field exactly as provided; it is the complete record (Arabic, transliteration, meaning, reflection, Quranic reference) in one inseparable string. Any explanation comes after the quoted record, follows the teaching order, and draws only on the teach block. ${NO_TEACH_CLAUSE}`
+
 export const QURAN_DIRECTIVES: readonly string[] = [
   'You MUST NOT paraphrase or reword the Arabic text or the translation below.',
   'You MUST present the Arabic text and translation exactly as provided.',
   'The translation is a "Translation of the Meaning"; label it as such if presenting to users.',
   'You MUST include the surah name and ayah reference when citing this verse.',
+  // WO#478 (P5): the verse is quoted first; explanation follows the teaching order.
+  `Quote the verse first, exactly as provided. Any explanation follows the teaching order and draws only on the teach block. ${NO_TEACH_CLAUSE}`,
   NO_EMOJI_RULE,
   PBUH_RULE,
   VOICE_2_RULE,
@@ -114,6 +134,8 @@ export const VERSE_COLLECTION_DIRECTIVES: readonly string[] = [
   "Each relevance_note only says where AskSakina's thematic index lists the verse. It is not an interpretation (tafsir); do not present it as one.",
   'If a verse has no translation, do not translate it yourself. Say the translation is unavailable, or call get_quran_verse for that reference.',
   'These are the verses the index lists for the topic, not every relevant verse in the Quran. Do not add verses from memory as if they came from this response.',
+  // WO#478 (P6): each verse is quoted first; explanation follows the teaching order.
+  `Quote each verse first, exactly as provided. Any explanation follows the teaching order and draws only on that verse's teach block. ${NO_TEACH_CLAUSE}`,
   NO_EMOJI_RULE,
   PBUH_RULE,
   VOICE_2_RULE,
@@ -123,8 +145,11 @@ export const DUA_DIRECTIVES: readonly string[] = [
   "You MUST NOT paraphrase the Arabic text or the English translation of any du'a below.",
   'The hadith grading and source reference MUST be cited exactly as provided.',
   'Do NOT separate the grading from the hadith text.',
-  // WO#454: Gem 10's wording, verbatim (replaces the "Prefer the 'dua_block'" line).
-  "You MUST output the 'dua_block' field exactly as provided. Do not reassemble the record from individual keys.",
+  // WO#478 (P2, Architect ruling of 20 Oct 2026): replaces Gem 10's WO#454
+  // hand-off line ("You MUST output the 'dua_block' field exactly as
+  // provided. Do not reassemble the record from individual keys."). The
+  // record is still quoted whole; explanation follows it.
+  DUA_BLOCK_DIRECTIVE,
   NO_EMOJI_RULE,
   PBUH_RULE,
   VOICE_2_RULE,
@@ -155,10 +180,13 @@ export const NOT_A_NARRATION_SCOPE_HEAD = 'Applies to these general supplication
 
 /**
  * WO#454 (Architect draft, to Gem 10 in part 14): on every du'a response with
- * more than one record.
+ * more than one record. WO#478 (P3): "summarise" is dropped, because an
+ * explanation from the teach block is a summary of what the notes say; the
+ * after-not-instead rule is added. Emission condition unchanged.
  */
 export const ANTI_SUMMARISATION_DIRECTIVE =
-  "CRITICAL: Present each du'a below as its own complete record. Do not merge, summarise, or condense several du'as into one."
+  "CRITICAL: Present each du'a below as its own complete record, quoted exactly. Do not merge or condense several du'as into one. Explain, where a teach block is supplied, after each record and never instead of it."
+
 
 /**
  * WO#454 (Gem 10, verbatim): on every response whose presentation contract
@@ -185,7 +213,9 @@ export const UNATTRIBUTED_CONTEXT_FALLBACK =
 export const NAME_DIRECTIVES: readonly string[] = [
   'You MUST present the Arabic text exactly as provided.',
   'You MUST include the English meaning alongside the Arabic and transliteration.',
-  "Prefer the 'name_block' field for display; it contains the complete record (Arabic, transliteration, meaning, reflection, Quranic reference) in one inseparable string. Use that field rather than reassembling from the structured keys.",
+  // WO#478 (P4): replaces the "Prefer the 'name_block' field for display"
+  // hand-off line. The record is still quoted whole; explanation follows it.
+  NAME_BLOCK_DIRECTIVE,
   'Reflections MUST NOT be paraphrased; quote them verbatim or omit them.',
   'When a Quranic reference is included, cite it by surah name and ayah number.',
   NO_EMOJI_RULE,
@@ -194,20 +224,22 @@ export const NAME_DIRECTIVES: readonly string[] = [
 ] as const
 
 /**
- * Teach directives (WO#407, Gem 10, 29 Sep 2026; WO#390 §B.1 left both to
- * Gem 10). Gem 10 wording, verbatim and LOCKED. The response builder emits
- * both only when the response carries a teach block, never on their own.
- * Change only on a Gem 10 ruling, verbatim. WO#408 addendum (Architect, after
- * Gem 10 FAIL): the grief sentence is replaced by a payload condition the
- * caller can verify; the server withholds teach on grief routes itself.
+ * Teach directive. WO#407 (Gem 10, 29 Sep 2026) wrote the first version;
+ * WO#408 replaced its grief sentence by a payload condition. WO#478 (P1,
+ * Architect rulings of 20 Oct 2026 under the [GEM4-DAWAH] ruling) replaced
+ * it with the teaching order: quote first, explain only from the teach
+ * fields as context from AskSakina's notes, hand over where the notes end,
+ * reflection question verbatim, one next step, nothing under a crisis
+ * block or after a disclosure of distress. Gem 4 re-checks the da'wah
+ * sentences at the 2.2.0 gate; Gem 3 and Gem 10 review the built text. The
+ * response builder emits it only when the response carries a teach block.
  */
 export const TEACH_DIRECTIVE =
-  'CRITICAL: The accompanying `teach` block is for educational context only and MUST NOT be framed, summarized, or presented as a fatwa or religious ruling. You MUST quote the Arabic terms and script exactly as provided without paraphrasing, altering codepoints, or transliterating independently. If citations and gradings are provided, present them exactly as written without implying authentication beyond what is explicitly stated. If the payload includes a crisis resource block, you MUST silently drop the `teach` content entirely and prioritize the crisis resources. If a reflection question is included, offer it verbatim for the user to consider, but DO NOT answer it on their behalf.'
+  'CRITICAL: Teaching order for the accompanying `teach` block. (1) Quote the record first, exactly as provided: the Arabic, the translation, the source and the grading, including a weak grading or a note that none is recorded. (2) Then you may explain in your own words, using only the `teach` fields (key_word, context, misconception) and nothing else, and say that it is context from AskSakina\'s notes, for example "AskSakina\'s notes explain that...". It is not tafsir and not a ruling: do not add your own interpretation of what Allah intends, do not derive a ruling, and do not choose between scholarly positions. (3) Where the notes end, say so, and point the user to a recognised tafsir or a qualified scholar. (4) If a reflection_question is included, offer it verbatim for the user to consider and do not answer it on their behalf. (5) Offer at most one related next step, taken from the `related` list by its label; if there is no `related` list, offer none. (6) If the payload includes a crisis resource block, drop the `teach` content entirely and prioritise the crisis resources. If the user has disclosed distress, grief or crisis in the conversation, quote records only: skip teach, reflection questions and the open door. Quote Arabic terms and script exactly as provided, without altering codepoints or transliterating independently, and present every citation and grading exactly as written, without implying authentication beyond what is explicitly stated, and never softened.'
 
 /**
- * `presentation_contract.teach`, same ruling as above. WO#408 (Gem 10 FAIL on
- * the 2.0 pre-publish review, Architect wording): the grief/bereavement clause
- * is removed; the server withholds teach on grief and support routes itself.
+ * `presentation_contract.teach` (WO#478, P1c; replaces the WO#407/WO#408
+ * contract). Same emission condition as TEACH_DIRECTIVE.
  */
 export const TEACH_CONTRACT =
-  'Educational Context (Teach): Present the key word, root, and gloss exactly as provided to explain the linguistic context. Keep the reflection question completely open-ended; output it verbatim and wait for the user to respond. Do not synthesize the citations and gradings into a general statement; output the source strings exactly. Under no circumstances should this block be rendered if the payload includes a crisis resource block.'
+  'Educational Context (Teach): Quote the record first, exactly. Then explain only from the teach block (key word, root, gloss, context, misconception), labelled as context from AskSakina\'s notes, not as tafsir or a ruling; where the notes end, say so and refer to a recognised tafsir or a qualified scholar. Output citations and gradings exactly as written. Offer the reflection question verbatim and do not answer it. Offer at most one related next step. Under no circumstances should this block be rendered if the payload includes a crisis resource block.'

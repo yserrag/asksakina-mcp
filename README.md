@@ -71,8 +71,14 @@ Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). C
 
 | Name | Type | Required | Notes |
 |---|---|---|---|
-| `context` | `string` | yes | Free-form life context |
+| `context` | `string` | one of `context` or `id` | Free-form life context |
+| `id` | `string` | one of `context` or `id` | A du'a id taken from a `related` reference in an earlier response (WO#390) |
 | `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` | no, defaults `en` | Translation language |
+| `audience` | `'curious'` \| `'revert'` \| `'practising'` | no | From the user's own self-description only. Echoed as `teach.audience`; omitted, the teach block says `unknown` (2.2.0) |
+| `limit` | integer 1 to 10 | no, defaults 3 | How many records a context lookup returns (2.2.0). The bereaved set and the abuse allowlist are always returned whole. Ignored with `id` |
+| `offset` | integer, 0 or more | no, defaults 0 | How many records to skip before the page, for paging with `limit` (2.2.0). Ignored with `id` and on `bereaved` |
+
+**Result shaping (2.2.0).** A context lookup returns `limit` records of the route's existing order (bundle order; Gem 4's fixed order on `bereaved`), starting at `offset`. When more follow the page, `content.total_available` gives the whole count, `content.truncated` is true, and `content.more` carries the note "N more du'as for this context; call get_dua with offset and limit to see them." The same note is in `CRITICAL_RULES`. `content.offset` is present when it is not 0. Every record of a category is reachable by paging.
 
 **Example response (truncated)**
 
@@ -107,8 +113,11 @@ Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). C
       }
       /* … */
     ],
-    "total_results": 12,
-    "grading_summary": { "quranic": 2, "graded": 0, "not_a_narration": 0, "not_recorded": 10 }
+    "total_results": 3,
+    "total_available": 12,
+    "truncated": true,
+    "more": "9 more du'as for this context; call get_dua with offset and limit to see them.",
+    "grading_summary": { "quranic": 2, "graded": 0, "not_a_narration": 0, "not_recorded": 1 }
   }
   // crisis_resource block added if context triggers the crisis keyword list
 }
@@ -165,6 +174,14 @@ No match returns `content_type: "not_found"` with `verses: []`, `no_results: tru
 
 Read this resource **before** using the tools. It contains the seven core directives plus three Gem-cleared educational dawah texts. Most MCP clients fetch it automatically the first time they connect.
 
+### Server `instructions` (2.2.0)
+
+The initialize result carries `instructions` (1,529 characters, under the 1,801 limit): the quoting and teaching rules, the da'wah adab block ruled on 20 Oct 2026 (verbatim), and the open-door line with its conditions (only on the user's interest in Islam itself, at most once per conversation, never in distress, never as a condition of an answer, never after a decline). A client that surfaces `instructions` gives its model these rules once per session; the per-response rules in `_sakina_meta.llm_directives` apply either way.
+
+### Teaching (2.2.0, "teach, don't hand off")
+
+Where a teaching entry exists for a record (`src/teach/entries.ts`; six records today), the record carries a `teach` block and a `related` list, with or without `audience`. The directives give the teaching order: quote the record first, exactly (Arabic, translation, source, grading); then explain only from the teach block, as context from AskSakina's notes, not tafsir or a ruling; where the notes end, say so and point to a recognised tafsir or a qualified scholar; offer the reflection question verbatim without answering it; offer at most one related next step. Nothing attaches under a support block, on a grief route or on a crisis response, and the directives tell the agent to quote records only once the user has disclosed distress, grief or crisis. Where no teach block is supplied, the agent may explain only from the record's own supplied fields, attributed to AskSakina's notes, then hand over the same way.
+
 ---
 
 ## Response envelope
@@ -186,7 +203,7 @@ Every tool returns the same shape:
     },
     "educational_context": "…"
   },
-  "content": { /* tool-specific record */ },
+  "content": { /* tool-specific record; a record with a teaching entry also carries "teach" and "related" (2.2.0) */ },
   // get_dua and find_verses, when crisis keywords detected:
   "crisis_resource": { "level": "hard" | "soft", "crisis_type": "self-harm" | "abuse", "locale": "…", "directive": "…", "text": "…" }
 }

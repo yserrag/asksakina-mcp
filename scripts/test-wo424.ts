@@ -80,7 +80,8 @@ async function main() {
 
   // ── get_dua: none of them in the "Applies to ungraded" directive ──
   for (const context of ['morning', 'evening']) {
-    const res = (await getDuaHandler({ context })) as unknown as { _sakina_meta: { llm_directives: Record<string, unknown> }; content: { duas: { title: string; dua_block: string; grading_directive?: string }[] } }
+    // WO#478: get_dua returns 3 records by default; ask for the maximum (10).
+    const res = (await getDuaHandler({ context, limit: 10 })) as unknown as { _sakina_meta: { llm_directives: Record<string, unknown> }; content: { duas: { title: string; dua_block: string; grading_directive?: string }[] } }
     const ours = res.content.duas.filter((d) => gradingLine(d.dua_block) === LINE)
     const directives = JSON.stringify(res._sakina_meta.llm_directives)
     check(ours.length > 0 && ours.every((d) => !d.grading_directive), `get_dua(${context}): ${ours.length} records carry the line, none with the ungraded directive`)

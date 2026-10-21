@@ -1,6 +1,6 @@
 import { SAKINA_DISCLAIMER, NOT_FOUND_DISCLAIMER, CRISIS_ONLY_DISCLAIMER } from '../contracts/disclaimers.js';
 import { QURAN_VERSE_CONTEXT, HADITH_CONTEXT, NAMES_OF_ALLAH_CONTEXT, } from '../contracts/educational.js';
-import { QURAN_CONTRACT, HADITH_CONTRACT, NAME_OF_ALLAH_CONTRACT, REFLECTION_CONTRACT, QURAN_DIRECTIVES, VERSE_COLLECTION_DIRECTIVES, DUA_DIRECTIVES, NAME_DIRECTIVES, VOICE_2_RULE, PBUH_RULE, NO_EMOJI_RULE, TEACH_DIRECTIVE, TEACH_CONTRACT, } from '../contracts/presentation.js';
+import { QURAN_CONTRACT, HADITH_CONTRACT, NAME_OF_ALLAH_CONTRACT, REFLECTION_CONTRACT, QURAN_DIRECTIVES, VERSE_COLLECTION_DIRECTIVES, DUA_DIRECTIVES, NAME_DIRECTIVES, VOICE_2_RULE, PBUH_RULE, NO_EMOJI_RULE, TEACH_DIRECTIVE, TEACH_CONTRACT, NO_TEACH_CLAUSE, } from '../contracts/presentation.js';
 const VERSION = '1.0';
 const SOURCE = 'AskSakina Islamic Knowledge Server (asksakina.com)';
 function metaForType(contentType) {
@@ -53,7 +53,7 @@ function metaForType(contentType) {
             return {
                 directives: [
                     'The lookup did not return a record. Do not fabricate a substitute.',
-                    'Suggest the user rephrase or consult asksakina.com directly.',
+                    'Suggest the user rephrase or try a related topic.',
                     NO_EMOJI_RULE,
                     PBUH_RULE,
                     VOICE_2_RULE,
@@ -63,6 +63,10 @@ function metaForType(contentType) {
                 disclaimer: NOT_FOUND_DISCLAIMER,
             };
     }
+}
+const NO_TEACH_SUFFIX = ` ${NO_TEACH_CLAUSE}`;
+function withoutNoTeachClause(directive) {
+    return directive.endsWith(NO_TEACH_SUFFIX) ? directive.slice(0, -NO_TEACH_SUFFIX.length) : directive;
 }
 function carriesTeach(value) {
     if (Array.isArray(value))
@@ -78,7 +82,8 @@ export function buildResponse(input) {
     const meta = metaForType(input.contentType);
     const teach = carriesTeach(input.content);
     const extra = [...(input.extraDirectives ?? []), ...(teach ? [TEACH_DIRECTIVE] : [])];
-    const directives = extra.length ? [...meta.directives, ...extra] : meta.directives;
+    const full = extra.length ? [...meta.directives, ...extra] : meta.directives;
+    const directives = input.withholdTeach ? full.map(withoutNoTeachClause) : full;
     const merged = input.contractOverride
         ? { ...meta.contract, ...input.contractOverride }
         : meta.contract;

@@ -29,6 +29,7 @@ import {
   NO_EMOJI_RULE,
   TEACH_DIRECTIVE,
   TEACH_CONTRACT,
+  NO_TEACH_CLAUSE,
 } from '../contracts/presentation.js'
 
 export type ContentType =
@@ -55,6 +56,15 @@ interface BuilderInput<TContent> {
   contractOverride?: Record<string, unknown>
   /** Appended to the content type's CRITICAL_RULES. */
   extraDirectives?: readonly string[]
+  /**
+   * WO#478 (Gem 3 condition 1): true under the same condition that withholds
+   * teach (a support block in the response, a grief route). The no-teach
+   * clause ("Where no teach block is supplied, you may explain only from
+   * this record's own supplied fields...") is then cut from every directive
+   * that carries it, so a response under a support block invites no
+   * explanation at all.
+   */
+  withholdTeach?: boolean
 }
 
 export interface SakinaResponse<TContent> {
@@ -138,7 +148,9 @@ function metaForType(contentType: ContentType): {
       return {
         directives: [
           'The lookup did not return a record. Do not fabricate a substitute.',
-          'Suggest the user rephrase or consult asksakina.com directly.',
+          // WO#478 (Gem 4 condition 3): the site link lives in the server
+          // instructions only.
+          'Suggest the user rephrase or try a related topic.',
           NO_EMOJI_RULE,
           PBUH_RULE,
           VOICE_2_RULE,
@@ -148,6 +160,12 @@ function metaForType(contentType: ContentType): {
         disclaimer: NOT_FOUND_DISCLAIMER,
       }
   }
+}
+
+/** The directive without its trailing no-teach clause (WO#478, Gem 3 condition 1). */
+const NO_TEACH_SUFFIX = ` ${NO_TEACH_CLAUSE}`
+function withoutNoTeachClause(directive: string): string {
+  return directive.endsWith(NO_TEACH_SUFFIX) ? directive.slice(0, -NO_TEACH_SUFFIX.length) : directive
 }
 
 /** True when any record in the content carries a teach block (WO#405). */
@@ -167,7 +185,8 @@ export function buildResponse<TContent>(
   // teach block, so a response without one serialises exactly as before.
   const teach = carriesTeach(input.content)
   const extra = [...(input.extraDirectives ?? []), ...(teach ? [TEACH_DIRECTIVE] : [])]
-  const directives = extra.length ? [...meta.directives, ...extra] : meta.directives
+  const full = extra.length ? [...meta.directives, ...extra] : meta.directives
+  const directives = input.withholdTeach ? full.map(withoutNoTeachClause) : full
   const merged = input.contractOverride
     ? { ...meta.contract, ...input.contractOverride }
     : meta.contract

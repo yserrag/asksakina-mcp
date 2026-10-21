@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import http from 'node:http';
+import { SERVER_INSTRUCTIONS } from './contracts/instructions.js';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -18,7 +19,7 @@ import { handleStatsRequest } from './logging/stats.js';
 import { enableDailyStore } from './logging/daily-store.js';
 import { extractClientIp } from './logging/geo.js';
 const SERVER_NAME = 'sakina-islamic-knowledge';
-const SERVER_VERSION = '2.1.1';
+const SERVER_VERSION = '2.2.0';
 const SERVER_DESCRIPTION = "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar.";
 const SERVER_CARD = {
     schemaVersion: '2025-07-09',
@@ -149,7 +150,7 @@ const SERVER_CARD = {
         privacy: {
             tracking: 'none',
             analytics: 'aggregate-only',
-            logging: 'in-memory aggregate counters only — per-tool call + status totals. No per-request records, no IPs, no client identifiers, no user-agents, no geolocation, no params, no response payloads. Counters reset on restart.',
+            logging: 'aggregate counters only: per-tool call and status totals. No per-request records, no IPs, no client identifiers, no user-agents, no geolocation, no params, no response payloads. Since-start totals reset on restart; on the hosted server, per-tool daily totals are kept on disk for at most 90 days.',
         },
     },
 };
@@ -178,7 +179,7 @@ export function createMcpServer() {
         name: SERVER_NAME,
         version: SERVER_VERSION,
         description: SERVER_DESCRIPTION,
-    });
+    }, { instructions: SERVER_INSTRUCTIONS });
     server.registerTool(GET_QURAN_VERSE_TITLE, {
         title: GET_QURAN_VERSE_TITLE,
         description: GET_QURAN_VERSE_DESCRIPTION,
