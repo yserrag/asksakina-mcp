@@ -25,7 +25,7 @@ interface BundledName {
 
 const namesOfAllah = JSON.parse(readFileSync(path.join(DATA_DIR, 'names.json'), 'utf-8')) as BundledName[]
 
-export type SupportedLocale = 'en' | 'id' | 'ur' | 'ar'
+export type SupportedLocale = 'en' | 'id' | 'ur' | 'ar' | 'tr'
 
 export interface NameRecord {
   /**
@@ -48,14 +48,15 @@ function sanitise(input: string): string {
 }
 
 function meaningFor(name: BundledName, locale: SupportedLocale): string {
-  if (locale === 'en') return name.meaning.en
+  // WO#481: no tr meanings are bundled; tr gets English (the tool says so).
+  if (locale === 'en' || locale === 'tr') return name.meaning.en
   if (locale === 'ur') return name.meaning.ur
   if (locale === 'id') return name.meaning.id
   return name.meaning.ar ?? name.meaning.en
 }
 
 function descriptionFor(name: BundledName, locale: SupportedLocale): string {
-  if (locale === 'en') return name.description.en
+  if (locale === 'en' || locale === 'tr') return name.description.en
   if (locale === 'ur') return name.description.ur
   if (locale === 'id') return name.description.id
   return name.description.ar ?? name.description.en
@@ -89,6 +90,18 @@ function toRecord(name: BundledName, locale: SupportedLocale): NameRecord {
     reflection,
     quranic_references,
   }
+}
+
+/**
+ * WO#481 (Gem 10 condition 3): true when the meaning or the reflection served
+ * for this Name in this locale is the English text (no bundled translation).
+ * ar and tr today; ur and id carry their own.
+ */
+export function servesEnglishFallback(num: number, locale: SupportedLocale): boolean {
+  if (locale === 'en') return false
+  const name = namesOfAllah.find((n) => n.number === num)
+  if (!name) return false
+  return meaningFor(name, locale) === name.meaning.en || descriptionFor(name, locale) === name.description.en
 }
 
 export function getNameByNumber(num: number, locale: SupportedLocale): NameRecord | null {

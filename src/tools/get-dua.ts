@@ -24,6 +24,7 @@ import {
   evaluateDistress,
 } from '../safety/crisis-keywords.js'
 import { buildResponse, type SakinaResponse } from '../meta/response-builder.js'
+import { duaEnglishNote, ENGLISH_FALLBACK_GUARD } from '../contracts/english-fallback.js'
 import {
   ANTI_SUMMARISATION_DIRECTIVE,
   HADITH_CONTRACT,
@@ -55,6 +56,16 @@ export const DUA_ID_PATTERN = /^[A-Za-z0-9-]{3,40}$/
 export const GET_DUA_DEFAULT_LIMIT = 3
 export const GET_DUA_MAX_LIMIT = 10
 
+/**
+ * WO#481 (Gem 10 conditions 3 and 4): every non-en du'a collection says the
+ * du'as are English, in content.translation_note and CRITICAL_RULES, with the
+ * translation guard. en is unchanged.
+ */
+function englishDisclosure(locale: string): { note: Record<string, string>; directives: string[] } {
+  const note = duaEnglishNote(locale)
+  return note ? { note: { translation_note: note }, directives: [note, ENGLISH_FALLBACK_GUARD] } : { note: {}, directives: [] }
+}
+
 /** The note on a page with more after it; exact wording from the Architect. */
 export function moreDuasNote(remaining: number): string {
   return `${remaining} more ${remaining === 1 ? "du'a" : "du'as"} for this context; call get_dua with offset and limit to see them.`
@@ -75,9 +86,9 @@ export const getDuaShape = {
     .optional()
     .describe("A du'a id taken from a related reference in an earlier response. Send this or context, not both."),
   locale: z
-    .enum(['en', 'id', 'ur', 'ar'])
+    .enum(['en', 'id', 'ur', 'ar', 'tr'])
     .optional()
-    .describe('Translation locale; defaults to "en". v1 returns English content for all locales.'),
+    .describe('Locale; defaults to "en". Du\'a records are English for every locale; a crisis resource is given in the request locale.'),
   audience: audienceArg,
   limit: z
     .number()
@@ -130,7 +141,7 @@ export async function getDuaHandler(
   // Gem 3 ruling (WO#385): on an abuse disclosure, the safety block and
   // resources come first and, in 1.4.1, alone. The du'a query never runs.
   if (distress.level === 'hard' && distress.crisisType === 'abuse') {
-    return abuseResponse(input.context, extras, ABUSE_SAFE_DUAS)
+    return abuseResponse(input.context, extras, ABUSE_SAFE_DUAS, input.locale ?? 'en')
   }
 
   // Gem 3 ruling (WO#388-B, 27 Sep 2026): every other hard crisis (self-harm)
@@ -212,7 +223,8 @@ export async function getDuaHandler(
   // WO#385: each distinct per-record directive in this response is also
   // stated once in CRITICAL_RULES; WO#418 B1 scopes the ungraded one.
   // WO#478: the "more" note is mandatory whenever records were cut.
-  const recordDirectives = [...collectionDirectivesFor(shown), ...(remaining > 0 ? [moreDuasNote(remaining)] : [])]
+  const english = englishDisclosure(input.locale ?? 'en')
+  const recordDirectives = [...collectionDirectivesFor(shown), ...(remaining > 0 ? [moreDuasNote(remaining)] : []), ...english.directives]
   const extraDirectives = recordDirectives.length ? recordDirectives : undefined
 
   return buildResponse({
@@ -236,6 +248,7 @@ export async function getDuaHandler(
         not_a_narration: general,
         not_recorded: unrecorded,
       },
+      ...english.note,
     },
     extras,
     contractOverride,
@@ -330,6 +343,7 @@ export function abuseResponse(
   context: string,
   extras: Record<string, unknown> | undefined,
   allowlist: readonly string[],
+  locale = 'en',
 ): SakinaResponse<unknown> {
   const duas = selectAbuseSafeDuas(allowlist)
   if (!duas.length) {
@@ -344,12 +358,13 @@ export function abuseResponse(
     })
   }
   const recordDirectives = collectionDirectivesFor(duas)
+  const english = englishDisclosure(locale)
   return buildResponse({
     contentType: 'dua_collection',
-    content: { context: 'abuse-safe', duas, total_results: duas.length },
+    content: { context: 'abuse-safe', duas, total_results: duas.length, ...english.note },
     extras,
     contractOverride: contractOverrideFor(duas),
-    extraDirectives: [ABUSE_ORDER_DIRECTIVE, ...recordDirectives],
+    extraDirectives: [ABUSE_ORDER_DIRECTIVE, ...recordDirectives, ...english.directives],
     // WO#478 (Gem 3): the hard abuse block withholds teach and the no-teach clause alike.
     withholdTeach: true,
   })
@@ -380,7 +395,7 @@ function oneOfRefusal(input: GetDuaInput): SakinaResponse<unknown> {
  */
 export function duaByIdResponse(
   id: string,
-  locale: 'en' | 'id' | 'ur' | 'ar',
+  locale: 'en' | 'id' | 'ur' | 'ar' | 'tr',
   allowlist: readonly string[],
   audience?: Audience,
 ): SakinaResponse<unknown> {
@@ -413,7 +428,7 @@ export function duaByIdResponse(
   // WO#407: nothing attaches under a support block (a soft keyword in the id).
   const duas = [withTeach(record, `dua:${id}`, { audience, locale, withhold: Boolean(extras) })]
   const unrecorded = duas.filter((d) => d.grading_status === 'not_recorded').length
-  const recordDirectives = collectionDirectivesFor([record])
+  const recordDirectives = [...collectionDirectivesFor([record]), ...englishDisclosure(locale).directives]
   return buildResponse({
     contentType: 'dua_collection',
     content: {
@@ -426,6 +441,7 @@ export function duaByIdResponse(
         not_a_narration: duas.filter((d) => d.grading_status === 'not_a_narration').length,
         not_recorded: unrecorded,
       },
+      ...englishDisclosure(locale).note,
     },
     extras,
     contractOverride: contractOverrideFor([record]),

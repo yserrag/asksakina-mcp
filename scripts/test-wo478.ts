@@ -255,7 +255,10 @@ async function main() {
     const card = JSON.parse(readFileSync(new URL('../.mcp/server.json', import.meta.url), 'utf-8')) as { version: string; packages: Array<{ version: string }> }
     const src = readFileSync(new URL('../src/server.ts', import.meta.url), 'utf-8')
     const log = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf-8')
-    check(pkg.version === '2.2.0' && card.version === '2.2.0' && card.packages.every((p) => p.version === '2.2.0') && src.includes("SERVER_VERSION = '2.2.0'") && log.includes('## 2.2.0'), 'package.json, .mcp/server.json, SERVER_VERSION and the CHANGELOG say 2.2.0')
+    // WO#481: the release moved on to 2.2.1; this checks that every version
+    // site agrees with package.json and that the 2.2.0 section still exists.
+    const v = pkg.version
+    check(card.version === v && card.packages.every((p) => p.version === v) && src.includes(`SERVER_VERSION = '${v}'`) && log.includes(`## ${v}`) && log.includes('## 2.2.0'), `package.json, .mcp/server.json, SERVER_VERSION and the CHANGELOG agree (${v}); the 2.2.0 section is present`)
   }
 
   console.log(failures ? `\nWO#478: ${failures} FAILED` : '\nWO#478: all passed')

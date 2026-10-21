@@ -16,6 +16,7 @@ const TRANSLATION_EDITIONS = {
 export const PARKED_TRANSLATION_LOCALES = {
     ur: 'Urdu',
     id: 'Indonesian',
+    tr: 'Turkish',
 };
 export function parkedTranslationNote(language) {
     return `A licensed ${language} translation is not yet available in AskSakina, so the English translation of the meaning (Pickthall) is provided instead.`;

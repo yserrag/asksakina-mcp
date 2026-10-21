@@ -36,7 +36,7 @@ Verbatim Quranic verse lookup by surah:ayah. Returns the canonical AskSakina env
 |---|---|---|---|
 | `surah` | `1`..`114` | yes | Surah number |
 | `ayah` | `1`..`286` | yes | Ayah within the surah |
-| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` | no, defaults `en` | Translation language. `ar` returns the Arabic original with the Pickthall English alongside. Urdu and Indonesian translations are not yet available (pending licences): `ur` and `id` return Pickthall English, `translation_language: "en"` and a `translation_note` saying so |
+| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` \| `'tr'` | no, defaults `en` | Translation language. `ar` returns the Arabic original with the Pickthall English alongside. Urdu, Indonesian and Turkish translations are not yet available (pending licences): `ur`, `id` and `tr` return Pickthall English, `translation_language: "en"` and a `translation_note` saying so |
 
 **Example response (truncated)**
 
@@ -73,7 +73,7 @@ Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). C
 |---|---|---|---|
 | `context` | `string` | one of `context` or `id` | Free-form life context |
 | `id` | `string` | one of `context` or `id` | A du'a id taken from a `related` reference in an earlier response (WO#390) |
-| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` | no, defaults `en` | Translation language |
+| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` \| `'tr'` | no, defaults `en` | Du'a records are English for every locale; a crisis resource is in the request locale (2.2.1) |
 | `audience` | `'curious'` \| `'revert'` \| `'practising'` | no | From the user's own self-description only. Echoed as `teach.audience`; omitted, the teach block says `unknown` (2.2.0) |
 | `limit` | integer 1 to 10 | no, defaults 3 | How many records a context lookup returns (2.2.0). The bereaved set and the abuse allowlist are always returned whole. Ignored with `id` |
 | `offset` | integer, 0 or more | no, defaults 0 | How many records to skip before the page, for paging with `limit` (2.2.0). Ignored with `id` and on `bereaved` |
@@ -136,7 +136,7 @@ Look up by number (1–99) or string (transliteration, Arabic, or English meanin
 | `number` | `1`..`99` | Primary lookup |
 | `name` | `string` | Transliteration, Arabic, or English meaning |
 
-Plus optional `locale`.
+Plus optional `locale` (`tr` returns the English meaning and reflection).
 
 **Example response (truncated)**
 
@@ -168,7 +168,7 @@ No match returns `content_type: "not_found"` with `verses: []`, `no_results: tru
 |---|---|---|---|
 | `query` | `string` | yes | Topic or keyword, e.g. `patience`, `grief`, `gratitude` |
 | `limit` | `1`..`10` | no, defaults `5` | Number of verses |
-| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` | no, defaults `en` | Selects the in-country crisis resources. Translations are Pickthall English; `ur` and `id` carry the parked-translation note |
+| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` \| `'tr'` | no, defaults `en` | Selects the in-country crisis resources. Translations are Pickthall English; `ur`, `id` and `tr` carry the parked-translation note |
 
 ### Resource: `sakina://about`
 

@@ -2,6 +2,61 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 2.2.1 (unreleased; built and tested only. Gem 10 reviews the built blocks before release)
+
+WO#481: crisis text in the user's language, and the `tr` locale. Gem 3
+approved the structure and the reuse of the app's `crisis.immediateDanger`,
+Gem 1 the translations, Gem 2 the ar and ur code points and the bidi rules,
+all on 21 Oct 2026 (`docs/wo481-architect.md`). Not published, not
+deployed, registry unchanged apart from the version number.
+
+### Changed
+
+- **Crisis blocks in the request locale** (Gem 3 HIGH RISK ruling: id, ur
+  and ar served English sentences until now). The self-harm, abuse and soft
+  blocks for `ar`, `ur`, `id` and `tr` are written in that language, each
+  helpline on its own line as "Name: number (hours)". The abuse block
+  closes with the app's `crisis.immediateDanger` (ar, ur, tr) or the id
+  sentence. `en` is byte-identical to 2.2.0. The directives stay English
+  (agent-facing). Every string is generated from the ruling record by
+  `scripts/wo481-extract-crisis-l10n.py` into
+  `src/safety/crisis-l10n-strings.ts`, never retyped.
+- **Bidi isolates (Gem 2), ar and ur only:** every URL, phone number and
+  "24/7" sits in LRI U+2066 ... PDI U+2069, and Arabic-script hours inside a
+  helpline line in RLI U+2067 ... PDI U+2069, all generated in one helper
+  (`src/safety/bidi.ts`), which also isolates every Latin-script run in an
+  ar or ur line (Architect ruling of 21 Oct 2026). en, id and tr carry no
+  isolate marks.
+- **Names in the lines:** ar uses the Arabic name from `src/data/helplines.ts`
+  where one exists, else the Latin one; ur uses Umang Helpline, Rozan
+  Counselling and Madadgaar National Helpline; id uses the `helplines.ts`
+  names (SEJIWA, with its "119, lalu tekan 8"). A name that carries an em
+  dash in `helplines.ts` is rendered whole with ", " in place of " — "
+  (the Arabic comma U+060C and a space for an Arabic-script name in ar;
+  Architect rulings of 21 Oct 2026; `helplines.ts` is unchanged), so Egypt
+  keeps the National Council for Women and UAE its full name. In ar and ur,
+  every Latin-script run in a line (service names included) is isolated
+  too. The id office hours keep the dataset's en dash; only em dashes are
+  banned.
+
+### Added
+
+- **`tr` locale** on all four tools and the server card. tr crisis blocks:
+  self-harm names 112 (7/24) and the IASP directory; abuse names ALO 183
+  Sosyal Destek Hattı (183, 7/24), its WhatsApp line 0501 183 0 183 for when
+  calling is not safe, and 112. Turkish crisis phrases route to them.
+  `PARKED_TRANSLATION_LOCALES.tr` ships in the same change, so a `tr` Quran
+  request gets Pickthall English with the disclosed note, never silently.
+  `tr` Names return the English meaning and reflection (the tool
+  description says so); du'a records stay English for every locale.
+- `scripts/test-wo481.ts` (`npm run test:wo481`, in `prepublishOnly`): the
+  table against the record, `helplines.ts` and the app bundles; each block's
+  structure; balanced isolates and every ar/ur phone number, URL and "24/7"
+  isolated; every number in every block present in `helplines.ts`; the
+  WhatsApp line equal to the `tr-alo-183` note; no em dash; 182 in no block;
+  Turkish routing; the tr parked note; en unchanged. The publish guards scan
+  the tr blocks and two Turkish crisis calls; 182 stays banned.
+
 ## 2.2.0 (unreleased; Gem 3, Gem 4, Gem 8 and Gem 10 passed the built text on 20 Oct 2026, delegated rulings by the Architect, with their conditions applied)
 
 WO#478, "teach, don't hand off" (Architect rulings of 20 Oct 2026, under the

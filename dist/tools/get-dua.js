@@ -4,6 +4,7 @@ import { BEREAVED_GENDER_NOTE } from '../data/bereaved-duas.js';
 import { ABUSE_SAFE_DUAS } from '../data/abuse-safe-duas.js';
 import { distressBlockFor, evaluateDistress, } from '../safety/crisis-keywords.js';
 import { buildResponse } from '../meta/response-builder.js';
+import { duaEnglishNote, ENGLISH_FALLBACK_GUARD } from '../contracts/english-fallback.js';
 import { ANTI_SUMMARISATION_DIRECTIVE, HADITH_CONTRACT, NOT_A_NARRATION_DIRECTIVE, NOT_A_NARRATION_SCOPE_HEAD, QURAN_CITATION_DIRECTIVE, QURAN_CONTRACT, UNGRADED_GRADING_DIRECTIVE, } from '../contracts/presentation.js';
 import { UNGRADED_SCOPE_HEAD } from '../contracts/gem4-wo418.js';
 import { isPickthallTranslation } from '../data/duas.js';
@@ -13,6 +14,10 @@ import { withTeach } from '../teach/attach.js';
 export const DUA_ID_PATTERN = /^[A-Za-z0-9-]{3,40}$/;
 export const GET_DUA_DEFAULT_LIMIT = 3;
 export const GET_DUA_MAX_LIMIT = 10;
+function englishDisclosure(locale) {
+    const note = duaEnglishNote(locale);
+    return note ? { note: { translation_note: note }, directives: [note, ENGLISH_FALLBACK_GUARD] } : { note: {}, directives: [] };
+}
 export function moreDuasNote(remaining) {
     return `${remaining} more ${remaining === 1 ? "du'a" : "du'as"} for this context; call get_dua with offset and limit to see them.`;
 }
@@ -28,9 +33,9 @@ export const getDuaShape = {
         .optional()
         .describe("A du'a id taken from a related reference in an earlier response. Send this or context, not both."),
     locale: z
-        .enum(['en', 'id', 'ur', 'ar'])
+        .enum(['en', 'id', 'ur', 'ar', 'tr'])
         .optional()
-        .describe('Translation locale; defaults to "en". v1 returns English content for all locales.'),
+        .describe('Locale; defaults to "en". Du\'a records are English for every locale; a crisis resource is given in the request locale.'),
     audience: audienceArg,
     limit: z
         .number()
@@ -61,7 +66,7 @@ export async function getDuaHandler(input) {
     const block = distressBlockFor(distress, input.locale ?? 'en');
     let extras = block ? { crisis_resource: block } : undefined;
     if (distress.level === 'hard' && distress.crisisType === 'abuse') {
-        return abuseResponse(input.context, extras, ABUSE_SAFE_DUAS);
+        return abuseResponse(input.context, extras, ABUSE_SAFE_DUAS, input.locale ?? 'en');
     }
     if (distress.level === 'hard') {
         return buildResponse({
@@ -119,7 +124,8 @@ export async function getDuaHandler(input) {
     const withhold = Boolean(extras?.crisis_resource) || GRIEF_CONTEXTS.has(result.resolvedCategory);
     const duas = shown.map((d, i) => withTeach(d, `dua:${shownIds[i]}`, { audience: input.audience, locale: input.locale, withhold }));
     const contractOverride = contractOverrideFor(shown);
-    const recordDirectives = [...collectionDirectivesFor(shown), ...(remaining > 0 ? [moreDuasNote(remaining)] : [])];
+    const english = englishDisclosure(input.locale ?? 'en');
+    const recordDirectives = [...collectionDirectivesFor(shown), ...(remaining > 0 ? [moreDuasNote(remaining)] : []), ...english.directives];
     const extraDirectives = recordDirectives.length ? recordDirectives : undefined;
     return buildResponse({
         contentType: 'dua_collection',
@@ -141,6 +147,7 @@ export async function getDuaHandler(input) {
                 not_a_narration: general,
                 not_recorded: unrecorded,
             },
+            ...english.note,
         },
         extras,
         contractOverride,
@@ -187,7 +194,7 @@ export function responseDirectivesFor(records) {
     ];
 }
 export const ABUSE_ORDER_DIRECTIVE = "Output the safety block and resources first. Only then, if du'as are included, present them after.";
-export function abuseResponse(context, extras, allowlist) {
+export function abuseResponse(context, extras, allowlist, locale = 'en') {
     const duas = selectAbuseSafeDuas(allowlist);
     if (!duas.length) {
         return buildResponse({
@@ -201,12 +208,13 @@ export function abuseResponse(context, extras, allowlist) {
         });
     }
     const recordDirectives = collectionDirectivesFor(duas);
+    const english = englishDisclosure(locale);
     return buildResponse({
         contentType: 'dua_collection',
-        content: { context: 'abuse-safe', duas, total_results: duas.length },
+        content: { context: 'abuse-safe', duas, total_results: duas.length, ...english.note },
         extras,
         contractOverride: contractOverrideFor(duas),
-        extraDirectives: [ABUSE_ORDER_DIRECTIVE, ...recordDirectives],
+        extraDirectives: [ABUSE_ORDER_DIRECTIVE, ...recordDirectives, ...english.directives],
         withholdTeach: true,
     });
 }
@@ -247,7 +255,7 @@ export function duaByIdResponse(id, locale, allowlist, audience) {
     }
     const duas = [withTeach(record, `dua:${id}`, { audience, locale, withhold: Boolean(extras) })];
     const unrecorded = duas.filter((d) => d.grading_status === 'not_recorded').length;
-    const recordDirectives = collectionDirectivesFor([record]);
+    const recordDirectives = [...collectionDirectivesFor([record]), ...englishDisclosure(locale).directives];
     return buildResponse({
         contentType: 'dua_collection',
         content: {
@@ -260,6 +268,7 @@ export function duaByIdResponse(id, locale, allowlist, audience) {
                 not_a_narration: duas.filter((d) => d.grading_status === 'not_a_narration').length,
                 not_recorded: unrecorded,
             },
+            ...englishDisclosure(locale).note,
         },
         extras,
         contractOverride: contractOverrideFor([record]),

@@ -613,7 +613,7 @@
       "expect": {
         "crisis_level": "hard",
         "must_contain": [
-          "0311-7786264"
+          "03117786264"
         ],
         "must_not_contain": [
           "116 123",
@@ -723,7 +723,7 @@
     },
     {
       "id": "crisis-abuse-id",
-      "description": "Abuse, Indonesian locale: in-country DV lines",
+      "description": "Abuse, Indonesian locale: in-country DV lines WO#481: the block is in the request locale (Gem 1 wording).",
       "tool": "get_dua",
       "args": {
         "context": "my husband hits me",
@@ -733,7 +733,7 @@
         "content_type": "crisis_resource_only",
         "crisis_level": "hard",
         "must_contain": [
-          "What you are experiencing is oppression (dhulm), and you are not to blame. Your first duty is to protect your safety, not to endure harm. Professional support is available to help you navigate this safely.",
+          "Apa yang kamu alami adalah kezaliman, dan kamu tidak bersalah.",
           "SAPA 129",
           "021-3903963"
         ],
@@ -742,7 +742,8 @@
           "762 2381",
           "\"context\":\"marriage\"",
           "\"duas\"",
-          "rephrase"
+          "rephrase",
+          "What you are experiencing is oppression"
         ],
         "field_checks": [
           {
@@ -758,7 +759,7 @@
     },
     {
       "id": "crisis-abuse-ur",
-      "description": "Abuse, Roman Urdu phrase and locale",
+      "description": "Abuse, Roman Urdu phrase and locale WO#481: the block is in the request locale (Gem 1 wording).",
       "tool": "get_dua",
       "args": {
         "context": "mera shohar mujhe marta hai",
@@ -768,16 +769,17 @@
         "content_type": "crisis_resource_only",
         "crisis_level": "hard",
         "must_contain": [
-          "What you are experiencing is oppression (dhulm), and you are not to blame. Your first duty is to protect your safety, not to endure harm. Professional support is available to help you navigate this safely.",
+          "آپ جس صورتحال سے گزر رہے ہیں وہ ظلم ہے، اور اس میں آپ کا کوئی قصور نہیں۔",
           "1098",
-          "0304-111-1741"
+          "03041111741"
         ],
         "must_not_contain": [
           "harming yourself",
           "762 2381",
           "\"context\":\"marriage\"",
           "\"duas\"",
-          "rephrase"
+          "rephrase",
+          "What you are experiencing is oppression"
         ],
         "field_checks": [
           {
@@ -793,7 +795,7 @@
     },
     {
       "id": "crisis-abuse-ar",
-      "description": "Abuse, Arabic locale",
+      "description": "Abuse, Arabic locale WO#481: the block is in the request locale (Gem 1 wording).",
       "tool": "get_dua",
       "args": {
         "context": "my husband hits me",
@@ -803,7 +805,7 @@
         "content_type": "crisis_resource_only",
         "crisis_level": "hard",
         "must_contain": [
-          "What you are experiencing is oppression (dhulm), and you are not to blame. Your first duty is to protect your safety, not to endure harm. Professional support is available to help you navigate this safely.",
+          "ما تمر به هو ظلم، وأنت لست الملام.",
           "1919",
           "15115"
         ],
@@ -812,7 +814,8 @@
           "762 2381",
           "\"context\":\"marriage\"",
           "\"duas\"",
-          "rephrase"
+          "rephrase",
+          "What you are experiencing is oppression"
         ],
         "field_checks": [
           {
@@ -980,6 +983,85 @@
       "expect": {
         "content_type": "crisis_resource_only",
         "crisis_level": "hard"
+      }
+    },
+    {
+      "id": "crisis-selfharm-tr",
+      "description": "WO#481: a Turkish self-harm phrase with locale tr gets the tr block alone: 112 and the IASP directory, in Turkish; never 182",
+      "tool": "get_dua",
+      "args": {
+        "context": "kendimi öldüreceğim",
+        "locale": "tr"
+      },
+      "expect": {
+        "content_type": "crisis_resource_only",
+        "crisis_level": "hard",
+        "must_contain": [
+          "Acil bir tehlike altındaysanız veya kendinize zarar verme düşünceleriniz varsa, lütfen hemen yardım isteyin.",
+          "112",
+          "iasp.info"
+        ],
+        "must_not_contain": [
+          "182",
+          "116 123",
+          "harming yourself"
+        ]
+      }
+    },
+    {
+      "id": "crisis-abuse-tr",
+      "description": "WO#481: a Turkish abuse phrase with locale tr gets the tr abuse block: ALO 183, its WhatsApp line and 112, in Turkish; never 182",
+      "tool": "get_dua",
+      "args": {
+        "context": "kocam beni dövüyor",
+        "locale": "tr"
+      },
+      "expect": {
+        "content_type": "crisis_resource_only",
+        "crisis_level": "hard",
+        "must_contain": [
+          "Yaşadığınız şey bir zulümdür ve bu sizin suçunuz değil.",
+          "183",
+          "0501 183 0 183",
+          "112"
+        ],
+        "must_not_contain": [
+          "182",
+          "harming yourself",
+          "What you are experiencing is oppression"
+        ]
+      }
+    },
+    {
+      "id": "dua-anxiety-tr",
+      "description": "WO#481: the soft block in Turkish for locale tr",
+      "tool": "get_dua",
+      "args": {
+        "context": "anxiety",
+        "locale": "tr"
+      },
+      "expect": {
+        "content_type": "dua_collection",
+        "crisis_level": "soft",
+        "must_contain": [
+          "Eğer bu duygular başa çıkılmaz hale gelirse, lütfen yardımın mevcut olduğunu bilin."
+        ]
+      }
+    },
+    {
+      "id": "quran-2-286-tr",
+      "description": "WO#481: tr gets Pickthall English with the parked Turkish note, never silently",
+      "tool": "get_quran_verse",
+      "args": {
+        "surah": 2,
+        "ayah": 286,
+        "locale": "tr"
+      },
+      "expect": {
+        "content_type": "quran_verse",
+        "must_contain": [
+          "licensed Turkish translation"
+        ]
       }
     }
   ]

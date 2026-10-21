@@ -21,9 +21,9 @@ export const getQuranVerseShape = {
     .max(286)
     .describe('Ayah (verse) number within the surah'),
   locale: z
-    .enum(['en', 'id', 'ur', 'ar'])
+    .enum(['en', 'id', 'ur', 'ar', 'tr'])
     .optional()
-    .describe('Translation locale; defaults to "en" (Pickthall). Urdu and Indonesian translations are not yet available: "ur" and "id" return Pickthall English with a note.'),
+    .describe('Translation locale; defaults to "en" (Pickthall). Urdu, Indonesian and Turkish translations are not yet available: "ur", "id" and "tr" return Pickthall English with a note.'),
   audience: audienceArg,
 } as const
 

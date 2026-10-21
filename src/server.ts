@@ -62,7 +62,7 @@ import { enableDailyStore } from './logging/daily-store.js'
 import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
-const SERVER_VERSION = '2.2.0'
+const SERVER_VERSION = '2.2.1'
 const SERVER_DESCRIPTION =
   "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
@@ -117,7 +117,7 @@ const SERVER_CARD = {
           },
           locale: {
             type: 'string',
-            enum: ['en', 'id', 'ur', 'ar'],
+            enum: ['en', 'id', 'ur', 'ar', 'tr'],
             description: 'Translation locale; defaults to "en" (Pickthall).',
           },
           audience: AUDIENCE_JSON_SCHEMA,
@@ -139,7 +139,7 @@ const SERVER_CARD = {
           },
           locale: {
             type: 'string',
-            enum: ['en', 'id', 'ur', 'ar'],
+            enum: ['en', 'id', 'ur', 'ar', 'tr'],
             description: 'Translation locale; defaults to "en".',
           },
           audience: AUDIENCE_JSON_SCHEMA,
@@ -159,7 +159,7 @@ const SERVER_CARD = {
           },
           locale: {
             type: 'string',
-            enum: ['en', 'id', 'ur', 'ar'],
+            enum: ['en', 'id', 'ur', 'ar', 'tr'],
             description: 'Translation locale; defaults to "en".',
           },
           audience: AUDIENCE_JSON_SCHEMA,
@@ -181,7 +181,7 @@ const SERVER_CARD = {
           },
           locale: {
             type: 'string',
-            enum: ['en', 'id', 'ur', 'ar'],
+            enum: ['en', 'id', 'ur', 'ar', 'tr'],
             description: 'Selects in-country crisis resources if needed; defaults to "en".',
           },
           audience: AUDIENCE_JSON_SCHEMA,

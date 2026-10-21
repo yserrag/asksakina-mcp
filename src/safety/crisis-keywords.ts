@@ -15,6 +15,7 @@
  */
 
 import { detectCrisis, type CrisisType } from './_synced/crisis-detection.js'
+import { abuseText, selfHarmText, softText } from './crisis-text-l10n.js'
 
 export type DistressLevel = 'hard' | 'soft' | 'none'
 
@@ -95,7 +96,7 @@ export function evaluateDistress(input: string): DistressHint {
 }
 
 /** Request locales the crisis blocks are localised for (matches get_dua). */
-export type CrisisLocale = 'en' | 'id' | 'ur' | 'ar'
+export type CrisisLocale = 'en' | 'id' | 'ur' | 'ar' | 'tr'
 
 const IASP = 'https://www.iasp.info/resources/Crisis_Centres/'
 
@@ -116,26 +117,21 @@ const HARD_CRISIS_DIRECTIVE =
   'CRITICAL: You MUST output the following crisis resource text exactly as written below. Do not alter it or make it conditional. Do not assess whether the user needs it; output it.'
 
 /**
- * Per-locale self-harm resource text (Gem 10 round-3, Option A; WO#385
- * rulings). Every number is in src/data/helplines.ts. 24/7 lines come first;
- * a limited-hours line carries its hours from helplines.ts. UK/US numbers
- * appear ONLY in `en`. Egypt is served by the IASP directory (Befrienders
- * Cairo 762 2381 was removed: not on the verified list).
+ * The en self-harm lines (Gem 10 round-3, Option A; WO#385 rulings). Every
+ * number is in src/data/helplines.ts. UK/US numbers appear ONLY in `en`.
+ * WO#481: ar, ur, id and tr are built in crisis-text-l10n.ts, in their own
+ * language (Gem 3, Gem 1 and Gem 2, 21 Oct 2026); the en text is unchanged.
  */
-const SELF_HARM_LINES: Record<CrisisLocale, string> = {
-  en: US_988_FOUNDER_VERIFIED
-    ? 'Samaritans (UK: 116 123, 24/7) or 988 (US/Canada, 24/7)'
-    : 'Samaritans (UK: 116 123, 24/7)',
-  id: 'Sehat Jiwa (Indonesia: 119 ext 8, 24/7) or Halo Kemenkes (1500-567, Monday to Friday, office hours)',
-  ur: 'Umang Helpline (Pakistan: 0311-7786264, 24/7) or Rozan Counselling (0304-111-1741, business hours)',
-  ar: 'Lebanon Embrace 1564 (24/7), Saudi Arabia 920033360 (8am to 8pm daily; Saturday 1pm to 8pm), UAE 800-HOPE (4673) (8am to 8pm)',
-}
+const SELF_HARM_LINES_EN = US_988_FOUNDER_VERIFIED
+  ? 'Samaritans (UK: 116 123, 24/7) or 988 (US/Canada, 24/7)'
+  : 'Samaritans (UK: 116 123, 24/7)'
 
 const HARD_CRISIS_TEXT: Record<CrisisLocale, string> = {
-  en: `If you are in immediate danger or having thoughts of harming yourself, please reach out for help right now. Call your local emergency services, or contact a crisis helpline such as ${SELF_HARM_LINES.en}, or visit ${IASP} for international crisis lines.`,
-  id: `If you are in immediate danger or having thoughts of harming yourself, please reach out for help right now. Call your local emergency services, or contact a crisis helpline such as ${SELF_HARM_LINES.id}, or visit ${IASP} for international crisis lines.`,
-  ur: `If you are in immediate danger or having thoughts of harming yourself, please reach out for help right now. Call your local emergency services, or contact a crisis helpline such as ${SELF_HARM_LINES.ur}, or visit ${IASP} for international crisis lines.`,
-  ar: `If you are in immediate danger or having thoughts of harming yourself, please reach out for help right now. Call your local emergency services, or contact a crisis helpline in your country: ${SELF_HARM_LINES.ar}, or visit ${IASP} for Egypt and other regions.`,
+  en: `If you are in immediate danger or having thoughts of harming yourself, please reach out for help right now. Call your local emergency services, or contact a crisis helpline such as ${SELF_HARM_LINES_EN}, or visit ${IASP} for international crisis lines.`,
+  ar: selfHarmText('ar'),
+  ur: selfHarmText('ur'),
+  id: selfHarmText('id'),
+  tr: selfHarmText('tr'),
 }
 
 /**
@@ -180,26 +176,18 @@ const ABUSE_DIRECTIVE =
   "CRITICAL: The user's message indicates they may be experiencing abuse. You MUST output the following resource text exactly as written below. Do not alter it or make it conditional. Do NOT give confrontation advice. Do NOT tell the user to \"just leave\" or when to leave. Do NOT suggest couples counselling, mediation or reconciliation. Do NOT frame enduring the abuse as sabr (patience), a test to bear, or a religious duty."
 
 /**
- * Domestic-abuse lines per locale. Every one is a Founder-verified entry in
- * src/data/helplines.ts with category 'abuse' (entry ids in brackets). 24/7
- * first; limited-hours lines carry their hours.
+ * The en domestic-abuse line (en-ndah, a Founder-verified entry in
+ * src/data/helplines.ts with category 'abuse'). WO#481: ar, ur, id and tr
+ * are built in crisis-text-l10n.ts; en is unchanged.
  */
-const ABUSE_LINES: Record<CrisisLocale, string> = {
-  // en-ndah
-  en: 'the National Domestic Abuse Helpline (UK: 0808 2000 247, 24/7, free)',
-  // id-sapa, id-komnas
-  id: 'SAPA 129 (Indonesia: 129, 24/7) or Komnas Perempuan (021-3903963, Monday to Friday, office hours)',
-  // ur-madadgaar, ur-rozan
-  ur: 'Madadgaar National Helpline (Pakistan: 1098, 24/7) or Rozan Counselling (0304-111-1741, business hours)',
-  // ar-saudi-1919, ar-uae-dfwac, ar-egypt-ncw, ar-jordan-fpd, ar-morocco-sos-femmes
-  ar: 'Saudi Arabia Family Violence Reporting Center 1919 (24/7), UAE Dubai Foundation for Women and Children 800-111 (24/7), Egypt National Council for Women Complaints Office 15115 (24/7), Jordan Family Protection Department 110 (24/7), Morocco SOS Femmes 0801 00 47 47 (office hours)',
-}
+const ABUSE_LINE_EN = 'the National Domestic Abuse Helpline (UK: 0808 2000 247, 24/7, free)'
 
 const ABUSE_TEXT: Record<CrisisLocale, string> = {
-  en: `${ABUSE_SENTENCE} The ${ABUSE_LINES.en.replace(/^the /, '')}. If you are in immediate danger, call your local emergency services.`,
-  id: `${ABUSE_SENTENCE} ${ABUSE_LINES.id}. If you are in immediate danger, call your local emergency services.`,
-  ur: `${ABUSE_SENTENCE} ${ABUSE_LINES.ur}. If you are in immediate danger, call your local emergency services.`,
-  ar: `${ABUSE_SENTENCE} In your country: ${ABUSE_LINES.ar}. If you are in immediate danger, call your local emergency services.`,
+  en: `${ABUSE_SENTENCE} The ${ABUSE_LINE_EN.replace(/^the /, '')}. If you are in immediate danger, call your local emergency services.`,
+  ar: abuseText('ar'),
+  ur: abuseText('ur'),
+  id: abuseText('id'),
+  tr: abuseText('tr'),
 }
 
 function abuseBlockFor(locale: CrisisLocale) {
@@ -233,7 +221,8 @@ export const SOFT_DISTRESS_RESOURCE_BLOCK = {
 
 function softDistressBlockFor(locale: CrisisLocale) {
   if (locale === 'en') return SOFT_DISTRESS_RESOURCE_BLOCK
-  return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale }
+  // WO#481: the text is in the request locale; the directive stays Gem 10's.
+  return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, text: softText(locale) }
 }
 
 /**

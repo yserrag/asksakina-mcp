@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { findNameByString, getNameByNumber, } from '../data/names.js';
+import { findNameByString, getNameByNumber, servesEnglishFallback, } from '../data/names.js';
 import { buildResponse } from '../meta/response-builder.js';
+import { ENGLISH_FALLBACK_GUARD, nameEnglishNote } from '../contracts/english-fallback.js';
 import { distressBlockFor, evaluateDistress } from '../safety/crisis-keywords.js';
 import { audienceArg } from '../teach/audience.js';
 import { withTeach } from '../teach/attach.js';
@@ -18,9 +19,9 @@ export const getNameOfAllahShape = {
         .optional()
         .describe('Number of the Name in the canonical list, 1-99.'),
     locale: z
-        .enum(['en', 'id', 'ur', 'ar'])
+        .enum(['en', 'id', 'ur', 'ar', 'tr'])
         .optional()
-        .describe('Locale for meaning + reflection. Defaults to "en".'),
+        .describe('Locale for meaning + reflection. Defaults to "en"; "tr" returns the English meaning and reflection.'),
     audience: audienceArg,
 };
 export const getNameOfAllahSchema = z
@@ -64,15 +65,17 @@ export async function getNameOfAllahHandler(input) {
             extras,
         });
     }
+    const englishNote = servesEnglishFallback(record.number, locale) ? nameEnglishNote(locale) : undefined;
     return buildResponse({
         contentType: 'name_of_allah',
-        content: withTeach(record, `name:${record.number}`, {
+        content: withTeach(englishNote ? { ...record, translation_note: englishNote } : record, `name:${record.number}`, {
             audience: input.audience,
             locale,
             withhold: Boolean(extras),
         }),
         extras,
         withholdTeach: Boolean(extras),
+        ...(englishNote ? { extraDirectives: [englishNote, ENGLISH_FALLBACK_GUARD] } : {}),
     });
 }
 //# sourceMappingURL=get-name-of-allah.js.map

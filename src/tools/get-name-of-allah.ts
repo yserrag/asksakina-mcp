@@ -11,8 +11,10 @@ import {
   findNameByString,
   getNameByNumber,
   type SupportedLocale,
+  servesEnglishFallback,
 } from '../data/names.js'
 import { buildResponse, type SakinaResponse } from '../meta/response-builder.js'
+import { ENGLISH_FALLBACK_GUARD, nameEnglishNote } from '../contracts/english-fallback.js'
 import { distressBlockFor, evaluateDistress } from '../safety/crisis-keywords.js'
 import { audienceArg } from '../teach/audience.js'
 import { withTeach } from '../teach/attach.js'
@@ -33,9 +35,9 @@ export const getNameOfAllahShape = {
     .optional()
     .describe('Number of the Name in the canonical list, 1-99.'),
   locale: z
-    .enum(['en', 'id', 'ur', 'ar'])
+    .enum(['en', 'id', 'ur', 'ar', 'tr'])
     .optional()
-    .describe('Locale for meaning + reflection. Defaults to "en".'),
+    .describe('Locale for meaning + reflection. Defaults to "en"; "tr" returns the English meaning and reflection.'),
   audience: audienceArg,
 } as const
 
@@ -98,17 +100,21 @@ export async function getNameOfAllahHandler(
     })
   }
 
+  // WO#481 (Gem 10 conditions 3 and 4): an English meaning or reflection on a
+  // non-en request is disclosed, with the translation guard.
+  const englishNote = servesEnglishFallback(record.number, locale) ? nameEnglishNote(locale) : undefined
   return buildResponse({
     contentType: 'name_of_allah',
     // WO#405: teach and related appended only when audience was sent; WO#407:
     // nothing attaches when a support block is attached (a soft keyword in
     // `name`).
-    content: withTeach(record, `name:${record.number}`, {
+    content: withTeach(englishNote ? { ...record, translation_note: englishNote } : record, `name:${record.number}`, {
       audience: input.audience,
       locale,
       withhold: Boolean(extras),
     }),
     extras,
     withholdTeach: Boolean(extras),
+    ...(englishNote ? { extraDirectives: [englishNote, ENGLISH_FALLBACK_GUARD] } : {}),
   })
 }

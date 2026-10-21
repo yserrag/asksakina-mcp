@@ -53,6 +53,9 @@ const TRANSLATION_EDITIONS: Record<string, { id: string; label: string }> = {
 export const PARKED_TRANSLATION_LOCALES: Record<string, string> = {
   ur: 'Urdu',
   id: 'Indonesian',
+  // WO#481: with the tr locale, in the same commit, so a tr request never
+  // gets Pickthall English silently (WO#479 part 5).
+  tr: 'Turkish',
 }
 
 export function parkedTranslationNote(language: string): string {

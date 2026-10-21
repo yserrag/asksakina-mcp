@@ -38,6 +38,7 @@ import {
   UNGRADED_GRADING_DIRECTIVE,
 } from '../src/contracts/presentation.js'
 import { distressBlockFor, SOFT_DISTRESS_RESOURCE_BLOCK } from '../src/safety/crisis-keywords.js'
+import { softText } from '../src/safety/crisis-text-l10n.js'
 import { TEACH_ENTRIES } from '../src/teach/entries.js'
 import { validateTeachEntries, type TeachLookups } from '../src/teach/validate.js'
 import type { TeachEntry } from '../src/teach/types.js'
@@ -213,9 +214,10 @@ async function testCrisis() {
   const soft = 'Output this crisis resource block exactly as written. Do not counsel beyond it.'
   check(SOFT_DISTRESS_RESOURCE_BLOCK.directive === soft, 'the soft block\'s directive is Gem 10\'s, verbatim')
   check(SOFT_DISTRESS_RESOURCE_BLOCK.text === 'If these feelings become overwhelming, please know support is available. Visit https://www.iasp.info/resources/Crisis_Centres/ for helplines in your region.', 'the soft resource text is unchanged')
-  for (const loc of ['id', 'ur', 'ar'] as const) {
+  // WO#481: the soft text is in the request locale; the directive stays Gem 10's.
+  for (const loc of ['id', 'ur', 'ar', 'tr'] as const) {
     const b = distressBlockFor('soft', loc) as { directive: string; text: string }
-    check(b.directive === soft && b.text === SOFT_DISTRESS_RESOURCE_BLOCK.text, `soft block, ${loc}: same directive and text`)
+    check(b.directive === soft && b.text === softText(loc) && b.text !== SOFT_DISTRESS_RESOURCE_BLOCK.text, `soft block, ${loc}: same directive, localised text`)
   }
   const r = await byContext('feeling hopeless')
   check(r.crisis_resource?.level === 'soft' && r.crisis_resource.directive === soft, 'a soft route ("feeling hopeless") serves it')

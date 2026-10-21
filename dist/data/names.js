@@ -8,7 +8,7 @@ function sanitise(input) {
     return input.split('\u{FDFA}').join(' (peace be upon him)').trim();
 }
 function meaningFor(name, locale) {
-    if (locale === 'en')
+    if (locale === 'en' || locale === 'tr')
         return name.meaning.en;
     if (locale === 'ur')
         return name.meaning.ur;
@@ -17,7 +17,7 @@ function meaningFor(name, locale) {
     return name.meaning.ar ?? name.meaning.en;
 }
 function descriptionFor(name, locale) {
-    if (locale === 'en')
+    if (locale === 'en' || locale === 'tr')
         return name.description.en;
     if (locale === 'ur')
         return name.description.ur;
@@ -50,6 +50,14 @@ function toRecord(name, locale) {
         reflection,
         quranic_references,
     };
+}
+export function servesEnglishFallback(num, locale) {
+    if (locale === 'en')
+        return false;
+    const name = namesOfAllah.find((n) => n.number === num);
+    if (!name)
+        return false;
+    return meaningFor(name, locale) === name.meaning.en || descriptionFor(name, locale) === name.description.en;
 }
 export function getNameByNumber(num, locale) {
     const found = namesOfAllah.find((n) => n.number === num);

@@ -189,7 +189,8 @@ async function offline() {
       { level: 'soft' },
     ]
     for (const hint of hints) {
-      for (const locale of ['en', 'id', 'ur', 'ar']) {
+      // WO#481: tr included; 182 must never appear in any tr block.
+      for (const locale of ['en', 'id', 'ur', 'ar', 'tr']) {
         const block = distressBlockFor(hint, locale)
         if (!block) continue
         blocks++
@@ -281,8 +282,11 @@ async function live(url) {
     ['get_dua', { context: 'morning', limit: 10 }],
     ['get_dua', { context: 'laylat al qadr', limit: 10 }],
     ['get_dua', { context: 'ramadan', limit: 10 }],
-    ...['en', 'id', 'ur', 'ar'].map((locale) => ['get_dua', { context: 'I want to kill myself', locale }]),
-    ...['en', 'id', 'ur', 'ar'].map((locale) => ['get_dua', { context: 'my husband hits me', locale }]),
+    ...['en', 'id', 'ur', 'ar', 'tr'].map((locale) => ['get_dua', { context: 'I want to kill myself', locale }]),
+    ...['en', 'id', 'ur', 'ar', 'tr'].map((locale) => ['get_dua', { context: 'my husband hits me', locale }]),
+    // WO#481: Turkish phrases route to the tr blocks.
+    ['get_dua', { context: 'kendimi öldüreceğim', locale: 'tr' }],
+    ['get_dua', { context: 'kocam beni dövüyor', locale: 'tr' }],
     ['get_name_of_allah', { number: 1 }],
     ['get_name_of_allah', { number: 28 }],
     ['get_name_of_allah', { number: 99 }],

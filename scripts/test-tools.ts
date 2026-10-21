@@ -32,6 +32,7 @@ import { UNGRADED_SCOPE_HEAD } from '../src/contracts/gem4-wo418.js'
 import { ABUSE_SAFE_DUAS } from '../src/data/abuse-safe-duas.js'
 import { abuseResponse, ABUSE_ORDER_DIRECTIVE } from '../src/tools/get-dua.js'
 import { distressBlockFor, US_988_FOUNDER_VERIFIED, ABUSE_SENTENCE } from '../src/safety/crisis-keywords.js'
+import { L10N_HOURS, L10N_STRINGS } from '../src/safety/crisis-l10n-strings.js'
 import { stripPrependedBasmala, STRIP_PREFIXED_BASMALA, BASMALA_PREFIX_PLAIN, BASMALA_PREFIX_SHADDA, getBasmalaPrefixMismatchCount, bundledPickthall } from '../src/data/quran.js'
 import { TOTAL_NAMES } from '../src/data/names.js'
 import { readFileSync } from 'node:fs'
@@ -460,10 +461,13 @@ async function testDuaCrisisLocales() {
   console.log('\n=== get_dua hard crisis — per-locale verified tables (Gem 10 round-3 Option A) ===')
   const HARD = 'I want to kill myself'
   const UK_US_MARKERS = ['Samaritans', '116 123', '988', 'SHOUT']
-  const expectations: Array<{ locale: 'id' | 'ur' | 'ar'; must: string[] }> = [
-    { locale: 'id', must: ['1500-567', 'Sehat Jiwa'] },
-    { locale: 'ur', must: ['0311-7786264', 'Rozan'] },
+  // WO#481: the id/ur/ar text is localised (SEJIWA as in helplines.ts); tr added.
+  const expectations: Array<{ locale: 'id' | 'ur' | 'ar' | 'tr'; must: string[] }> = [
+    { locale: 'id', must: ['1500-567', 'SEJIWA'] },
+    // WO#481 (Gem 10 condition 2): ar and ur numbers are digits only.
+    { locale: 'ur', must: ['03117786264', 'Rozan'] },
     { locale: 'ar', must: ['920033360', '800-HOPE', '1564'] },
+    { locale: 'tr', must: ['112'] },
   ]
   for (const { locale, must } of expectations) {
     const response = await getDuaHandler({ context: HARD, locale })
@@ -521,16 +525,21 @@ async function testDuaCrisisLocales() {
 // every limited-hours line carries its hours.
 async function testCrisisOrderingAndHours() {
   console.log('\n=== crisis blocks: 24/7 first, hours on limited lines, Cairo removed (WO#385) ===')
-  const text = (hint: Parameters<typeof distressBlockFor>[0], l: 'en' | 'id' | 'ur' | 'ar') =>
-    ((distressBlockFor(hint, l) as { text?: string } | undefined)?.text ?? '')
+  // WO#481: the localised blocks; isolate marks are removed before matching,
+  // and the localised hours come from the generated table (never retyped).
+  const text = (hint: Parameters<typeof distressBlockFor>[0], l: 'en' | 'id' | 'ur' | 'ar' | 'tr') =>
+    ((distressBlockFor(hint, l) as { text?: string } | undefined)?.text ?? '').replace(/[\u2066-\u2069]/g, '')
+  const OFFICE_ID = 'Senin\u2013Jumat, jam kantor'
   // [type, locale, 24/7 numbers, limited-hours numbers with their hours]
-  const plan: Array<['self-harm' | 'abuse', 'en' | 'id' | 'ur' | 'ar', string[], Array<[string, string]>]> = [
-    ['self-harm', 'id', ['119 ext 8'], [['1500-567', 'Monday to Friday, office hours']]],
-    ['self-harm', 'ur', ['0311-7786264'], [['0304-111-1741', 'business hours']]],
-    ['self-harm', 'ar', ['1564'], [['920033360', '8am to 8pm daily; Saturday 1pm to 8pm'], ['800-HOPE (4673)', '8am to 8pm']]],
-    ['abuse', 'id', ['129 ('], [['021-3903963', 'Monday to Friday, office hours']]],
-    ['abuse', 'ur', ['1098'], [['0304-111-1741', 'business hours']]],
-    ['abuse', 'ar', ['1919', '800-111', '15115', ' 110 '], [['0801 00 47 47', 'office hours']]],
+  const plan: Array<['self-harm' | 'abuse', 'en' | 'id' | 'ur' | 'ar' | 'tr', string[], Array<[string, string]>]> = [
+    ['self-harm', 'id', ['119, lalu tekan 8'], [['1500-567', OFFICE_ID]]],
+    ['self-harm', 'ur', ['03117786264'], [['03041111741', L10N_HOURS.ur.business]]],
+    ['self-harm', 'ar', ['1564'], [['920033360', L10N_HOURS.ar.saudi], ['8004673', L10N_HOURS.ar.uae]]],
+    ['self-harm', 'tr', ['112'], []],
+    ['abuse', 'id', ['129 ('], [['021-3903963', OFFICE_ID]]],
+    ['abuse', 'ur', ['1098'], [['03041111741', L10N_HOURS.ur.business]]],
+    ['abuse', 'ar', ['1919', '800111', '15115', ' 110 '], [['0801004747', L10N_HOURS.ar.office]]],
+    ['abuse', 'tr', ['183', '112'], []],
   ]
   for (const [type, l, always, limited] of plan) {
     const t = text({ level: 'hard', crisisType: type }, l)
@@ -543,7 +552,7 @@ async function testCrisisOrderingAndHours() {
         : fail(`${type}/${l} ordering/hours`, t),
     )
   }
-  const all = (['en', 'id', 'ur', 'ar'] as const).flatMap((l) => [
+  const all = (['en', 'id', 'ur', 'ar', 'tr'] as const).flatMap((l) => [
     text({ level: 'hard', crisisType: 'self-harm' }, l),
     text({ level: 'hard', crisisType: 'abuse' }, l),
   ])
@@ -553,8 +562,9 @@ async function testCrisisOrderingAndHours() {
       : fail('Befrienders Cairo', 'still present'),
   )
   const arSelf = text({ level: 'hard', crisisType: 'self-harm' }, 'ar')
+  // WO#481: the ar T3 sentence names Egypt and the other regions (Gem 1).
   results.push(
-    /Egypt and other regions/.test(arSelf) && /iasp\.info/.test(arSelf)
+    arSelf.includes(L10N_STRINGS.ar.T3.split('[IASP]')[0]!) && /iasp\.info/.test(arSelf)
       ? pass('ar self-harm: Egypt is served by the IASP directory')
       : fail('ar Egypt via IASP', arSelf),
   )
@@ -570,15 +580,22 @@ async function testAbuseBlock() {
     id: ['129', '021-3903963'],
     ur: ['1098', '0304-111-1741'],
     ar: ['1919', '800-111', '15115', '110', '0801 00 47 47'],
+    // WO#481: never the WhatsApp number (not a phone: in helplines.ts).
+    tr: ['183', '112'],
   }
-  const cases: Array<[string, 'en' | 'id' | 'ur' | 'ar']> = [
+  const cases: Array<[string, 'en' | 'id' | 'ur' | 'ar' | 'tr']> = [
     ['my husband hits me', 'en'],
     ['he beats me', 'en'],
     ['I am being abused', 'en'],
     ['my husband hits me', 'id'],
     ['mera shohar mujhe marta hai', 'ur'],
     ['my husband hits me', 'ar'],
+    ['kocam beni dövüyor', 'tr'],
+    ['my husband hits me', 'tr'],
   ]
+  // WO#481: the abuse block opens with Gem 3's sentence in the request locale.
+  const opening = (l: string) =>
+    l === 'en' ? ABUSE_SENTENCE : (['T6a', 'T6b', 'T6c'] as const).map((k) => L10N_STRINGS[l as 'ar' | 'ur' | 'id' | 'tr'][k]).join(' ')
   for (const [q, locale] of cases) {
     const r = (await getDuaHandler({ context: q, locale })) as unknown as {
       _sakina_meta: { content_type: string; llm_directives: { CRITICAL_RULES: string[] } }
@@ -593,13 +610,14 @@ async function testAbuseBlock() {
       cr.crisis_type === 'abuse' &&
       cr.locale === locale &&
       !/harming yourself/i.test(text) &&
-      DV[locale].every((n) => text.includes(n) && helplines.includes(`phone: '${n}'`)) &&
+      // WO#481: ar and ur render numbers digits only (Gem 10 condition 2).
+      DV[locale].every((n) => text.includes(locale === 'ar' || locale === 'ur' ? n.replace(/[ -]/g, '') : n) && helplines.includes(`phone: '${n}'`)) &&
       /confrontation/.test(dir) &&
       /just leave/.test(dir) &&
       /couples counselling/.test(dir) &&
       /sabr/.test(dir) &&
       r._sakina_meta.content_type === 'crisis_resource_only' &&
-      text.startsWith(ABUSE_SENTENCE) &&
+      text.startsWith(opening(locale)) &&
       !('duas' in (r.content as object)) &&
       r.content.context === undefined &&
       r._sakina_meta.llm_directives.CRITICAL_RULES.some((d) => d.includes("Do NOT add du'as")) &&
@@ -1000,7 +1018,7 @@ async function testFastTrackLabels() {
       content: { duas: Array<{ title: string; dua_block: string; source: string; quran_citation?: string; hadith_source?: string; hadith_grading_status?: string }> }
     }
     const d = r.content.duas.find((x) => x.title === title)!
-    results.push(d ? pass(`${ctx}: the 9:129 record "${title}" is reached by context at offset 10`) : fail(`${ctx}: 9:129 record not on the page at offset 10`, r.content.duas.map((x) => x.title)))
+    results.push(d ? pass(`${ctx}: the 9:129 record "${title}" is reached by context at offset 10`) : fail(`${ctx}: 9:129 record not on the page at offset 10`, r.content.duas.map((x) => x.title).join(' | ')))
     // WO#423: the reference is Gem 4's locked string (it carries its grading
     // in parentheses), read from the bundle rather than retyped here.
     const ref = bundled.find((x) => x.category === `${ctx}-adhkar` && x.quran_ref === '9:129')?.countSource ?? ''

@@ -20,7 +20,7 @@ export const findVersesShape = {
         .optional()
         .describe(`Number of verses to return; default ${FIND_VERSES_DEFAULT_LIMIT}, max ${FIND_VERSES_MAX_LIMIT}.`),
     locale: z
-        .enum(['en', 'id', 'ur', 'ar'])
+        .enum(['en', 'id', 'ur', 'ar', 'tr'])
         .optional()
         .describe('Selects the in-country crisis resources if one is needed; defaults to "en". Translations are Pickthall English.'),
     audience: audienceArg,
