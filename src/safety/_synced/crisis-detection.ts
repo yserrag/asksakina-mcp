@@ -159,9 +159,8 @@ export const SELF_HARM_KEYWORDS_EN = [
   "will i go to hell if i",
 ]
 
-export const SELF_HARM_KEYWORDS = [
-  ...SELF_HARM_KEYWORDS_EN,
-
+/** Indonesian self-harm keywords (WO#482; moved unchanged, spread back into the full list). */
+export const SELF_HARM_KEYWORDS_ID = [
   // ── Indonesian (Bahasa Indonesia — informal kamu register) ─────────────
   'bunuh diri', 'ingin mati', 'pengen mati', 'akhiri hidup',
   'lebih baik mati', 'ingin hilang saja', 'semoga aku mati',
@@ -180,6 +179,22 @@ export const SELF_HARM_KEYWORDS = [
   'bundir', 'pengen bundir', 'gak kuat lagi',
   'minum racun', 'gantung diri',
 
+  // WO#252-B: Architect-approved crisis expansion (net-new keywords from the
+  // reviewed Gem 2/3/4/5 candidate union; see the note in the full list).
+  "pengen hilang",
+  "mending mati",
+  "tidak kuat lagi",
+  "ga kuat lagi",
+  "mau pergi jauh",
+  "nyilet",
+  "mo mati aja",
+  "putus asa bgt",
+  "doa agar cepat mati",
+  "tidak kuat cobaan",
+]
+
+/** Urdu self-harm keywords, Roman and Urdu script (WO#482; moved unchanged, spread back into the full list). */
+export const SELF_HARM_KEYWORDS_UR = [
   // ── Urdu (transliterated) ──────────────────────────────────────────────
   'khudkushi', 'marna chahta', 'marna chahti', 'zindagi khatam',
   'marne ka dil', 'kash main mar jaun', 'mout aa jaye',
@@ -198,6 +213,31 @@ export const SELF_HARM_KEYWORDS = [
   'khatam karna chahta', 'khatam kar dungi',
   'zeher kha lungi', 'zeher khana', 'jaan leni',
 
+  // WO#252-B: Architect-approved crisis expansion (net-new keywords from the
+  // reviewed Gem 2/3/4/5 candidate union; see the note in the full list).
+  // ── Urdu script ──
+  "مين مرنا چاہتا ہون",
+  "مرنا چاہتا ہون",
+  "مرنا چاہتي ہون",
+  "اپني جان لے لون",
+  "زندگي سے تنگ",
+  "جينے كا دل نہين",
+  "موت ا جايے",
+  "زندگي ختم",
+  "جينے كا مقصد",
+  "تھك گيا ہون",
+  "ميري جان نكل جايے",
+  "زہر كھا لون",
+  "زندہ نہين رہنا",
+  "جان دے دون",
+  "رگ كاٹ لي",
+  "اللہ مجھے اٹھا لے",
+  "زندگي عذاب ہے",
+  "موت كي دعا",
+]
+
+/** Arabic self-harm keywords (WO#482; moved unchanged, spread back into the full list). */
+export const SELF_HARM_KEYWORDS_AR = [
   // ── Arabic (MSA) — stored in normaliseArabic() form (WO#97 §S3D) ──────
   // The detector applies the same normalisation to user input, so
   // chat-typed Arabic without hamza / tashkeel matches the formal
@@ -255,6 +295,27 @@ export const SELF_HARM_KEYWORDS = [
   'مش عايز اعيش',      // Egyptian negation
   'ما بدي اعيش',       // Levantine negation
 
+  // WO#252-B: Architect-approved crisis expansion (net-new keywords from the
+  // reviewed Gem 2/3/4/5 candidate union; see the note in the full list).
+  "الانتحار",
+  "انتحار",
+  "اريد اموت",
+  "اقتل نفسي",
+  "مالي خلق اعيش",
+  "الموت ارحم",
+  "اريد ارتاح",
+  "تعبت من الدنيا",
+  "بموت نفسي",
+  "ذبحت عمري",
+  "اقطع شراييني",
+  "هل الانتحار كفر",
+  "دعاء الموت",
+  "يا رب خدني",
+  "يا ليتني مت",
+]
+
+/** Turkish self-harm keywords (WO#482; moved unchanged, spread back into the full list). */
+export const SELF_HARM_KEYWORDS_TR = [
   // ── Turkish — WO#145-B ──────────────────────────────────────────
   'kendimi öldüreceğim', 'ölmek istiyorum', 'hayatıma son vereceğim',
   'intihar', 'ölsem daha iyi', 'yaşamak için bir nedenim yok',
@@ -270,6 +331,30 @@ export const SELF_HARM_KEYWORDS = [
   'kendimden nefret ediyorum', 'intahar', 'intihar edicem',
   'ölicem', 'ölecem', 'kendimi asıcam',
   'yaşamak haram oldu',
+  // WO#482, Gem 3 ruling (21 Oct 2026): hopelessness is HARD in Turkish
+  // ("I am hopeless", "hopelessness"); both open the crisis modal.
+  'umutsuzum', 'umutsuzluk',
+
+  // WO#252-B: Architect-approved crisis expansion (net-new keywords from the
+  // reviewed Gem 2/3/4/5 candidate union; see the note in the full list).
+  "hayatıma son",
+  "uyuyup uyanmamak",
+  "allah canımı alsın",
+  "dayanamıyorum artık",
+  "kurtulmak istiyorum",
+  "her şeyi bitirmek",
+  "kendime zarar",
+  "allah belamı versin",
+  "nefes alamıyorum",
+  "imtihana dayanamıyorum",
+]
+
+export const SELF_HARM_KEYWORDS = [
+  ...SELF_HARM_KEYWORDS_EN,
+  ...SELF_HARM_KEYWORDS_ID,
+  ...SELF_HARM_KEYWORDS_UR,
+  ...SELF_HARM_KEYWORDS_AR,
+  ...SELF_HARM_KEYWORDS_TR,
 
   // ── Persian / Farsi (fa) — WO#212 A2 ────────────────────────────
   // Stored in normaliseArabic() form (آ→ا etc.) so chat-typed input,
@@ -313,63 +398,7 @@ export const SELF_HARM_KEYWORDS = [
   // against the live post-252-A detector. Arabic stored in normaliseArabic()
   // form; Latin/transliterated lower-cased. Both folded again defensively by
   // matchesAny at match time.
-  // ── TR ──
-  "hayatıma son",
-  "uyuyup uyanmamak",
-  "allah canımı alsın",
-  "dayanamıyorum artık",
-  "kurtulmak istiyorum",
-  "her şeyi bitirmek",
-  "kendime zarar",
-  "allah belamı versin",
-  "nefes alamıyorum",
-  "imtihana dayanamıyorum",
-  // ── ID ──
-  "pengen hilang",
-  "mending mati",
-  "tidak kuat lagi",
-  "ga kuat lagi",
-  "mau pergi jauh",
-  "nyilet",
-  "mo mati aja",
-  "putus asa bgt",
-  "doa agar cepat mati",
-  "tidak kuat cobaan",
-  // ── UR ──
-  "مين مرنا چاہتا ہون",
-  "مرنا چاہتا ہون",
-  "مرنا چاہتي ہون",
-  "اپني جان لے لون",
-  "زندگي سے تنگ",
-  "جينے كا دل نہين",
-  "موت ا جايے",
-  "زندگي ختم",
-  "جينے كا مقصد",
-  "تھك گيا ہون",
-  "ميري جان نكل جايے",
-  "زہر كھا لون",
-  "زندہ نہين رہنا",
-  "جان دے دون",
-  "رگ كاٹ لي",
-  "اللہ مجھے اٹھا لے",
-  "زندگي عذاب ہے",
-  "موت كي دعا",
-  // ── AR ──
-  "الانتحار",
-  "انتحار",
-  "اريد اموت",
-  "اقتل نفسي",
-  "مالي خلق اعيش",
-  "الموت ارحم",
-  "اريد ارتاح",
-  "تعبت من الدنيا",
-  "بموت نفسي",
-  "ذبحت عمري",
-  "اقطع شراييني",
-  "هل الانتحار كفر",
-  "دعاء الموت",
-  "يا رب خدني",
-  "يا ليتني مت",
+  // (Its tr, id, ur and ar entries are in the per-language arrays above, WO#482.)
 
   // ── WO#264 — fa/bn dialect additions (Gem 5 string + Gem 3 tier) ──
   // dialect additions — Gem 5 string + Gem 3 tier (fa self-harm), WO#264
@@ -464,9 +493,8 @@ export const ABUSE_KEYWORDS_EN = [
   "break family ties for safety",
 ]
 
-export const ABUSE_KEYWORDS = [
-  ...ABUSE_KEYWORDS_EN,
-
+/** Indonesian abuse keywords (WO#482; moved unchanged, spread back into the full list). */
+export const ABUSE_KEYWORDS_ID = [
   // ── Indonesian ──────────────────────────────────────────────────────────
   'dipukul', 'dilecehkan', 'diperkosa', 'takut pulang',
   'kekerasan rumah tangga',
@@ -475,6 +503,28 @@ export const ABUSE_KEYWORDS = [
   // user types ("KDRT", "Kdrt", "kdrt") matches.
   'kdrt',
 
+  // WO#252-B: Architect-approved crisis expansion (net-new keywords from the
+  // reviewed Gem 2/3/4/5 candidate union; see the note in the full list).
+  "suami memukul",
+  "pelecehan",
+  "bapak kasar",
+  "diancam suami",
+  "diancam",
+  "dipaksa menikah",
+  "dipaksa nikah",
+  "dikurung",
+  "dikunciin",
+  "bapak main tangan",
+  "disiksa",
+  "suami kasar",
+  "ga berani lapor",
+  "suami pukul istri hukum islam",
+  "dipaksa suami",
+  "harus taat walau disiksa",
+]
+
+/** Urdu abuse keywords, Roman and Urdu script (WO#482; moved unchanged, spread back into the full list). */
+export const ABUSE_KEYWORDS_UR = [
   // ── Urdu (transliterated) ──────────────────────────────────────────────
   // (Removed by WO#94 Gem 3 + Gem 5: 'marta hai' / 'marti hai' —
   //  colloquially "has a crush on", high false positive. Replaced by
@@ -488,6 +538,37 @@ export const ABUSE_KEYWORDS = [
   'hath uthata hai',
   'zabardasti ki',
 
+  // WO#252-B: Architect-approved crisis expansion (net-new keywords from the
+  // reviewed Gem 2/3/4/5 candidate union; see the note in the full list).
+  // ── Urdu script ──
+  "ميرا شوہر مجھے مارتا ہے",
+  "شوہر مارتا ہے",
+  "مجھے مار پڑتي ہے",
+  "گھريلو تشدد",
+  "زبردستي كرتا ہے",
+  "گاليان ديتا ہے",
+  "مجھے ڈر لگتا ہے",
+  "باپ مارتا ہے",
+  "باپ نے مارا",
+  "گھر مين ظلم",
+  "زبردستي شادي",
+  "مار پيٹ",
+  "باہر نہين جانے ديتے",
+  "خوف اتا ہے",
+  "گھر جانے سے ڈر",
+  "جان كا خطرہ",
+  "زبردستي",
+  "ظلم ہوتا ہے",
+  "حبس بے جا",
+  "گلا دبايا",
+  "شوہر مارتا ہے كيا طلاق گناہ ہے",
+  "باپ ظلم كرتا ہے",
+  "صبر كا حكم",
+  "مجازي خدا",
+]
+
+/** Arabic abuse keywords (WO#482; moved unchanged, spread back into the full list). */
+export const ABUSE_KEYWORDS_AR = [
   // ── Arabic (WO#94 Gem 3) — already in normaliseArabic() form ──────────
   // None of these contain hamza / taa-marbuta / tashkeel so the
   // pre-normalised storage is identical to the source spelling.
@@ -495,6 +576,30 @@ export const ABUSE_KEYWORDS = [
   'يعنفني',  // "He abuses me"
   'تحرش',    // "Harassment / assault"
 
+  // WO#252-B: Architect-approved crisis expansion (net-new keywords from the
+  // reviewed Gem 2/3/4/5 candidate union; see the note in the full list).
+  "العنف الاسري",
+  "عنف اسري",
+  "اهلي يعذبوني",
+  "ابوي يطقني",
+  "ضرب مبرح",
+  "خايفه من زوجي",
+  "يهددني",
+  "محبوسه بالبيت",
+  "غصبوني",
+  "ضربني",
+  "زوجي يطقني",
+  "خايفه ارجع البيت",
+  "حابسني",
+  "بيهددني",
+  "مغصوبه علي الزواج",
+  "طاعه الزوج الظالم",
+  "ابي يظلمني",
+  "هل يجوز قطع صله الرحم",
+]
+
+/** Turkish abuse keywords (WO#482; moved unchanged, spread back into the full list). */
+export const ABUSE_KEYWORDS_TR = [
   // ── Turkish — WO#145-B ──────────────────────────────────────────
   'bana vuruyor', 'şiddet görüyorum', 'eve gitmeye korkuyorum',
   'cinsel istismar', 'taciz edildim', 'tecavüze uğradım',
@@ -507,6 +612,36 @@ export const ABUSE_KEYWORDS = [
   'annem bana vuruyor', 'sevgilim bana vuruyor', 'sevgilim beni dövüyor',
   'dışarı çıkmama izin vermiyor', 'beni tehdit ediyor', 'abim beni dövüyor',
   'dayak yiyorum', 'bana el kaldırıyor', 'zorla dokunuyor',
+  // WO#482, Gem 3 round 2 (21 Oct 2026): fear of being beaten is ABUSE
+  // whoever the subject is ("dövmesinden korkuyorum", "dövecek diye").
+  'dövmesinden', 'dövecek diye',
+
+  // WO#252-B: Architect-approved crisis expansion (net-new keywords from the
+  // reviewed Gem 2/3/4/5 candidate union; see the note in the full list).
+  "kocam dövüyor",
+  "babam vuruyor",
+  "tehdit ediyor",
+  "bana taciz",
+  "evde şiddet",
+  "zorla evlendiriliyorum",
+  "zorla evlendirdiler",
+  "abim dövüyor",
+  "şiddet uyguluyor",
+  "eve gitmekten korkuyorum",
+  "hapis gibiyim",
+  "beni dövdü",
+  "kocam dövüyor boşanmak günah mı",
+  "babam vuruyor hakkı var mı",
+  "zulme sabretmek",
+  "itaat etmek zorunda mıyım",
+]
+
+export const ABUSE_KEYWORDS = [
+  ...ABUSE_KEYWORDS_EN,
+  ...ABUSE_KEYWORDS_ID,
+  ...ABUSE_KEYWORDS_UR,
+  ...ABUSE_KEYWORDS_AR,
+  ...ABUSE_KEYWORDS_TR,
 
   // ── Persian / Farsi (fa) — WO#212 A2 (Gem 3/5 VERIFIED, WO#266) ────
   // Bare nouns خشونت خانگی + ازار جنسی are frame-gated (WO#265 four-gate).
@@ -534,84 +669,7 @@ export const ABUSE_KEYWORDS = [
   // against the live post-252-A detector. Arabic stored in normaliseArabic()
   // form; Latin/transliterated lower-cased. Both folded again defensively by
   // matchesAny at match time.
-  // ── TR ──
-  "kocam dövüyor",
-  "babam vuruyor",
-  "tehdit ediyor",
-  "bana taciz",
-  "evde şiddet",
-  "zorla evlendiriliyorum",
-  "zorla evlendirdiler",
-  "abim dövüyor",
-  "şiddet uyguluyor",
-  "eve gitmekten korkuyorum",
-  "hapis gibiyim",
-  "beni dövdü",
-  "kocam dövüyor boşanmak günah mı",
-  "babam vuruyor hakkı var mı",
-  "zulme sabretmek",
-  "itaat etmek zorunda mıyım",
-  // ── ID ──
-  "suami memukul",
-  "pelecehan",
-  "bapak kasar",
-  "diancam suami",
-  "diancam",
-  "dipaksa menikah",
-  "dipaksa nikah",
-  "dikurung",
-  "dikunciin",
-  "bapak main tangan",
-  "disiksa",
-  "suami kasar",
-  "ga berani lapor",
-  "suami pukul istri hukum islam",
-  "dipaksa suami",
-  "harus taat walau disiksa",
-  // ── UR ──
-  "ميرا شوہر مجھے مارتا ہے",
-  "شوہر مارتا ہے",
-  "مجھے مار پڑتي ہے",
-  "گھريلو تشدد",
-  "زبردستي كرتا ہے",
-  "گاليان ديتا ہے",
-  "مجھے ڈر لگتا ہے",
-  "باپ مارتا ہے",
-  "باپ نے مارا",
-  "گھر مين ظلم",
-  "زبردستي شادي",
-  "مار پيٹ",
-  "باہر نہين جانے ديتے",
-  "خوف اتا ہے",
-  "گھر جانے سے ڈر",
-  "جان كا خطرہ",
-  "زبردستي",
-  "ظلم ہوتا ہے",
-  "حبس بے جا",
-  "گلا دبايا",
-  "شوہر مارتا ہے كيا طلاق گناہ ہے",
-  "باپ ظلم كرتا ہے",
-  "صبر كا حكم",
-  "مجازي خدا",
-  // ── AR ──
-  "العنف الاسري",
-  "عنف اسري",
-  "اهلي يعذبوني",
-  "ابوي يطقني",
-  "ضرب مبرح",
-  "خايفه من زوجي",
-  "يهددني",
-  "محبوسه بالبيت",
-  "غصبوني",
-  "ضربني",
-  "زوجي يطقني",
-  "خايفه ارجع البيت",
-  "حابسني",
-  "بيهددني",
-  "مغصوبه علي الزواج",
-  "طاعه الزوج الظالم",
-  "ابي يظلمني",
-  "هل يجوز قطع صله الرحم",
+  // (Its tr, id, ur and ar entries are in the per-language arrays above, WO#482.)
 
   // ── WO#264 — fa dialect additions (Gem 5 string + Gem 3 tier) ──
   // dialect additions — Gem 5 string + Gem 3 tier (fa abuse), WO#264
@@ -921,6 +979,10 @@ export function detectCrisis(text: string): CrisisDetectionResult {
   if (matchesAnyExcept(ABUSE_KEYWORDS, BARE_NOUN_SET, input)) {
     return { isCrisis: true, crisisType: 'abuse' }
   }
+  // WO#482 (Gem 3 round 2): Turkish relational fear, a relation word then "kork".
+  if (trFearProximity(text, input)) {
+    return { isCrisis: true, crisisType: 'abuse' }
+  }
   // Only bare-noun guards can match now — apply the four-gate suppression.
   const hits = bareNounHits(input)
   if (hits.length === 0) return { isCrisis: false, crisisType: 'none' }
@@ -928,4 +990,78 @@ export function detectCrisis(text: string): CrisisDetectionResult {
   if (hits.length >= 2) return { isCrisis: true, crisisType: type } // gate 1: 2+ distinct bare nouns
   if (fireBareNoun(text, input)) return { isCrisis: true, crisisType: type }
   return { isCrisis: false, crisisType: 'none' } // suppressed: informational frame
+}
+
+/**
+ * WO#482: which language lists a crisis input hit. detectCrisis says only
+ * whether, and which type; this says in which language, so a caller that
+ * has no request locale can answer in the language the person wrote in.
+ * It uses the detector's own prepared input and per-keyword matcher, so a
+ * list hits here exactly when it would hit inside detectCrisis. It does not
+ * decide whether there is a crisis: call it only after detectCrisis fired.
+ * Persian, Bengali and Punjabi entries are not split out, so a hit on one
+ * of them alone returns [].
+ */
+export type CrisisKeywordLanguage = 'en' | 'id' | 'ur' | 'ar' | 'tr'
+
+const KEYWORDS_BY_LANGUAGE: Readonly<Record<'self-harm' | 'abuse', ReadonlyArray<[CrisisKeywordLanguage, ReadonlyArray<string>]>>> = {
+  'self-harm': [
+    ['en', SELF_HARM_KEYWORDS_EN],
+    ['id', SELF_HARM_KEYWORDS_ID],
+    ['ur', SELF_HARM_KEYWORDS_UR],
+    ['ar', SELF_HARM_KEYWORDS_AR],
+    ['tr', SELF_HARM_KEYWORDS_TR],
+  ],
+  abuse: [
+    ['en', ABUSE_KEYWORDS_EN],
+    ['id', ABUSE_KEYWORDS_ID],
+    ['ur', ABUSE_KEYWORDS_UR],
+    ['ar', ABUSE_KEYWORDS_AR],
+    ['tr', ABUSE_KEYWORDS_TR],
+  ],
+}
+
+export function crisisKeywordLanguages(text: string, crisisType: 'self-harm' | 'abuse'): CrisisKeywordLanguage[] {
+  const input = prepareInput(text)
+  return KEYWORDS_BY_LANGUAGE[crisisType]
+    .filter(([language, keywords]) => matchesAny(keywords, input) || (crisisType === 'abuse' && language === 'tr' && trFearProximity(text, input)))
+    .map(([language]) => language)
+}
+
+/**
+ * WO#482, Gem 3 round 2 (21 Oct 2026; docs/wo482-architect.md): Turkish
+ * relational fear is ABUSE. A relation word followed by "kork" with up to three
+ * words between ("kocamdan korkuyorum", "eşimden çok korkuyorum"). It is
+ * matched on the prepared Latin input, which is already lower-cased and folded
+ * by foldLatin (ı and İ to i, ş to s, ç to c, ğ to g, ö to o, ü to u), against
+ * relation words folded by the same function, so Turkish letters and ASCII
+ * typing both match. The relation word starts at a Unicode word boundary. Gem 3
+ * accepts the false positives ("ondan korkuyorum" about an exam, "kocamdan
+ * ayrılmaktan korkuyorum").
+ */
+export const TR_FEAR_RELATIONS: ReadonlyArray<string> = [
+  'eşimden', 'kocamdan', 'karımdan', 'babamdan', 'annemden', 'abimden', 'ablamdan', 'ağabeyimden', 'sevgilimden',
+  'nişanlımdan', 'kayınpederimden', 'kayınvalidemden', 'kaynanamdan', 'kayınbabamdan', 'amcamdan', 'dayımdan', 'ailemden', 'ondan',
+]
+// Architect ruling (21 Oct 2026): punctuation (commas, semicolons, colons,
+// dashes and the rest of \p{P}) counts as a separator, like whitespace, so
+// "eşimden, çok korkuyorum" is abuse; a word is a run of anything else. The
+// three-word limit still applies. A missed abuse disclosure outweighs a false
+// positive (Gem 3).
+const TR_FEAR_PROXIMITY = new RegExp(`(?<![\\p{L}\\p{N}])(?:${TR_FEAR_RELATIONS.map((w) => foldLatin(w)).join('|')})[\\s\\p{P}]+(?:[^\\s\\p{P}]+[\\s\\p{P}]+){0,3}kork`, 'u')
+
+/**
+ * Gem 10 condition 2 (21 Oct 2026): the rule runs first on the RAW input,
+ * lower-cased and folded by foldLatin only (case and Turkish letters; one
+ * character in, one out, so no space is added or removed), where the
+ * pattern's own [\s\p{P}] split is the tokeniser. Then on the prepared forms
+ * (normaliseSeparators, stripped apostrophes, the letter-spacing collapse),
+ * which can change the word count either way: an apostrophe split counts
+ * "Ahmet'ten" as two words in the raw form and one in the prepared form, and
+ * a run of two or more symbols becomes a space. A hit on any form is a hit,
+ * so normalisation can add a match but never remove one.
+ */
+function trFearProximity(text: string, input: PreparedInput): boolean {
+  const raw = foldLatin(text.toLowerCase())
+  return TR_FEAR_PROXIMITY.test(raw) || input.latin.some((f) => TR_FEAR_PROXIMITY.test(f))
 }

@@ -177,6 +177,20 @@ function carriesTeach(value: unknown): boolean {
   return Object.values(record).some(carriesTeach)
 }
 
+/**
+ * WO#482, Gem 10 condition 1 (21 Oct 2026), verbatim: on every response that
+ * carries a non-en crisis_resource block (hard or soft; ar, ur, id or tr),
+ * whether the locale came from the agent or from keyword routing. en
+ * responses are unchanged.
+ */
+export const CRISIS_ANTI_TRANSLATION =
+  'CRITICAL: Output this crisis resource block exactly as written in its original language. Do not translate, paraphrase, or summarize it. Do not counsel beyond it.'
+
+function carriesNonEnCrisisBlock(extras: Record<string, unknown> | undefined): boolean {
+  const block = extras?.crisis_resource as { locale?: unknown } | undefined
+  return !!block && typeof block.locale === 'string' && block.locale !== 'en'
+}
+
 export function buildResponse<TContent>(
   input: BuilderInput<TContent>,
 ): SakinaResponse<TContent> {
@@ -184,7 +198,11 @@ export function buildResponse<TContent>(
   // WO#407 (Gem 10): the teach directive and contract go out only with a
   // teach block, so a response without one serialises exactly as before.
   const teach = carriesTeach(input.content)
-  const extra = [...(input.extraDirectives ?? []), ...(teach ? [TEACH_DIRECTIVE] : [])]
+  const extra = [
+    ...(input.extraDirectives ?? []),
+    ...(teach ? [TEACH_DIRECTIVE] : []),
+    ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION] : []),
+  ]
   const full = extra.length ? [...meta.directives, ...extra] : meta.directives
   const directives = input.withholdTeach ? full.map(withoutNoTeachClause) : full
   const merged = input.contractOverride

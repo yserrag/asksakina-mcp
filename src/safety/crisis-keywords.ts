@@ -14,8 +14,9 @@
  * Hard always wins over soft when both match.
  */
 
-import { detectCrisis, type CrisisType } from './_synced/crisis-detection.js'
+import { crisisKeywordLanguages, detectCrisis, type CrisisKeywordLanguage, type CrisisType } from './_synced/crisis-detection.js'
 import { abuseText, selfHarmText, softText } from './crisis-text-l10n.js'
+import { foldLatin } from './_synced/latin-fold.js'
 
 export type DistressLevel = 'hard' | 'soft' | 'none'
 
@@ -23,6 +24,12 @@ export interface DistressHint {
   level: DistressLevel
   /** Populated when level === 'hard'. */
   crisisType?: CrisisType
+  /**
+   * Populated when level === 'hard' or 'soft' (WO#482): the languages whose
+   * keyword list the input hit (for a hard hint, the list for crisisType).
+   * Used only when the request has no locale of its own (crisisLocaleFor).
+   */
+  keywordLanguages?: CrisisKeywordLanguage[]
   /** Populated when level === 'soft'. */
   matchedKeyword?: string
 }
@@ -38,7 +45,7 @@ export interface DistressHint {
  * work" should match; "the stress test passed" should not, but a
  * person typing the latter into get_dua is unlikely).
  */
-const SOFT_DISTRESS_KEYWORDS = [
+export const SOFT_DISTRESS_KEYWORDS = [
   'anxiety', 'anxious', 'panic',
   'stress', 'stressed', 'overwhelmed',
   'fear', 'fearful', 'afraid', 'scared', 'frightened',
@@ -50,7 +57,13 @@ const SOFT_DISTRESS_KEYWORDS = [
   'distress', 'distressed', 'distressing',
 ] as const
 
-const WORD_BOUNDARY = /\W+/
+/**
+ * WO#482, Architect ruling (21 Oct 2026): words are split on anything that is
+ * not a Unicode letter or number. The old /\W+/ split on every non-ASCII
+ * letter, so a Turkish word with ı, ğ, ü, ş, ç or ö fell apart ("kaygı" became
+ * "kayg") and no such keyword could ever match. Exported for test-wo482.
+ */
+export const SOFT_WORD_BOUNDARY = /[^\p{L}\p{N}]+/u
 
 /**
  * WO#478 (Architect, 20 Oct 2026, phrase fixes only): a soft keyword inside
@@ -77,8 +90,87 @@ function softDistressKeyword(input: string): string | undefined {
     }
     // Whole-word check so "stress test" matches but "destressing" does
     // not lift "stress" out of context unintentionally.
-    const tokens = lower.split(WORD_BOUNDARY)
+    const tokens = lower.split(SOFT_WORD_BOUNDARY)
     if (tokens.includes(keyword)) return keyword
+  }
+  return undefined
+}
+
+/**
+ * WO#482, Gem 3 ruling (21 Oct 2026; docs/wo482-architect.md): Turkish soft
+ * keywords. `prefix` entries match at a Unicode word start with any ending,
+ * because Turkish adds suffixes ("kaygılıyım", "endişeleniyorum"); `whole`
+ * entries match only as whole words or phrases. "çok üzgünüm" is not listed
+ * (an apology false positive); "umutsuzum" is a hard keyword in the detector.
+ */
+export const SOFT_DISTRESS_KEYWORDS_TR: { readonly prefix: readonly string[]; readonly whole: readonly string[] } = {
+  prefix: ['kaygı', 'endişe', 'bunal', 'korku', 'yas tut', 'çaresiz'],
+  whole: ['yalnızım', 'stresliyim', 'kederliyim', 'daraldım', 'panik atak', 'içim acıyor', 'canım yanıyor', 'derdim var'],
+}
+
+/**
+ * Turkish case-folding before matching (Gem 3): NFC first, so a decomposed
+ * "İ" or "ü" composes, then İ to i and I to ı, then lower case. So
+ * "Kaygı" and "KAYGI" both read "kaygı". Used for the Turkish keywords only:
+ * English keeps plain lower-casing, where I must stay i.
+ */
+export function turkishFold(s: string): string {
+  return s.normalize('NFC').replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase()
+}
+
+/**
+ * Devotional phrases, fear of Allah (taqwa), are not distress: "korku" is
+ * skipped inside them (Gem 3, rounds 1 and 2). "Allah'tan kork-" with or
+ * without the apostrophe and with either suffix vowel ("-tan", "-dan"), and
+ * "Allah korkusu"; the whole following word is removed. ASCII only, so the
+ * one pattern serves both the Turkish and the ASCII-folded copy.
+ */
+export const TR_DEVOTIONAL_FEAR = /allah(?:['’ʼ`]?[td]an\s+kork|\s+korkusu)[\p{L}\p{N}]*/gu
+
+/**
+ * Gem 3 round 2: the "korku" prefix does not match korkunç ("awful"), korkutucu
+ * or the korkut- stem ("to frighten"). Written in Turkish letters and folded
+ * by function for the ASCII copy.
+ */
+export const SOFT_PREFIX_EXCEPTIONS_TR: Readonly<Record<string, readonly string[]>> = { korku: ['nç', 't'] }
+
+// The word start Gem 3 specified: JavaScript's \b is ASCII-only, so it is
+// written as a lookbehind on Unicode letters and numbers.
+const WORD_START = '(?<![\\p{L}\\p{N}])'
+const WORD_END = '(?![\\p{L}\\p{N}])'
+// An exception is excluded in both spellings in both passes: input typed
+// in ASCII ("korkunc") reaches the Turkish-letter pass unchanged.
+const except = (k: string) => {
+  const ex = SOFT_PREFIX_EXCEPTIONS_TR[k]
+  return ex ? `(?!${[...new Set(ex.flatMap((e) => [e, foldLatin(e)]))].join('|')})` : ''
+}
+const same = (s: string) => s
+
+/**
+ * Gem 3 round 2 (ASCII folding): each Turkish keyword is matched twice, in
+ * Turkish letters against the Turkish-folded input, and folded to ASCII (by
+ * the detector's own foldLatin: ı and İ to i, ş to s, ç to c, ğ to g, ö to
+ * o, ü to u) against an ASCII-folded copy of the input, so "kaygi",
+ * "caresizim" and "yalnizim" match. Only the Turkish lists are folded.
+ */
+const TR_PATTERNS = (['turkish', 'ascii'] as const).map((form) => {
+  const fold = form === 'ascii' ? foldLatin : same
+  return {
+    form,
+    prefix: SOFT_DISTRESS_KEYWORDS_TR.prefix.map((k) => [k, new RegExp(WORD_START + fold(k) + except(k), 'u')] as const),
+    whole: SOFT_DISTRESS_KEYWORDS_TR.whole.map((k) => [k, new RegExp(WORD_START + fold(k) + WORD_END, 'u')] as const),
+  }
+})
+
+function turkishSoftKeyword(input: string): string | undefined {
+  const turkish = turkishFold(input)
+  for (const p of TR_PATTERNS) {
+    const text = p.form === 'ascii' ? foldLatin(turkish) : turkish
+    const withoutDevotional = text.replace(TR_DEVOTIONAL_FEAR, ' ')
+    for (const [keyword, re] of p.prefix) {
+      if (re.test(keyword === 'korku' ? withoutDevotional : text)) return keyword
+    }
+    for (const [keyword, re] of p.whole) if (re.test(text)) return keyword
   }
   return undefined
 }
@@ -86,11 +178,16 @@ function softDistressKeyword(input: string): string | undefined {
 export function evaluateDistress(input: string): DistressHint {
   const crisis = detectCrisis(input)
   if (crisis.isCrisis) {
-    return { level: 'hard', crisisType: crisis.crisisType }
+    const keywordLanguages = crisis.crisisType === 'none' ? [] : crisisKeywordLanguages(input, crisis.crisisType)
+    return { level: 'hard', crisisType: crisis.crisisType, keywordLanguages }
   }
+  // WO#482: a soft hint records its languages too (en, tr), so the soft block
+  // follows the detected language under the hard rule (crisisLocaleFor).
   const softMatch = softDistressKeyword(input)
-  if (softMatch) {
-    return { level: 'soft', matchedKeyword: softMatch }
+  const trMatch = turkishSoftKeyword(input)
+  if (softMatch || trMatch) {
+    const keywordLanguages: CrisisKeywordLanguage[] = [...(softMatch ? ['en' as const] : []), ...(trMatch ? ['tr' as const] : [])]
+    return { level: 'soft', matchedKeyword: softMatch ?? trMatch, keywordLanguages }
   }
   return { level: 'none' }
 }
@@ -226,8 +323,27 @@ function softDistressBlockFor(locale: CrisisLocale) {
 }
 
 /**
+ * WO#482: the language of a hard or soft block. An explicit non-en request
+ * locale always wins. With locale omitted or en (callers pass 'en' for an
+ * omitted locale), the block follows the keyword the detector matched: if
+ * exactly one of the id, ur, ar or tr lists hit, that language is served,
+ * whether or not an English keyword also hit. Two or more of them, or none
+ * (English only, or a Persian, Bengali or Punjabi keyword, which have no
+ * MCP block), keep en. Soft blocks follow the same rule (Gem 3 ruling,
+ * 21 Oct 2026): their keywords are English and Turkish, so a soft block
+ * switches only to tr. A bare level ('soft' with no hint, as the bereaved
+ * route passes) has no languages and keeps the request locale.
+ */
+export function crisisLocaleFor(hint: DistressHint, locale: CrisisLocale): CrisisLocale {
+  if (locale !== 'en' || hint.level === 'none') return locale
+  const matched = (hint.keywordLanguages ?? []).filter((l) => l !== 'en')
+  return matched.length === 1 ? matched[0]! : 'en'
+}
+
+/**
  * Returns the right block for a distress hint (or a bare level) and request
- * locale, or undefined for none. A hard hint with crisisType 'abuse' gets the
+ * locale, or undefined for none (a hard block is in crisisLocaleFor's language,
+ * WO#482). A hard hint with crisisType 'abuse' gets the
  * abuse block; any other hard hint gets the self-harm block.
  */
 export function distressBlockFor(
@@ -235,7 +351,10 @@ export function distressBlockFor(
   locale: CrisisLocale = 'en',
 ) {
   const h: DistressHint = typeof hint === 'string' ? { level: hint } : hint
-  if (h.level === 'hard') return h.crisisType === 'abuse' ? abuseBlockFor(locale) : selfHarmBlockFor(locale)
-  if (h.level === 'soft') return softDistressBlockFor(locale)
+  if (h.level === 'hard') {
+    const l = crisisLocaleFor(h, locale)
+    return h.crisisType === 'abuse' ? abuseBlockFor(l) : selfHarmBlockFor(l)
+  }
+  if (h.level === 'soft') return softDistressBlockFor(crisisLocaleFor(h, locale))
   return undefined
 }

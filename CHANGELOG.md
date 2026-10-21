@@ -2,6 +2,48 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 2.2.2 (unreleased; built and tested only. Gem 3 and Gem 10 review the built text before release)
+
+WO#482: the crisis block follows the language of the crisis keyword. On
+2.2.1, `get_dua("kendimi öldüreceğim")` with no locale returned the en
+block (Samaritans UK); agents often omit the locale.
+
+- With the locale omitted or `en`, a hard crisis block (self-harm or abuse)
+  is served in the language of the keyword the detector matched, when
+  exactly one of the Indonesian, Urdu (Roman or Urdu script), Arabic or
+  Turkish lists hit. That holds whether or not an English keyword also hit.
+  Two or more of those languages, English alone, or a Persian, Bengali or
+  Punjabi keyword (no MCP block) keep `en`.
+- An explicit non-en locale always wins.
+- Gem 3 ruling (21 Oct 2026): "umutsuzum" and "umutsuzluk" are hard
+  self-harm keywords (the app detector too: they open the crisis modal).
+  Turkish soft keywords: kaygı, endişe, bunal, korku, yas tut and çaresiz
+  match at a Unicode word start with any ending; yalnızım, stresliyim,
+  kederliyim, daraldım, panik atak, içim acıyor, canım yanıyor and derdim var
+  match as whole words. Turkish case-folding first (İ to i, I to ı). "korku"
+  does not fire inside "Allah'tan kork-". The soft block follows the detected
+  language under the same rule as hard.
+- Gem 3 ruling, round 2 (21 Oct 2026), in the app detector and the MCP:
+  a Turkish relation word (eşimden, kocamdan, babamdan, annemden, ondan and
+  14 others) followed by "kork" with up to three words between is ABUSE;
+  "dövmesinden" and "dövecek diye" are ABUSE. Every Turkish list also
+  matches ASCII typing ("kaygi", "caresizim", "esimden cok korkuyorum"):
+  the detector already folded Latin input and keywords (WO#252-A), and the
+  soft matcher now does too, for the Turkish keywords only. "korku" no
+  longer matches korkunç, korkutucu or the korkut- stem; "Allah korkusu" is
+  devotional, like "Allah'tan kork-".
+- Applies wherever the crisis check runs: `get_dua` (context and id),
+  `find_verses`, `get_name_of_allah`.
+- The detector (`src/lib/utils/crisis-detection.ts`, synced) now exports
+  its id, ur, ar and tr keywords as their own lists, moved unchanged, and
+  `crisisKeywordLanguages(text, crisisType)`. `detectCrisis` is unchanged.
+- The soft matcher splits words on anything that is not a Unicode letter or
+  number (`/[^\p{L}\p{N}]+/u`, Architect ruling 21 Oct 2026). The old `/\W+/`
+  split broke every non-ASCII letter, so no Turkish keyword with ı, ğ, ü,
+  ş, ç or ö could match. Every English soft keyword matches as before.
+- Not published, not deployed, registry unchanged apart from the version
+  number.
+
 ## 2.2.1 (unreleased; built and tested only. Gem 10 reviews the built blocks before release)
 
 WO#481: crisis text in the user's language, and the `tr` locale. Gem 3

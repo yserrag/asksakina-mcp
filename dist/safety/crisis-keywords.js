@@ -1,6 +1,7 @@
-import { detectCrisis } from './_synced/crisis-detection.js';
+import { crisisKeywordLanguages, detectCrisis } from './_synced/crisis-detection.js';
 import { abuseText, selfHarmText, softText } from './crisis-text-l10n.js';
-const SOFT_DISTRESS_KEYWORDS = [
+import { foldLatin } from './_synced/latin-fold.js';
+export const SOFT_DISTRESS_KEYWORDS = [
     'anxiety', 'anxious', 'panic',
     'stress', 'stressed', 'overwhelmed',
     'fear', 'fearful', 'afraid', 'scared', 'frightened',
@@ -11,7 +12,7 @@ const SOFT_DISTRESS_KEYWORDS = [
     'worry', 'worried',
     'distress', 'distressed', 'distressing',
 ];
-const WORD_BOUNDARY = /\W+/;
+export const SOFT_WORD_BOUNDARY = /[^\p{L}\p{N}]+/u;
 export const SOFT_PHRASE_EXCLUSIONS = [
     { phrase: 'loss of faith', keywords: ['loss', 'loss of'] },
     { phrase: 'fear of allah', keywords: ['fear'] },
@@ -27,20 +28,62 @@ function softDistressKeyword(input) {
                 return keyword;
             continue;
         }
-        const tokens = lower.split(WORD_BOUNDARY);
+        const tokens = lower.split(SOFT_WORD_BOUNDARY);
         if (tokens.includes(keyword))
             return keyword;
+    }
+    return undefined;
+}
+export const SOFT_DISTRESS_KEYWORDS_TR = {
+    prefix: ['kaygı', 'endişe', 'bunal', 'korku', 'yas tut', 'çaresiz'],
+    whole: ['yalnızım', 'stresliyim', 'kederliyim', 'daraldım', 'panik atak', 'içim acıyor', 'canım yanıyor', 'derdim var'],
+};
+export function turkishFold(s) {
+    return s.normalize('NFC').replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase();
+}
+export const TR_DEVOTIONAL_FEAR = /allah(?:['’ʼ`]?[td]an\s+kork|\s+korkusu)[\p{L}\p{N}]*/gu;
+export const SOFT_PREFIX_EXCEPTIONS_TR = { korku: ['nç', 't'] };
+const WORD_START = '(?<![\\p{L}\\p{N}])';
+const WORD_END = '(?![\\p{L}\\p{N}])';
+const except = (k) => {
+    const ex = SOFT_PREFIX_EXCEPTIONS_TR[k];
+    return ex ? `(?!${[...new Set(ex.flatMap((e) => [e, foldLatin(e)]))].join('|')})` : '';
+};
+const same = (s) => s;
+const TR_PATTERNS = ['turkish', 'ascii'].map((form) => {
+    const fold = form === 'ascii' ? foldLatin : same;
+    return {
+        form,
+        prefix: SOFT_DISTRESS_KEYWORDS_TR.prefix.map((k) => [k, new RegExp(WORD_START + fold(k) + except(k), 'u')]),
+        whole: SOFT_DISTRESS_KEYWORDS_TR.whole.map((k) => [k, new RegExp(WORD_START + fold(k) + WORD_END, 'u')]),
+    };
+});
+function turkishSoftKeyword(input) {
+    const turkish = turkishFold(input);
+    for (const p of TR_PATTERNS) {
+        const text = p.form === 'ascii' ? foldLatin(turkish) : turkish;
+        const withoutDevotional = text.replace(TR_DEVOTIONAL_FEAR, ' ');
+        for (const [keyword, re] of p.prefix) {
+            if (re.test(keyword === 'korku' ? withoutDevotional : text))
+                return keyword;
+        }
+        for (const [keyword, re] of p.whole)
+            if (re.test(text))
+                return keyword;
     }
     return undefined;
 }
 export function evaluateDistress(input) {
     const crisis = detectCrisis(input);
     if (crisis.isCrisis) {
-        return { level: 'hard', crisisType: crisis.crisisType };
+        const keywordLanguages = crisis.crisisType === 'none' ? [] : crisisKeywordLanguages(input, crisis.crisisType);
+        return { level: 'hard', crisisType: crisis.crisisType, keywordLanguages };
     }
     const softMatch = softDistressKeyword(input);
-    if (softMatch) {
-        return { level: 'soft', matchedKeyword: softMatch };
+    const trMatch = turkishSoftKeyword(input);
+    if (softMatch || trMatch) {
+        const keywordLanguages = [...(softMatch ? ['en'] : []), ...(trMatch ? ['tr'] : [])];
+        return { level: 'soft', matchedKeyword: softMatch ?? trMatch, keywordLanguages };
     }
     return { level: 'none' };
 }
@@ -105,12 +148,20 @@ function softDistressBlockFor(locale) {
         return SOFT_DISTRESS_RESOURCE_BLOCK;
     return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, text: softText(locale) };
 }
+export function crisisLocaleFor(hint, locale) {
+    if (locale !== 'en' || hint.level === 'none')
+        return locale;
+    const matched = (hint.keywordLanguages ?? []).filter((l) => l !== 'en');
+    return matched.length === 1 ? matched[0] : 'en';
+}
 export function distressBlockFor(hint, locale = 'en') {
     const h = typeof hint === 'string' ? { level: hint } : hint;
-    if (h.level === 'hard')
-        return h.crisisType === 'abuse' ? abuseBlockFor(locale) : selfHarmBlockFor(locale);
+    if (h.level === 'hard') {
+        const l = crisisLocaleFor(h, locale);
+        return h.crisisType === 'abuse' ? abuseBlockFor(l) : selfHarmBlockFor(l);
+    }
     if (h.level === 'soft')
-        return softDistressBlockFor(locale);
+        return softDistressBlockFor(crisisLocaleFor(h, locale));
     return undefined;
 }
 //# sourceMappingURL=crisis-keywords.js.map

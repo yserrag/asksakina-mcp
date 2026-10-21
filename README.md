@@ -73,7 +73,7 @@ Returns du'as matching a life context (anxiety, grief, morning, travel, etc.). C
 |---|---|---|---|
 | `context` | `string` | one of `context` or `id` | Free-form life context |
 | `id` | `string` | one of `context` or `id` | A du'a id taken from a `related` reference in an earlier response (WO#390) |
-| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` \| `'tr'` | no, defaults `en` | Du'a records are English for every locale; a crisis resource is in the request locale (2.2.1) |
+| `locale` | `'en'` \| `'id'` \| `'ur'` \| `'ar'` \| `'tr'` | no, defaults `en` | Du'a records are English for every locale; a crisis resource is in the request locale (2.2.1); with the locale omitted or `en`, a hard crisis resource is in the language of the matched crisis keyword (id, ur, ar or tr; 2.2.2) |
 | `audience` | `'curious'` \| `'revert'` \| `'practising'` | no | From the user's own self-description only. Echoed as `teach.audience`; omitted, the teach block says `unknown` (2.2.0) |
 | `limit` | integer 1 to 10 | no, defaults 3 | How many records a context lookup returns (2.2.0). The bereaved set and the abuse allowlist are always returned whole. Ignored with `id` |
 | `offset` | integer, 0 or more | no, defaults 0 | How many records to skip before the page, for paging with `limit` (2.2.0). Ignored with `id` and on `bereaved` |

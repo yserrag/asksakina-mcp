@@ -78,10 +78,19 @@ function carriesTeach(value) {
         return true;
     return Object.values(record).some(carriesTeach);
 }
+export const CRISIS_ANTI_TRANSLATION = 'CRITICAL: Output this crisis resource block exactly as written in its original language. Do not translate, paraphrase, or summarize it. Do not counsel beyond it.';
+function carriesNonEnCrisisBlock(extras) {
+    const block = extras?.crisis_resource;
+    return !!block && typeof block.locale === 'string' && block.locale !== 'en';
+}
 export function buildResponse(input) {
     const meta = metaForType(input.contentType);
     const teach = carriesTeach(input.content);
-    const extra = [...(input.extraDirectives ?? []), ...(teach ? [TEACH_DIRECTIVE] : [])];
+    const extra = [
+        ...(input.extraDirectives ?? []),
+        ...(teach ? [TEACH_DIRECTIVE] : []),
+        ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION] : []),
+    ];
     const full = extra.length ? [...meta.directives, ...extra] : meta.directives;
     const directives = input.withholdTeach ? full.map(withoutNoTeachClause) : full;
     const merged = input.contractOverride

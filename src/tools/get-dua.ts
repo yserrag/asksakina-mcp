@@ -88,7 +88,7 @@ export const getDuaShape = {
   locale: z
     .enum(['en', 'id', 'ur', 'ar', 'tr'])
     .optional()
-    .describe('Locale; defaults to "en". Du\'a records are English for every locale; a crisis resource is given in the request locale.'),
+    .describe('Locale; defaults to "en". Du\'a records are English for every locale; a crisis resource is given in the request locale, or, with no locale or "en", in the language of the crisis words (Indonesian, Urdu, Arabic or Turkish).'),
   audience: audienceArg,
   limit: z
     .number()
@@ -134,7 +134,8 @@ export async function getDuaHandler(
   const distress = evaluateDistress(input.context)
   // Gem 10 round-3 (Option A): serve the verified in-country crisis table for
   // the request locale (en default). id/ur/ar get their own helplines, never
-  // the UK/US numbers.
+  // the UK/US numbers. WO#482: with no locale or en, a hard block follows the
+  // language of the matched crisis keyword (crisisLocaleFor).
   const block = distressBlockFor(distress, input.locale ?? 'en')
   let extras: Record<string, unknown> | undefined = block ? { crisis_resource: block } : undefined
 
