@@ -120,7 +120,7 @@ export const ABUSE_IDS = {
 /** Fields of those entries in src/data/helplines.ts. */
 export const HELPLINE_FIELDS: Record<string, { name: string; phone: string; hours?: string; note?: string; country: string }> = {
   "ar-egypt-ncw": {
-    "name": "مكتب شكاوى المرأة — المجلس القومي للمرأة",
+    "name": "مكتب شكاوى المرأة، المجلس القومي للمرأة",
     "phone": "15115",
     "hours": "24/7",
     "note": "واتساب: 01007525600 — دعم نفسي وقانوني",
@@ -141,7 +141,7 @@ export const HELPLINE_FIELDS: Record<string, { name: string; phone: string; hour
     "country": "LB"
   },
   "ar-mohap-hope-uae": {
-    "name": "800-HOPE — National Mental Support Line",
+    "name": "800-HOPE, National Mental Support Line",
     "phone": "800-4673",
     "hours": "8am–8pm",
     "country": "AE"

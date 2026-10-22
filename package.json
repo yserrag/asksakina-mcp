@@ -1,6 +1,6 @@
 {
   "name": "@asksakina/islamic-knowledge-mcp",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "private": false,
   "description": "Curated Islamic knowledge MCP server: Quranic verses, a curated du'a corpus, and the 99 Names of Allah. New and changed content is reviewed through AskSakina's structured specialist-AI review chain across mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali); not a substitute for a qualified scholar. Provides four lookup tools to AI agents over the Model Context Protocol.",
   "mcpName": "com.asksakina/islamic-knowledge",
@@ -21,7 +21,7 @@
     "update-geoip": "node node_modules/geoip-lite/scripts/updatedb.js",
     "prebuild": "npm run bundle-data",
     "build": "tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
-    "prepublishOnly": "npm run bundle-data && npm run build && npm run test:tools && npm run test:analytics && npm run test:http && npm run test:ratelimit && npm run test:crisis && npm run test:teach && npm run test:wo418 && npm run test:wo423 && npm run test:wo424 && npm run test:wo430 && npm run test:wo444 && npm run test:wo454 && npm run test:wo456 && npm run test:wo478 && npm run test:wo481 && npm run test:wo482 && npm run test:wo484 && npm run guards",
+    "prepublishOnly": "npm run bundle-data && npm run build && npm run test:tools && npm run test:analytics && npm run test:http && npm run test:ratelimit && npm run test:crisis && npm run test:teach && npm run test:wo418 && npm run test:wo423 && npm run test:wo424 && npm run test:wo430 && npm run test:wo444 && npm run test:wo454 && npm run test:wo456 && npm run test:wo478 && npm run test:wo481 && npm run test:wo482 && npm run test:wo484 && npm run test:wo485 && npm run guards",
     "start": "tsx src/server.ts",
     "start:dist": "node dist/server.js",
     "test:tools": "tsx scripts/test-tools.ts",
@@ -44,7 +44,8 @@
     "test:wo478": "tsx scripts/test-wo478.ts",
     "test:wo481": "tsx scripts/test-wo481.ts",
     "test:wo482": "tsx scripts/test-wo482.ts",
-    "test:wo484": "tsx scripts/test-wo484.ts"
+    "test:wo484": "tsx scripts/test-wo484.ts",
+    "test:wo485": "tsx scripts/test-wo485.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

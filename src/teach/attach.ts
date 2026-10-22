@@ -56,6 +56,18 @@ function relatedWire(ref: RelatedRef): RelatedRefWire | null {
   }
 }
 
+/**
+ * WO#485: `teach.context_block`, the context text and its citations bound
+ * into one display string: the text, a newline (WO#487, Gem 10 condition),
+ * then the citations as "Text (Grading)" (or "Text" where no grading is
+ * recorded) joined with "; ". A context with no citations (the Gem 4
+ * fallback) is its text alone.
+ */
+export function contextBlock(ctx: NonNullable<TeachEntry['context']>): string {
+  if (ctx.kind !== 'cited' || ctx.citations.length === 0) return ctx.text
+  return `${ctx.text}\n${ctx.citations.map((c) => (c.grading ? `${c.text} (${c.grading})` : c.text)).join('; ')}`
+}
+
 function teachWire(key: TeachKey, entry: TeachEntry, audience: WireAudience): TeachBlockWire {
   const ctx = entry.context
   const block: TeachBlockWire = {
@@ -79,6 +91,7 @@ function teachWire(key: TeachKey, entry: TeachEntry, audience: WireAudience): Te
               : { attributed: false as const, text: ctx.text },
         }
       : {}),
+    ...(ctx ? { context_block: contextBlock(ctx) } : {}),
     ...(entry.misconception
       ? {
           misconception: {

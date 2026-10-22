@@ -224,6 +224,14 @@ export interface TeachBlockWire {
     | { attributed: true; text: string; citations: CitationWire[] }
     | { attributed: false; text: typeof UNATTRIBUTED_CONTEXT_FALLBACK }
   misconception?: { text: string; citations: CitationWire[] }
+  /**
+   * WO#485 (Gem 10, 22 Oct 2026): the context pre-bound for display, so an
+   * agent quotes the text, citations and gradings as one string. The context
+   * text, a newline (WO#487, Gem 10), then each citation as "Text (Grading)"
+   * where a grading exists, else "Text", joined with "; ". Present exactly when `context` is. The fields
+   * above are unchanged.
+   */
+  context_block?: string
   /** Field 4. Absent on grief routes and whenever a soft support block is
    *  in the response (Gem 3, WO#405). */
   reflection_question?: string

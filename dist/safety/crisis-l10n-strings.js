@@ -103,7 +103,7 @@ export const ABUSE_IDS = {
 };
 export const HELPLINE_FIELDS = {
     "ar-egypt-ncw": {
-        "name": "مكتب شكاوى المرأة — المجلس القومي للمرأة",
+        "name": "مكتب شكاوى المرأة، المجلس القومي للمرأة",
         "phone": "15115",
         "hours": "24/7",
         "note": "واتساب: 01007525600 — دعم نفسي وقانوني",
@@ -124,7 +124,7 @@ export const HELPLINE_FIELDS = {
         "country": "LB"
     },
     "ar-mohap-hope-uae": {
-        "name": "800-HOPE — National Mental Support Line",
+        "name": "800-HOPE, National Mental Support Line",
         "phone": "800-4673",
         "hours": "8am–8pm",
         "country": "AE"

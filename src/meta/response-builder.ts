@@ -28,6 +28,7 @@ import {
   PBUH_RULE,
   NO_EMOJI_RULE,
   TEACH_DIRECTIVE,
+  TEACH_BINDING_DIRECTIVES,
   TEACH_CONTRACT,
   NO_TEACH_CLAUSE,
 } from '../contracts/presentation.js'
@@ -200,7 +201,7 @@ export function buildResponse<TContent>(
   const teach = carriesTeach(input.content)
   const extra = [
     ...(input.extraDirectives ?? []),
-    ...(teach ? [TEACH_DIRECTIVE] : []),
+    ...(teach ? [TEACH_DIRECTIVE, ...TEACH_BINDING_DIRECTIVES] : []),
     ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION] : []),
   ]
   const full = extra.length ? [...meta.directives, ...extra] : meta.directives

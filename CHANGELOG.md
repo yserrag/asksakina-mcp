@@ -2,6 +2,27 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 2.3.1 (Gem 10 correction of 2.3.0, 22 Oct 2026)
+
+WO#485 (`docs/wo485-architect.md`). Every response that carries a teach
+block now also carries, verbatim, in `CRITICAL_RULES`:
+
+- "CRITICAL: You must present the context text and all citations and
+  gradings exactly as provided, bound together in one string. Do not omit
+  the grading."
+- "CRITICAL: Present all explanatory glosses, contexts, and reflections using
+  neutral, educational framing (e.g., 'In Islamic tradition...', 'Muslims
+  believe...'). Do not present them as personalized religious rulings."
+
+Each teach block with a context also carries `context_block`: the context
+text, then each citation as "Text (Grading)" (or "Text" where no grading is
+recorded), joined with "; ". The existing teach fields are unchanged.
+Responses without a teach block are unchanged.
+
+`context_block` separates the context text from its citations with a
+newline ("\n"), not a space (WO#487, Gem 10 condition; 2.3.1 amended in
+place before release).
+
 ## 2.3.0 (unreleased; Gem 10 PASS for publish, 22 Oct 2026, delegated ruling by the Architect, for Gem 10 review)
 
 WO#484: teaching batch 2, 38 teach entries (approved 21 Oct 2026; record in

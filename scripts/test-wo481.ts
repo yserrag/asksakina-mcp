@@ -299,7 +299,8 @@ async function main() {
     const arSelf = bare(block({ level: 'hard', crisisType: 'self-harm' }, 'ar').text)
     const idSelf = block({ level: 'hard', crisisType: 'self-harm' }, 'id').text
     const idAbuse = block({ level: 'hard', crisisType: 'abuse' }, 'id').text
-    check(HELPLINE_FIELDS['ar-egypt-ncw']!.name.includes(' \u2014 ') && arAbuse.includes(`${full('ar-egypt-ncw', '\u060C ')} (${COUNTRY_NAMES.ar.EG}): 15115`), 'ar: Egypt keeps the Complaints Office and the National Council for Women')
+    // WO#483: helplines.ts now joins the two parts itself (U+060C), so the MCP renders the dataset name as it is.
+    check(!HELPLINE_FIELDS['ar-egypt-ncw']!.name.includes('\u2014') && HELPLINE_FIELDS['ar-egypt-ncw']!.name.includes('\u060C ') && arAbuse.includes(`${full('ar-egypt-ncw', '\u060C ')} (${COUNTRY_NAMES.ar.EG}): 15115`), 'ar: Egypt keeps the Complaints Office and the National Council for Women (joined by U+060C in helplines.ts, WO#483)')
     // Ruling of 21 Oct (Arabic comma): U+060C joins an Arabic-script name; Latin keeps ", ".
     const egypt = arAbuse.split('\n').find((x) => x.endsWith('15115 (24/7)')) ?? ''
     check(egypt.includes('\u060C ') && !egypt.includes(', ') && !egypt.includes(','), 'ar: the Arabic-script Egypt name joins with the Arabic comma U+060C, no Latin comma', egypt)

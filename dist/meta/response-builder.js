@@ -1,6 +1,6 @@
 import { SAKINA_DISCLAIMER, NOT_FOUND_DISCLAIMER, CRISIS_ONLY_DISCLAIMER } from '../contracts/disclaimers.js';
 import { QURAN_VERSE_CONTEXT, HADITH_CONTEXT, NAMES_OF_ALLAH_CONTEXT, } from '../contracts/educational.js';
-import { QURAN_CONTRACT, HADITH_CONTRACT, NAME_OF_ALLAH_CONTRACT, REFLECTION_CONTRACT, QURAN_DIRECTIVES, VERSE_COLLECTION_DIRECTIVES, DUA_DIRECTIVES, NAME_DIRECTIVES, VOICE_2_RULE, PBUH_RULE, NO_EMOJI_RULE, TEACH_DIRECTIVE, TEACH_CONTRACT, NO_TEACH_CLAUSE, } from '../contracts/presentation.js';
+import { QURAN_CONTRACT, HADITH_CONTRACT, NAME_OF_ALLAH_CONTRACT, REFLECTION_CONTRACT, QURAN_DIRECTIVES, VERSE_COLLECTION_DIRECTIVES, DUA_DIRECTIVES, NAME_DIRECTIVES, VOICE_2_RULE, PBUH_RULE, NO_EMOJI_RULE, TEACH_DIRECTIVE, TEACH_BINDING_DIRECTIVES, TEACH_CONTRACT, NO_TEACH_CLAUSE, } from '../contracts/presentation.js';
 const VERSION = '1.0';
 const SOURCE = 'AskSakina Islamic Knowledge Server (asksakina.com)';
 function metaForType(contentType) {
@@ -88,7 +88,7 @@ export function buildResponse(input) {
     const teach = carriesTeach(input.content);
     const extra = [
         ...(input.extraDirectives ?? []),
-        ...(teach ? [TEACH_DIRECTIVE] : []),
+        ...(teach ? [TEACH_DIRECTIVE, ...TEACH_BINDING_DIRECTIVES] : []),
         ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION] : []),
     ];
     const full = extra.length ? [...meta.directives, ...extra] : meta.directives;

@@ -17,6 +17,11 @@ function relatedWire(ref) {
             return null;
     }
 }
+export function contextBlock(ctx) {
+    if (ctx.kind !== 'cited' || ctx.citations.length === 0)
+        return ctx.text;
+    return `${ctx.text}\n${ctx.citations.map((c) => (c.grading ? `${c.text} (${c.grading})` : c.text)).join('; ')}`;
+}
 function teachWire(key, entry, audience) {
     const ctx = entry.context;
     const block = {
@@ -39,6 +44,7 @@ function teachWire(key, entry, audience) {
                     : { attributed: false, text: ctx.text },
             }
             : {}),
+        ...(ctx ? { context_block: contextBlock(ctx) } : {}),
         ...(entry.misconception
             ? {
                 misconception: {
