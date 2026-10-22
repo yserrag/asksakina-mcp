@@ -168,8 +168,9 @@ async function main() {
     check(teachBlocks(h).length === 1 && teachBlocks(h)[0]!.record_id === 'verse:39:53', 'find_verses "hope", no audience: 39:53 carries teach')
     const d = await dua({ id: 'D00068' })
     check(teachBlocks(d)[0]?.audience === 'unknown', 'get_dua {id: D00068}, no audience: teach (audience unknown)')
-    const none = [await verse({ surah: 2, ayah: 255 }), await name({ number: 2 }), await dua({ context: 'travel' })]
-    check(none.every((r) => teachBlocks(r).length === 0 && !rules(r).includes(TEACH_DIRECTIVE)), 'no entry: no teach and no teach directive (2:255, Name 2, travel)')
+    // WO#484: 2:255 and Name 2 now carry entries; 2:256 and Name 11 do not.
+    const none = [await verse({ surah: 2, ayah: 256 }), await name({ number: 11 }), await dua({ context: 'travel' })]
+    check(none.every((r) => teachBlocks(r).length === 0 && !rules(r).includes(TEACH_DIRECTIVE)), 'no entry: no teach and no teach directive (2:256, Name 11, travel)')
     const held = [await dua({ context: 'anxiety' }), await find({ query: 'despair' }), await dua({ context: 'bereaved' })]
     check(held.every((r) => teachBlocks(r).length === 0), 'support block and grief route: nothing attaches, audience or not')
     const ur = [await name({ number: 1, locale: 'ur' }), await dua({ id: 'D00068', locale: 'ar' })]

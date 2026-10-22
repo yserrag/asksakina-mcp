@@ -348,10 +348,14 @@ async function checkTeachEntries() {
       const r = entry.record
       if (r.kind === 'dua') return getDuaRecordById(r.id)?.arabic
       if (r.kind === 'name') return namesOfAllah.find((x) => x.number === r.number)?.arabic
+      // WO#484: a teach verse missing from the module refuses the bundle; it
+      // used to return undefined, which skipped the Field 1 check silently.
+      // Teach entries are a consumer of build-scripture-index.mjs, so every
+      // teach verse is in the module.
       try {
         return getVerseArabic(r.ref)
       } catch {
-        return undefined
+        throw new Error(`teach entry ${r.ref}: the verse is not in the scripture module, so its Field 1 word cannot be checked`)
       }
     },
   })

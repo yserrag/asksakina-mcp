@@ -13,6 +13,14 @@
  * normalise it; `npm run bundle-data` checks each word against the record's
  * Arabic byte for byte (validate.ts, ACKNOWLEDGED_FIELD1_MISMATCHES).
  *
+ * WO#484 batch 2 (approved 21 Oct 2026): 38 records, base content only.
+ * Field 1 and related signed by Gem 2, Field 2 by Gem 4 (with three citation
+ * corrections the Architect verified on sunnah.com), Field 4 by Gem 3 (112:3
+ * reworded by Gem 3). Records with no approved context carry no Field 2.
+ * Gem 10's publish sign-off is delegated: given by the Architect on the
+ * Founder's delegation (22 Oct 2026), for Gem 10 review. Record:
+ * docs/wo484-architect.md.
+ *
  * Kept apart from the du'a corpus (WO#86 rule): no du'a record text is ever
  * edited to carry teaching.
  */
@@ -34,6 +42,19 @@ const GEM3_GEM1_WO408: readonly SignOff[] = [
  * contract and four reflection questions. The release gate reads it.
  */
 const GEM10: readonly SignOff[] = [{ gem: 10, ruling: 'WO#408 re-review, Gem 10 APPROVED', date: '2026-09-29' }]
+
+const signedB2 = (gem: SignOff['gem'], ruling = 'WO#484 batch 2, approved'): readonly SignOff[] => [{ gem, ruling, date: '2026-10-21' }]
+const GEM2_B2 = signedB2(2)
+const GEM3_B2 = signedB2(3)
+const GEM4_B2 = signedB2(4, 'WO#484 batch 2, approved; citations checked by the Architect on sunnah.com')
+/** 112:3: Gem 3 reworded the reflection ("understand", not "picture"). */
+const GEM3_B2_112_3 = signedB2(3, 'WO#484 batch 2, approved as reworded by Gem 3')
+/**
+ * Gem 10's publish sign-off for batch 2: delegated. Given by the Architect on
+ * the Founder's delegation (22 Oct 2026), for Gem 10 review; recorded in
+ * docs/wo484-architect.md. The release gate reads it.
+ */
+const GEM10_B2: readonly SignOff[] = [{ gem: 10, ruling: 'WO#484 delegated PASS (Architect)', date: '2026-10-22' }]
 
 export const TEACH_ENTRIES: Readonly<Partial<Record<TeachKey, TeachEntry>>> = {
   'dua:D00068': {
@@ -184,5 +205,815 @@ export const TEACH_ENTRIES: Readonly<Partial<Record<TeachKey, TeachEntry>>> = {
     },
     related: { refs: [{ kind: 'verse', ref: '17:110' }, { kind: 'verse', ref: '1:3' }], reviewedBy: GEM2 },
     publishReviewedBy: GEM10,
+  },
+  'verse:1:1': {
+    record: { kind: 'verse', ref: '1:1' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u0631\u064e\u0651\u062d\u06e1\u0645\u064e\u0670\u0646\u0650', transliteration: 'Ar-Rahman' }],
+      root: '\u0631 \u062d \u0645',
+      root_transliteration: 'r-h-m',
+      gloss:
+        'Vast and encompassing mercy. Shares a root with the Arabic word for womb, indicating unconditional nourishment.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This is the first verse in the standard (Hafs) numbering of Surah Al-Fatihah, the foundational chapter of the Quran. The Prophet (peace be upon him) stated: "There is no prayer for the one who does not recite the Opening of the Book."',
+      citations: [{ text: 'Quran 1:1' }, { text: 'Sahih al-Bukhari 756' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'How does beginning with the dual mention of mercy shape your reading of everything that follows?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '1:3' }, { kind: 'name', number: 1 }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:1:2': {
+    record: { kind: 'verse', ref: '1:2' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u06e1\u062d\u064e\u0645\u06e1\u062f\u064f', transliteration: 'Al-Hamd' }],
+      root: '\u062d \u0645 \u062f',
+      root_transliteration: 'h-m-d',
+      gloss:
+        'Ultimate praise and gratitude. It encompasses both deep thanks and recognition of perfection.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This verse acknowledges Allah as the Lord of the worlds. It forms the core praise in every unit of the prayer.',
+      citations: [{ text: 'Quran 1:2' }, { text: 'Sahih Muslim 395' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'What is the effect of pairing absolute praise with the vastness of the worlds?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '1:1' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:1:3': {
+    record: { kind: 'verse', ref: '1:3' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u0631\u064e\u0651\u062d\u0650\u064a\u0645\u0650', transliteration: 'Ar-Raheem' }],
+      root: '\u0631 \u062d \u0645',
+      root_transliteration: 'r-h-m',
+      gloss:
+        'Specific, continuous mercy. Often understood as the mercy continuously bestowed upon believers.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This verse reinforces Allah\'s boundless mercy immediately after declaring His lordship.',
+      citations: [{ text: 'Quran 1:3' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'How does repeating these two names of mercy change the tone after acknowledging the Lord of the worlds?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '1:1' }, { kind: 'name', number: 2 }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:1:4': {
+    record: { kind: 'verse', ref: '1:4' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0645\u064e\u0670\u0644\u0650\u0643\u0650', transliteration: 'Malik' }],
+      root: '\u0645 \u0644 \u0643',
+      root_transliteration: 'm-l-k',
+      gloss:
+        'Master or Sovereign. Implies absolute ownership and ultimate authority over the Day of Judgment.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This verse establishes ultimate accountability by declaring Allah as the sole Master of the Day of Judgement.',
+      citations: [{ text: 'Quran 1:4' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'What does it mean for the ultimate day of judgment to be held by the Master rather than just a judge?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'name', number: 3 }, { kind: 'verse', ref: '114:2' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:1:5': {
+    record: { kind: 'verse', ref: '1:5' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0646\u064e\u0639\u06e1\u0628\u064f\u062f\u064f', transliteration: 'na\'budu' }],
+      root: '\u0639 \u0628 \u062f',
+      root_transliteration: '\'-b-d',
+      gloss:
+        'To worship and serve with complete devotion. It reflects both outward obedience and inward submission.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This verse marks the shift from praising Allah to directly addressing Him.',
+      citations: [{ text: 'Quran 1:5' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'Why might the verse place worship before the request for help?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '1:6' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:1:6': {
+    record: { kind: 'verse', ref: '1:6' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u0635\u0650\u0651\u0631\u064e\u0670\u0637\u064e', transliteration: 'as-sirat' }],
+      root: '\u0635 \u0631 \u0637',
+      root_transliteration: 's-r-t',
+      gloss:
+        'The straight, clear path. It is described as unwavering and direct.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This verse is the central petition of Al-Fatihah, asking for the straight path of guidance in every prayer.',
+      citations: [{ text: 'Quran 1:6' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'How does asking to be shown a path differ from asking for a destination?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '1:7' }, { kind: 'verse', ref: '1:5' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:1:7': {
+    record: { kind: 'verse', ref: '1:7' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u064e\u0654\u0646\u06e1\u0639\u064e\u0645\u06e1\u062a\u064e', transliteration: 'an\'amta' }],
+      root: '\u0646 \u0639 \u0645',
+      root_transliteration: 'n-\'-m',
+      gloss:
+        'To bestow favor or grace. Reflects the blessings given to those guided on the right path.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This verse clarifies the straight path by contrasting it with those who earned anger and those who went astray.',
+      citations: [{ text: 'Quran 1:7' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'What do you notice about the path being described through people rather than abstract concepts?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '1:6' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:2:255': {
+    record: { kind: 'verse', ref: '2:255' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u06e1\u062d\u064e\u064a\u064f\u0651', transliteration: 'al-hayy' }],
+      root: '\u062d \u064a \u064a',
+      root_transliteration: 'h-y-y',
+      gloss:
+        'The Ever-Living. Denotes the source of all life who never experiences death or weariness.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'Known as Ayat al-Kursi, the Prophet (peace be upon him) identified this as the greatest verse in the Book of Allah. He also stated that whoever recites it at the end of every obligatory prayer, nothing but death will prevent them from entering Paradise.',
+      citations: [{ text: 'Quran 2:255' }, { text: 'Sahih Muslim 810' }, { text: 'Sunan al-Nasa\'i, \'Amal al-Yawm wal-Laylah 100', grading: 'Sahih, al-Albani' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'How does the transition from absolute sovereignty to gentle preservation affect your sense of security?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '2:286' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:2:286': {
+    record: { kind: 'verse', ref: '2:286' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0648\u064f\u0633\u06e1\u0639\u064e\u0647\u064e\u0627', transliteration: 'wus\'aha' }],
+      root: '\u0648 \u0633 \u0639',
+      root_transliteration: 'w-s-\'',
+      gloss:
+        'Capacity or scope. Indicates that burdens are carefully measured to never exceed what a soul can handle.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This is the final verse of Surah Al-Baqarah. The Prophet (peace be upon him) said that reciting the last two verses of this chapter at night is sufficient for a person.',
+      citations: [{ text: 'Quran 2:286' }, { text: 'Sahih al-Bukhari 5009' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'What do you notice about the rhythm of asking for mercy directly after acknowledging limits?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '2:255' }, { kind: 'verse', ref: '65:2' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:112:1': {
+    record: { kind: 'verse', ref: '112:1' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u064e\u0654\u062d\u064e\u062f\u064c', transliteration: 'ahad' }],
+      root: '\u0623 \u062d \u062f',
+      root_transliteration: 'a-h-d',
+      gloss:
+        'The Unique, Indivisible One. Denotes absolute singular unity, distinct from anything else.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This verse opens Surah Al-Ikhlas, affirming the absolute oneness of Allah. The Prophet (peace be upon him) declared that this surah is equivalent to one-third of the Quran.',
+      citations: [{ text: 'Quran 112:1' }, { text: 'Sahih al-Bukhari 5013' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'How does the simplicity of declaring absolute oneness feel when spoken aloud?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '112:2' }, { kind: 'verse', ref: '112:3' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:112:2': {
+    record: { kind: 'verse', ref: '112:2' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u0635\u064e\u0651\u0645\u064e\u062f\u064f', transliteration: 'as-samad' }],
+      root: '\u0635 \u0645 \u062f',
+      root_transliteration: 's-m-d',
+      gloss:
+        'The Eternal Refuge. The independent source that everything relies upon, while He needs nothing.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'What does the concept of an eternally sought refuge suggest about seeking shelter?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '112:1' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:112:3': {
+    record: { kind: 'verse', ref: '112:3' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u064a\u064e\u0644\u0650\u062f\u06e1', transliteration: 'yalid' }],
+      root: '\u0648 \u0644 \u062f',
+      root_transliteration: 'w-l-d',
+      gloss:
+        'To beget or give birth. Highlights that the Creator is completely outside the cycle of human reproduction.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'How does removing the cycle of birth and generation change the way you understand the Divine?',
+      reviewedBy: GEM3_B2_112_3,
+    },
+    related: { refs: [{ kind: 'verse', ref: '112:4' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:112:4': {
+    record: { kind: 'verse', ref: '112:4' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0643\u064f\u0641\u064f\u0648\u064b\u0627', transliteration: 'kufuwan' }],
+      root: '\u0643 \u0641 \u0621',
+      root_transliteration: 'k-f-\'',
+      gloss:
+        'Equal or comparable. Emphasizes that there is nothing in existence that can be compared to Him.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'What is the comfort in knowing there is nothing comparable to this presence?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '112:1' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:113:1': {
+    record: { kind: 'verse', ref: '113:1' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u06e1\u0641\u064e\u0644\u064e\u0642\u0650', transliteration: 'al-falaq' }],
+      root: '\u0641 \u0644 \u0642',
+      root_transliteration: 'f-l-q',
+      gloss:
+        'The daybreak. It literally means to split or cleave, representing dawn breaking through darkness.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This verse opens Surah Al-Falaq, a primary chapter for seeking refuge in Allah from external harms. It is part of the daily morning and evening adhkar.',
+      citations: [{ text: 'Quran 113:1' }, { text: 'Sunan Abi Dawud 5082', grading: 'Hasan, al-Albani' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'How does the image of daybreak change the way you seek refuge from darkness?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '113:2' }, { kind: 'verse', ref: '114:1' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:113:2': {
+    record: { kind: 'verse', ref: '113:2' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u062e\u064e\u0644\u064e\u0642\u064e', transliteration: 'khalaqa' }],
+      root: '\u062e \u0644 \u0642',
+      root_transliteration: 'kh-l-q',
+      gloss:
+        'To create. Seeks refuge from any harm originating within the creation.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'What do you notice about seeking protection from creation rather than from the Creator?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '113:3' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:113:3': {
+    record: { kind: 'verse', ref: '113:3' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u063a\u064e\u0627\u0633\u0650\u0642\u064d', transliteration: 'ghasiq' }],
+      root: '\u063a \u0633 \u0642',
+      root_transliteration: 'gh-s-q',
+      gloss:
+        'Intense darkness. Refers to the night as it deepens, a time often associated with hidden harms.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'How does naming the intense darkness help in finding safety from it?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '113:4' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:113:4': {
+    record: { kind: 'verse', ref: '113:4' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u06e1\u0639\u064f\u0642\u064e\u062f\u0650', transliteration: 'al-\'uqad' }],
+      root: '\u0639 \u0642 \u062f',
+      root_transliteration: '\'-q-d',
+      gloss:
+        'Knots. Historical context relates to malignant spiritual practices of blowing on tied knots.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'Why might unseen harms be specifically listed when asking for protection?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '113:5' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:113:5': {
+    record: { kind: 'verse', ref: '113:5' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u062d\u064e\u0627\u0633\u0650\u062f\u064d', transliteration: 'hasid' }],
+      root: '\u062d \u0633 \u062f',
+      root_transliteration: 'h-s-d',
+      gloss:
+        'Envier. One who wishes for the destruction or loss of someone else\'s blessings.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'What does the focus on the moment of envy tell us about hidden harm?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '114:4' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:114:1': {
+    record: { kind: 'verse', ref: '114:1' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u0646\u064e\u0651\u0627\u0633\u0650', transliteration: 'an-nas' }],
+      root: '\u0646 \u0648 \u0633',
+      root_transliteration: 'n-w-s',
+      gloss:
+        'Mankind or people. A universal appeal seeking refuge for all humanity.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This verse opens Surah An-Nas, focusing on seeking refuge from internal whispers and doubts. Along with Al-Falaq, it is known as one of the Mu\'awwidhatayn (verses of refuge).',
+      citations: [{ text: 'Quran 114:1' }, { text: 'Sunan an-Nasa\'i 5428', grading: 'Hasan, Darussalam' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'How does it feel to seek refuge specifically in the Lord of humanity?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '114:2' }, { kind: 'verse', ref: '113:1' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:114:2': {
+    record: { kind: 'verse', ref: '114:2' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0645\u064e\u0644\u0650\u0643\u0650', transliteration: 'malik' }],
+      root: '\u0645 \u0644 \u0643',
+      root_transliteration: 'm-l-k',
+      gloss:
+        'The King. Emphasizes absolute sovereignty over all people.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'What does adding the title of King bring to the plea for protection?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'name', number: 3 }, { kind: 'verse', ref: '114:3' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:114:3': {
+    record: { kind: 'verse', ref: '114:3' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u0650\u0655\u0644\u064e\u0670\u0647\u0650', transliteration: 'ilah' }],
+      root: '\u0623 \u0644 \u0647',
+      root_transliteration: 'a-l-h',
+      gloss:
+        'God or deity. The singular, rightful object of all human worship.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'How does moving from Lord to King to God deepen the sense of sanctuary?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '114:4' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:114:4': {
+    record: { kind: 'verse', ref: '114:4' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u06e1\u0648\u064e\u0633\u06e1\u0648\u064e\u0627\u0633\u0650', transliteration: 'al-waswas' }],
+      root: '\u0648 \u0633 \u0648 \u0633',
+      root_transliteration: 'w-s-w-s',
+      gloss:
+        'The whisperer. Refers to silent, insidious suggestions that attempt to misguide the heart.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'What do you notice about the description of a harm that sneaks and whispers?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '114:5' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:114:5': {
+    record: { kind: 'verse', ref: '114:5' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0635\u064f\u062f\u064f\u0648\u0631\u0650', transliteration: 'sudur' }],
+      root: '\u0635 \u062f \u0631',
+      root_transliteration: 's-d-r',
+      gloss:
+        'Chests or hearts. The innermost sanctum of human intention and feeling where whispers are felt.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'How does it change things to know that the hidden whisper targets the heart directly?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '114:6' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:114:6': {
+    record: { kind: 'verse', ref: '114:6' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u06e1\u062c\u0650\u0646\u064e\u0651\u0629\u0650', transliteration: 'al-jinnah' }],
+      root: '\u062c \u0646 \u0646',
+      root_transliteration: 'j-n-n',
+      gloss:
+        'The jinn. Unseen entities created from smokeless fire, capable of planting whispers like humans.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'Why might both seen and unseen sources be grouped together at the end of this plea?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '114:4' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:94:5': {
+    record: { kind: 'verse', ref: '94:5' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0671\u0644\u06e1\u0639\u064f\u0633\u06e1\u0631\u0650', transliteration: 'al-\'usr' }],
+      root: '\u0639 \u0633 \u0631',
+      root_transliteration: '\'-s-r',
+      gloss:
+        'Hardship or difficulty. A tight, constricted situation.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'What changes when you read that ease is with the hardship rather than waiting after it?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '94:6' }, { kind: 'verse', ref: '13:28' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:94:6': {
+    record: { kind: 'verse', ref: '94:6' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u064a\u064f\u0633\u06e1\u0631\u08f0\u0627', transliteration: 'yusran' }],
+      root: '\u064a \u0633 \u0631',
+      root_transliteration: 'y-s-r',
+      gloss:
+        'Ease or relief. The indefinite form suggests multiple or expansive avenues of relief alongside the hardship.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This verse repeats the promise of ease found in the preceding verse.',
+      citations: [{ text: 'Quran 94:6' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'How does the exact repetition of this promise land when you read it a second time?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '94:5' }, { kind: 'verse', ref: '65:2' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:13:28': {
+    record: { kind: 'verse', ref: '13:28' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u062a\u064e\u0637\u06e1\u0645\u064e\u064a\u0650\u0654\u0646\u064f\u0651', transliteration: 'tatma\'innu' }],
+      root: '\u0637 \u0645 \u0623 \u0646',
+      root_transliteration: 't-m-a-n',
+      gloss:
+        'To find rest, tranquility, or settle down. It describes a heart securely anchored and at peace.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'How is the action of remembering connected to the physical resting of the heart here?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '94:5' }, { kind: 'verse', ref: '65:3' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:65:2': {
+    record: { kind: 'verse', ref: '65:2' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0645\u064e\u062e\u06e1\u0631\u064e\u062c\u08f0\u0627', transliteration: 'makhrajan' }],
+      root: '\u062e \u0631 \u062c',
+      root_transliteration: 'kh-r-j',
+      gloss:
+        'A way out or exit. A divine promise of escape from seemingly impossible situations for the mindful.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'What stands out about the command to act with kindness right before the promise of a way out?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '65:3' }, { kind: 'verse', ref: '94:5' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'verse:65:3': {
+    record: { kind: 'verse', ref: '65:3' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u064a\u064e\u062a\u064e\u0648\u064e\u0643\u064e\u0651\u0644\u06e1', transliteration: 'yatawakkal' }],
+      root: '\u0648 \u0643 \u0644',
+      root_transliteration: 'w-k-l',
+      gloss:
+        'To rely fully on or place total trust in. Handing over one\'s affairs completely to the Divine.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'This verse continues from 65:2, promising unexpected provision and sufficiency for those who rely entirely on Allah (tawakkul).',
+      citations: [{ text: 'Quran 65:3' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'How does the image of an unexpected provision pair with the certainty of a set measure?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '65:2' }, { kind: 'verse', ref: '13:28' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'name:2': {
+    record: { kind: 'name', number: 2 },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u0644\u0631\u064e\u0651\u062d\u0650\u064a\u0645', transliteration: 'Ar-Raheem' }],
+      root: '\u0631 \u062d \u0645',
+      root_transliteration: 'r-h-m',
+      gloss:
+        'The deeply and continually Merciful. Specifically tailored mercy constantly directed towards believers.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'Ar-Raheem refers to the specific, tailored mercy bestowed upon the believers. It frequently pairs with Ar-Rahman to encompass both the vastness and the precise application of divine mercy.',
+      citations: [{ text: 'Quran 1:1' }, { text: 'Quran 2:163' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'How does understanding mercy as a tailored and ongoing action shape your view of this Name?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'name', number: 1 }, { kind: 'verse', ref: '1:3' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'name:3': {
+    record: { kind: 'name', number: 3 },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u0644\u0652\u0645\u064e\u0644\u0650\u0643', transliteration: 'Al-Malik' }],
+      root: '\u0645 \u0644 \u0643',
+      root_transliteration: 'm-l-k',
+      gloss:
+        'The Sovereign or King. Possessor of absolute authority and control over all creation.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'Cited in the Quran as the Sovereign or King. The Prophet (peace be upon him) stated that Allah will say on the Day of Resurrection: "I am the King. Where are the kings of the earth?"',
+      citations: [{ text: 'Quran 20:114' }, { text: 'Quran 23:116' }, { text: 'Quran 59:23' }, { text: 'Quran 62:1' }, { text: 'Sahih al-Bukhari 4812' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'What kind of peace comes from knowing the highest authority is called The King?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'verse', ref: '114:2' }, { kind: 'verse', ref: '1:4' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'name:4': {
+    record: { kind: 'name', number: 4 },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u0644\u0652\u0642\u064f\u062f\u064f\u0651\u0648\u0633', transliteration: 'Al-Quddus' }],
+      root: '\u0642 \u062f \u0633',
+      root_transliteration: 'q-d-s',
+      gloss:
+        'The Most Holy. Completely pure and free of any flaw, deficiency, or imperfection.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'Paired with Al-Malik in the Quran. The Prophet (peace be upon him) used to say in his bowing and prostration: "Subbuhun Quddusun, Rabbul-mala\'ikati war-ruh" (Glorious, Holy, Lord of the angels and the Spirit).',
+      citations: [{ text: 'Quran 59:23' }, { text: 'Quran 62:1' }, { text: 'Sahih Muslim 487' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'How does the concept of utter purity differ from just being free of mistakes?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'name', number: 5 }, { kind: 'name', number: 3 }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'name:5': {
+    record: { kind: 'name', number: 5 },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u0644\u0633\u064e\u0651\u0644\u064e\u0627\u0645', transliteration: 'As-Salam' }],
+      root: '\u0633 \u0644 \u0645',
+      root_transliteration: 's-l-m',
+      gloss:
+        'The Source of Peace. The provider of wholeness, tranquility, and safety from defect.',
+      reviewedBy: GEM2_B2,
+    },
+    context: {
+      kind: 'cited',
+      text:
+        'The Prophet (peace be upon him) would seek forgiveness three times after finishing the prayer and say: "O Allah, You are As-Salam and from You is peace."',
+      citations: [{ text: 'Quran 59:23' }, { text: 'Sahih Muslim 591' }],
+      reviewedBy: GEM4_B2,
+    },
+    reflection: {
+      text: 'What do you notice about peace being a source rather than just a feeling?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'name', number: 6 }, { kind: 'name', number: 4 }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'name:6': {
+    record: { kind: 'name', number: 6 },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u0644\u0652\u0645\u064f\u0624\u0652\u0645\u0650\u0646', transliteration: 'Al-Mu\'min' }],
+      root: '\u0623 \u0645 \u0646',
+      root_transliteration: 'a-m-n',
+      gloss:
+        'The Granter of Security. The ultimate source of trust who imparts safety and inspires faith.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'How does the idea of granting security change how you hold onto faith?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'name', number: 7 }, { kind: 'name', number: 5 }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'name:7': {
+    record: { kind: 'name', number: 7 },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u0644\u0652\u0645\u064f\u0647\u064e\u064a\u0652\u0645\u0650\u0646', transliteration: 'Al-Muhaymin' }],
+      root: '\u0647 \u064a \u0645 \u0646',
+      root_transliteration: 'h-y-m-n',
+      gloss:
+        'The Guardian. An overarching preserver who watches over and protects all details of existence.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'What is the difference between being watched over and being guarded?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'name', number: 6 }, { kind: 'name', number: 8 }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'name:8': {
+    record: { kind: 'name', number: 8 },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u0644\u0652\u0639\u064e\u0632\u0650\u064a\u0632', transliteration: 'Al-Aziz' }],
+      root: '\u0639 \u0632 \u0632',
+      root_transliteration: '\'-z-z',
+      gloss:
+        'The Almighty. Absolute strength and dignity that can never be overcome or defeated.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'How does connecting with absolute strength affect your sense of dignity?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'name', number: 9 }, { kind: 'name', number: 7 }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'name:9': {
+    record: { kind: 'name', number: 9 },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u0644\u0652\u062c\u064e\u0628\u064e\u0651\u0627\u0631', transliteration: 'Al-Jabbar' }],
+      root: '\u062c \u0628 \u0631',
+      root_transliteration: 'j-b-r',
+      gloss:
+        'The Compeller or Restorer. The one who forcefully mends the broken and restores matters to perfection.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'What stands out about a power that compels specifically toward restoration and mending?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'name', number: 10 }, { kind: 'name', number: 8 }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
+  },
+  'name:10': {
+    record: { kind: 'name', number: 10 },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0627\u0644\u0652\u0645\u064f\u062a\u064e\u0643\u064e\u0628\u0650\u0651\u0631', transliteration: 'Al-Mutakabbir' }],
+      root: '\u0643 \u0628 \u0631',
+      root_transliteration: 'k-b-r',
+      gloss:
+        'The Supreme. Possessor of ultimate majesty, far above the attributes and limitations of His creation.',
+      reviewedBy: GEM2_B2,
+    },
+    reflection: {
+      text: 'How does acknowledging ultimate supremacy create space for your own freedom?',
+      reviewedBy: GEM3_B2,
+    },
+    related: { refs: [{ kind: 'name', number: 9 }, { kind: 'verse', ref: '1:2' }], reviewedBy: GEM2_B2 },
+    publishReviewedBy: GEM10_B2,
   },
 }

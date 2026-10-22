@@ -120,23 +120,38 @@ const _paraphrased: TeachContextFallback = { kind: 'not_recorded', text: 'FIXTUR
 const _misNoCite: TeachMisconception = { authoredBy: 'founder', text: 'FIXTURE', citations: [], reviewedBy: [] }
 void [_uncited, _paraphrased, _misNoCite]
 
+/** WO#405 batch 1. */
+const SIX = ['dua:D00060', 'dua:D00068', 'name:1', 'name:34', 'verse:21:87', 'verse:39:53']
+/** WO#484 batch 2: the approved records, from the archived file (docs/wo484-batch2-entries.json). */
+const BATCH2: readonly string[] = (JSON.parse(readFileSync(new URL('../../docs/wo484-batch2-entries.json', import.meta.url), 'utf-8')) as Array<{ record: string }>).map((e) => e.record)
+/** Every record that carries a teach entry. */
+const ENTRY_KEYS: readonly string[] = [...SIX, ...BATCH2]
+
 console.log('\n=== teach entries: shipped data ===')
 {
   const keys = Object.keys(TEACH_ENTRIES).sort()
-  const want = ['dua:D00060', 'dua:D00068', 'name:1', 'name:34', 'verse:21:87', 'verse:39:53']
+  const want = [...SIX, ...BATCH2].sort()
   JSON.stringify(keys) === JSON.stringify(want)
-    ? pass('entries.ts holds exactly the six WO#405 batch 1 records')
+    ? pass(`entries.ts holds exactly the six WO#405 batch 1 records and the ${BATCH2.length} WO#484 batch 2 records`)
     : fail('entries.ts keys', keys)
   check('shipped entries pass the field check', TEACH_ENTRIES as Record<string, TeachEntry>, null)
   const entries = Object.values(TEACH_ENTRIES) as TeachEntry[]
   entries.every((e) => !e.misconception && !e.by_audience)
-    ? pass('no Field 3 and no audience variants on any batch 1 entry')
+    ? pass('no Field 3 and no audience variants on any batch 1 or batch 2 entry')
     : fail('Field 3 / variants present')
+  // WO#484: batch 2 carries the delegated Gem 10 sign-off (22 Oct 2026), so the
+  // release gate passes for all 44; batch 1 keeps its own Gem 10 approval.
   const gate = publishGateErrors(TEACH_ENTRIES)
-  const gem10 = entries.every((e) => e.publishReviewedBy.length === 1 && e.publishReviewedBy[0]!.gem === 10 && e.publishReviewedBy[0]!.ruling === 'WO#408 re-review, Gem 10 APPROVED' && e.publishReviewedBy[0]!.date === '2026-09-29')
-  gate.length === 0 && gem10
-    ? pass('release gate passes: all six carry Gem 10\'s WO#408 re-review approval')
-    : fail('release gate', gate)
+  const batch1 = SIX.map((k) => TEACH_ENTRIES[k as keyof typeof TEACH_ENTRIES]!)
+  const gem10 = batch1.every((e) => e.publishReviewedBy.length === 1 && e.publishReviewedBy[0]!.gem === 10 && e.publishReviewedBy[0]!.ruling === 'WO#408 re-review, Gem 10 APPROVED' && e.publishReviewedBy[0]!.date === '2026-09-29')
+  const refused = gate.map((e) => e.split(':').slice(0, -1).join(':').replace(/: entry \(publish\) lacks sign-off from Gem 10$/, ''))
+  gem10 && publishGateErrors(Object.fromEntries(SIX.map((k) => [k, TEACH_ENTRIES[k as keyof typeof TEACH_ENTRIES]]))).length === 0
+    ? pass('release gate passes on batch 1: all six carry Gem 10\'s WO#408 re-review approval')
+    : fail('release gate, batch 1', gate)
+  gate.length === 0 &&
+  BATCH2.every((k) => JSON.stringify(TEACH_ENTRIES[k as keyof typeof TEACH_ENTRIES]!.publishReviewedBy) === JSON.stringify([{ gem: 10, ruling: 'WO#484 delegated PASS (Architect)', date: '2026-10-22' }]))
+    ? pass(`release gate passes for all ${keys.length}: the ${BATCH2.length} batch 2 entries carry the delegated Gem 10 sign-off (WO#484, 22 Oct 2026)`)
+    : fail('release gate, batch 2', { gate, refused })
 }
 
 console.log('\n=== teach entries: accepted shapes ===')
@@ -454,7 +469,6 @@ type Rec = Record<string, unknown> & {
 }
 type AnyResp = { _sakina_meta: { content_type: string }; content: Record<string, unknown>; crisis_resource?: { level?: string } }
 
-const SIX = ['dua:D00060', 'dua:D00068', 'name:1', 'name:34', 'verse:21:87', 'verse:39:53']
 
 /** Every object in a response that carries `teach`, with where it was found. */
 function teachBlocks(r: unknown): Rec['teach'][] {
@@ -553,28 +567,29 @@ async function testAttachment() {
     let stray = 0
     for (const slug of categories) {
       for (const b of teachBlocks(await getDuaHandler({ context: slug, audience: 'revert' }))) {
-        if (SIX.includes(b!.record_id)) seen.add(b!.record_id)
+        if (ENTRY_KEYS.includes(b!.record_id)) seen.add(b!.record_id)
         else stray++
       }
     }
     for (let n = 1; n <= 99; n++) {
       for (const b of teachBlocks(await getNameOfAllahHandler({ number: n, audience: 'revert' }))) {
-        if (SIX.includes(b!.record_id)) seen.add(b!.record_id)
+        if (ENTRY_KEYS.includes(b!.record_id)) seen.add(b!.record_id)
         else stray++
       }
     }
     for (const q of AVAILABLE_THEMES_FOR_TEST) {
       for (const b of teachBlocks(await findVersesHandler({ query: q, limit: 10, audience: 'revert' }))) {
-        if (SIX.includes(b!.record_id)) seen.add(b!.record_id)
+        if (ENTRY_KEYS.includes(b!.record_id)) seen.add(b!.record_id)
         else stray++
       }
     }
-    for (const [s, a] of [[2, 255], [1, 1], [21, 88], [39, 54], [94, 1]] as const) {
+    // WO#484: 2:255 and 1:1 now carry entries; these five verses carry none.
+    for (const [s, a] of [[2, 256], [3, 1], [21, 88], [39, 54], [94, 1]] as const) {
       stray += teachBlocks(await getQuranVerseHandler({ surah: s, ayah: a, audience: 'revert' })).length
     }
     stray === 0
-      ? pass(`all ${categories.length} du'a categories, 99 Names, every theme and 5 other verses: teach only on the six (${[...seen].sort().join(', ')})`)
-      : fail(`${stray} teach blocks outside the six`)
+      ? pass(`all ${categories.length} du'a categories, 99 Names, every theme and 5 verses with no entry: teach only on records with an entry (${[...seen].sort().join(', ')})`)
+      : fail(`${stray} teach blocks on records with no entry`)
     // WO#478 (teach by default): with `audience` omitted, the entries that are
     // reachable without a support block attach with audience "unknown":
     // Names 1 and 34, and 39:53. The two du'a entries sit in stress-anxiety,
@@ -584,18 +599,20 @@ async function testAttachment() {
     const noTeach = (r: unknown) => teachBlocks(r).length + (teachDirectivesPresent(r) ? 1 : 0)
     const tally = (r: unknown) => {
       for (const b of teachBlocks(r)) {
-        if (b!.audience === 'unknown' && SIX.includes(b!.record_id)) unknownOn.add(b!.record_id)
+        if (b!.audience === 'unknown' && ENTRY_KEYS.includes(b!.record_id)) unknownOn.add(b!.record_id)
         else strayUnknown++
       }
     }
     for (const slug of categories) tally(await getDuaHandler({ context: slug }))
     for (let n = 1; n <= 99; n++) tally(await getNameOfAllahHandler({ number: n }))
     tally(await getQuranVerseHandler({ surah: 39, ayah: 53 }))
-    JSON.stringify([...unknownOn].sort()) === '["name:1","name:34","verse:39:53"]' && strayUnknown === 0
-      ? pass('audience omitted: teach with audience unknown on exactly name:1, name:34 and verse:39:53 across every category, 99 Names and 39:53; nothing else (WO#478; baseline in scripts/byte-identity.ts)')
+    // WO#484: Names 2 to 10 now carry entries too.
+    const wantUnknown = [...ENTRY_KEYS.filter((k) => k.startsWith('name:')), 'verse:39:53'].sort()
+    JSON.stringify([...unknownOn].sort()) === JSON.stringify(wantUnknown) && strayUnknown === 0
+      ? pass(`audience omitted: teach with audience unknown on exactly ${wantUnknown.join(', ')} across every category, 99 Names and 39:53; nothing else (WO#478, WO#484)`)
       : fail('audience omitted', { unknownOn: [...unknownOn], strayUnknown })
     // WO#407: a response whose records carry no teach carries no teach directive.
-    const noEntry = noTeach(await getQuranVerseHandler({ surah: 2, ayah: 255, audience: 'revert' })) + noTeach(await getQuranVerseHandler({ surah: 2, ayah: 255 })) + noTeach(await getNameOfAllahHandler({ number: 2 }))
+    const noEntry = noTeach(await getQuranVerseHandler({ surah: 2, ayah: 256, audience: 'revert' })) + noTeach(await getQuranVerseHandler({ surah: 2, ayah: 256 })) + noTeach(await getNameOfAllahHandler({ number: 11 }))
     noEntry === 0 ? pass('a record with no entry, with or without audience: no teach and no teach directives') : fail(`${noEntry} teach blocks on records with no entry`)
     const ur = noTeach(await getNameOfAllahHandler({ number: 34, locale: 'ur', audience: 'revert' })) +
       noTeach(await getDuaHandler({ id: 'D00068', locale: 'ar', audience: 'revert' })) +

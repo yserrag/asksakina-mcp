@@ -2,6 +2,29 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 2.3.0 (unreleased; Gem 10 PASS for publish, 22 Oct 2026, delegated ruling by the Architect, for Gem 10 review)
+
+WO#484: teaching batch 2, 38 teach entries (approved 21 Oct 2026; record in
+`docs/wo484-architect.md`, content archived as `docs/wo484-batch2-entries.json`).
+
+- Surah al-Fatihah 1:1 to 1:7, 2:255, 2:286, al-Ikhlas 112:1 to 112:4,
+  al-Falaq 113:1 to 113:5, an-Nas 114:1 to 114:6, 94:5, 94:6, 13:28, 65:2,
+  65:3, and the Names 2 to 10.
+- Field 1 and related signed by Gem 2, Field 2 by Gem 4 (three citation
+  corrections checked by the Architect on sunnah.com), Field 4 by Gem 3.
+  20 records carry no Field 2, as approved.
+- Gem 10: PASS for publish, no conditions (22 Oct 2026), given by the
+  Architect on the Founder's delegation, for Gem 10 review. Every batch 2
+  entry carries it in `publishReviewedBy`, and the release gate passes for
+  all 44 entries.
+- Key-word Arabic is written as \u escapes of each record's bundled bytes,
+  and every one matches byte for byte. Teach entries are now a consumer of
+  the scripture module, so the four Fatiha verses the module lacked (1:3,
+  1:4, 1:5, 1:7) are in it. A teach verse missing from the module now
+  refuses the bundle instead of skipping the check.
+- Not published, not deployed, registry unchanged apart from the version
+  number.
+
 ## 2.2.2 (unreleased; built and tested only. Gem 3 and Gem 10 review the built text before release)
 
 WO#482: the crisis block follows the language of the crisis keyword. On
