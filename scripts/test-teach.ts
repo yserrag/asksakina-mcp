@@ -508,7 +508,8 @@ function testTeachDirectivePins() {
   const sha = (t: string) => createHash('sha256').update(t, 'utf8').digest('hex')
   const pins: Array<[string, string, string]> = [
     ['CRITICAL_RULES teach directive', TEACH_DIRECTIVE, 'ee032942f2bc602a000401ca56d3df23187f81249dad482314416f70e4ffda2b'],
-    ['presentation_contract.teach', TEACH_CONTRACT, '68cea585544c427ccddea244020738279cc1ebdd4ba18a850ed6d53bbb6450d7'],
+    // WO#488 Part D: the contract ends with Gem 10's context_block line (was 68cea585...).
+    ['presentation_contract.teach', TEACH_CONTRACT, '060e26c7f4bf486e8ddb9c831ed6e46872ba5c31619be1fcbb359c475e48ea72'],
   ]
   for (const [label, text, want] of pins) sha(text) === want ? pass(`${label}: sha256 ${want.slice(0, 12)}…`) : fail(`${label} changed`, sha(text))
 }

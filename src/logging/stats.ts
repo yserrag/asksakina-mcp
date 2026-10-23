@@ -1,7 +1,8 @@
 // `/stats` endpoint for the Sakina MCP server.
 //
 // Serves the in-memory AGGREGATE COUNTERS maintained by request-logger
-// (per-tool call + status totals, plus summed duration for an average).
+// (per-tool call + status totals, plus summed duration for an average;
+// WO#488: teach served per tool, the audience tally and prompt fetches).
 // There are no log files to read — per-request JSONL logging was removed
 // in WO#360. The numbers reset when the process restarts; that is the
 // deliberate cost of collecting nothing per request.
@@ -16,6 +17,7 @@ import http from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 
 import { getAggregateSnapshot, type ToolName } from './request-logger.js'
+import type { AudienceBucket, PromptName } from './counter-keys.js'
 import { getDailyStore, RETENTION_DAYS } from './daily-store.js'
 import { getLimiterStatus, type LimiterStatus } from '../safety/rate-limiter.js'
 import { getBasmalaPrefixMismatchCount } from '../data/quran.js'
@@ -47,6 +49,8 @@ interface ToolStatsPayload {
   not_found: number
   error: number
   avg_response_ms: number
+  /** WO#488: responses that carried a teach block. */
+  teach_served: number
 }
 
 interface StatsPayload {
@@ -54,6 +58,10 @@ interface StatsPayload {
   since: string
   total_requests: number
   by_tool: Record<string, ToolStatsPayload>
+  /** WO#488: tool calls by audience value (five fixed keys), across all tools. */
+  audience: Record<AudienceBucket, number>
+  /** WO#488: prompt fetches by prompt name. */
+  prompts: Record<PromptName, number>
   /** WO#385: which limiter is enforcing the budget, and Upstash health. */
   rate_limiter: LimiterStatus
   /** WO#385: ayah-1 texts that started with neither recorded basmala
@@ -70,11 +78,12 @@ interface DailyToolPayload {
   not_found: number
   error: number
   avg_response_ms: number
+  teach_served: number
 }
 
 interface DailyPayload {
   retention_days: number
-  days: { date: string; total: number; by_tool: Record<string, DailyToolPayload> }[]
+  days: { date: string; total: number; by_tool: Record<string, DailyToolPayload>; audience: Record<AudienceBucket, number>; prompts: Record<PromptName, number> }[]
 }
 
 function buildDaily(): DailyPayload | null {
@@ -89,19 +98,23 @@ function buildDaily(): DailyPayload | null {
         const c = d.by_tool[t]
         const n = c.ok + c.not_found + c.error
         total += n
-        by_tool[t] = { total: n, ok: c.ok, not_found: c.not_found, error: c.error, avg_response_ms: n > 0 ? Math.round(c.duration_ms_sum / n) : 0 }
+        by_tool[t] = { total: n, ok: c.ok, not_found: c.not_found, error: c.error, avg_response_ms: n > 0 ? Math.round(c.duration_ms_sum / n) : 0, teach_served: c.teach_served }
       }
-      return { date: d.date, total, by_tool }
+      return { date: d.date, total, by_tool, audience: d.audience, prompts: d.prompts }
     }),
   }
 }
 
-/** The /stats privacy line when nothing is kept on disk (unchanged since WO#360). */
+/**
+ * The /stats privacy line when nothing is kept on disk. WO#488 Part B
+ * (docs/mcp-teach-phase0/07-measurement.md 3.2; Gem 8 approved the draft,
+ * 22 Oct 2026): names the teach, audience and prompt counters.
+ */
 export const PRIVACY_MEMORY_ONLY =
-  'aggregate-only in-memory counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; resets on restart'
-/** WO#456 (proposed; Gem 8 and Gem 10 to approve): the line when daily totals are kept on disk. */
+  'aggregate-only in-memory counters, including teach-served per tool, a tally of audience values and prompt fetches by name; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no other params, no payloads; resets on restart'
+/** The line when daily totals are kept on disk (WO#456; WO#488 Part B, Gem 8 approved the draft). */
 export const PRIVACY_WITH_DAILY =
-  'aggregate-only counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; since-start totals reset on restart; daily per-tool totals (ok, not_found, error, summed duration) kept on the server\'s own disk for at most 90 days'
+  'aggregate-only counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params beyond a tally of audience values, no payloads; since-start totals reset on restart; daily totals (per tool: ok, not_found, error, summed duration, teach served; plus audience tally and prompt fetches by name) kept on the server\'s own disk for at most 90 days'
 
 function buildPayload(): StatsPayload {
   const snap = getAggregateSnapshot()
@@ -114,6 +127,7 @@ function buildPayload(): StatsPayload {
       not_found: c.not_found,
       error: c.error,
       avg_response_ms: c.total > 0 ? Math.round(c.duration_ms_sum / c.total) : 0,
+      teach_served: c.teach_served,
     }
   }
   return {
@@ -121,6 +135,8 @@ function buildPayload(): StatsPayload {
     since: snap.since,
     total_requests: snap.total,
     by_tool,
+    audience: snap.audience,
+    prompts: snap.prompts,
     rate_limiter: getLimiterStatus(),
     basmala_prefix_mismatch: getBasmalaPrefixMismatchCount(),
     daily: buildDaily(),

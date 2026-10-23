@@ -37,14 +37,14 @@ function buildDaily() {
                 const c = d.by_tool[t];
                 const n = c.ok + c.not_found + c.error;
                 total += n;
-                by_tool[t] = { total: n, ok: c.ok, not_found: c.not_found, error: c.error, avg_response_ms: n > 0 ? Math.round(c.duration_ms_sum / n) : 0 };
+                by_tool[t] = { total: n, ok: c.ok, not_found: c.not_found, error: c.error, avg_response_ms: n > 0 ? Math.round(c.duration_ms_sum / n) : 0, teach_served: c.teach_served };
             }
-            return { date: d.date, total, by_tool };
+            return { date: d.date, total, by_tool, audience: d.audience, prompts: d.prompts };
         }),
     };
 }
-export const PRIVACY_MEMORY_ONLY = 'aggregate-only in-memory counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; resets on restart';
-export const PRIVACY_WITH_DAILY = 'aggregate-only counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params, no payloads; since-start totals reset on restart; daily per-tool totals (ok, not_found, error, summed duration) kept on the server\'s own disk for at most 90 days';
+export const PRIVACY_MEMORY_ONLY = 'aggregate-only in-memory counters, including teach-served per tool, a tally of audience values and prompt fetches by name; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no other params, no payloads; resets on restart';
+export const PRIVACY_WITH_DAILY = 'aggregate-only counters; no per-request records, no IPs, no user-agents, no client identifiers, no geolocation, no params beyond a tally of audience values, no payloads; since-start totals reset on restart; daily totals (per tool: ok, not_found, error, summed duration, teach served; plus audience tally and prompt fetches by name) kept on the server\'s own disk for at most 90 days';
 function buildPayload() {
     const snap = getAggregateSnapshot();
     const by_tool = {};
@@ -56,6 +56,7 @@ function buildPayload() {
             not_found: c.not_found,
             error: c.error,
             avg_response_ms: c.total > 0 ? Math.round(c.duration_ms_sum / c.total) : 0,
+            teach_served: c.teach_served,
         };
     }
     return {
@@ -63,6 +64,8 @@ function buildPayload() {
         since: snap.since,
         total_requests: snap.total,
         by_tool,
+        audience: snap.audience,
+        prompts: snap.prompts,
         rate_limiter: getLimiterStatus(),
         basmala_prefix_mismatch: getBasmalaPrefixMismatchCount(),
         daily: buildDaily(),

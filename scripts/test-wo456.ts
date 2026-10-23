@@ -39,8 +39,11 @@ const check = (ok: boolean, label: string, detail?: unknown) => {
 const tmp = () => mkdtempSync(path.join(tmpdir(), 'wo456-'))
 
 const TOOLS = ['get_quran_verse', 'get_dua', 'get_name_of_allah', 'find_verses']
-const COUNTER_KEYS = ['duration_ms_sum', 'error', 'not_found', 'ok']
-const SENTINELS = ['WO456SENTINEL', '203.0.113.77', 'wo456-agent', 'wo456-client']
+// WO#488 Part B: teach_served per tool; the audience tally and prompts at the top level.
+const COUNTER_KEYS = ['duration_ms_sum', 'error', 'not_found', 'ok', 'teach_served']
+const AUDIENCE_KEYS = ['absent', 'curious', 'practising', 'revert', 'unknown']
+const PROMPT_KEYS = ['explore_names_of_allah', 'understand_a_verse']
+const SENTINELS = ['WO456SENTINEL', '203.0.113.77', 'wo456-agent', 'wo456-client', 'wo456-audience']
 
 /** Every file in `dir` is YYYY-MM-DD.json holding exactly the allowed shape. */
 function auditDir(dir: string): string[] {
@@ -61,7 +64,12 @@ function auditDir(dir: string): string[] {
       problems.push(`${name} is not JSON`)
       continue
     }
-    if (JSON.stringify(Object.keys(j).sort()) !== JSON.stringify(['by_tool', 'date'])) problems.push(`${name} top-level keys ${Object.keys(j)}`)
+    if (JSON.stringify(Object.keys(j).sort()) !== JSON.stringify(['audience', 'by_tool', 'date', 'prompts'])) problems.push(`${name} top-level keys ${Object.keys(j)}`)
+    for (const [k, keys] of [['audience', AUDIENCE_KEYS], ['prompts', PROMPT_KEYS]] as const) {
+      const o = j[k] as Record<string, unknown>
+      if (JSON.stringify(Object.keys(o ?? {}).sort()) !== JSON.stringify(keys)) problems.push(`${name} ${k} keys ${Object.keys(o ?? {})}`)
+      for (const v of Object.values(o ?? {})) if (!Number.isInteger(v) || (v as number) < 0) problems.push(`${name} ${k} value ${v}`)
+    }
     if (j.date !== m[1]) problems.push(`${name} date ${j.date}`)
     const bt = j.by_tool as Record<string, Record<string, unknown>>
     if (JSON.stringify(Object.keys(bt ?? {}).sort()) !== JSON.stringify([...TOOLS].sort())) problems.push(`${name} tools ${Object.keys(bt ?? {})}`)
@@ -120,7 +128,7 @@ function testAllowedFieldsOnly() {
     check(problems.length === 0, 'rewriting the day drops every field outside the allowed set', problems)
     const j = JSON.parse(readFileSync(path.join(dir, '2026-10-12.json'), 'utf8'))
     check(j.by_tool.get_dua.ok === 2, 'the allowed counts in that file are kept and added to', j.by_tool.get_dua)
-    check(JSON.stringify(sanitiseDay('2026-10-12', { by_tool: { get_dua: { ok: -3, error: 1.9, not_found: 'x' } } }).by_tool.get_dua) === JSON.stringify({ ok: 0, not_found: 0, error: 1, duration_ms_sum: 0 }), 'values are stored as non-negative integers only')
+    check(JSON.stringify(sanitiseDay('2026-10-12', { by_tool: { get_dua: { ok: -3, error: 1.9, not_found: 'x' } } }).by_tool.get_dua) === JSON.stringify({ ok: 0, not_found: 0, error: 1, duration_ms_sum: 0, teach_served: 0 }), 'values are stored as non-negative integers only')
     check(!readdirSync(dir).some((n) => n.endsWith('.tmp')), 'no temporary file is left behind')
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -216,7 +224,7 @@ const stop = (pr: Proc, signal: NodeJS.Signals) =>
   })
 async function stats(port: number) {
   const r = await fetch(`http://127.0.0.1:${port}/stats`, { headers: { authorization: 'Bearer wo456-token' } })
-  return (await r.json()) as { privacy: string; daily: null | { retention_days: number; days: { date: string; total: number; by_tool: Record<string, { ok: number; not_found: number; total: number }> }[] } }
+  return (await r.json()) as { privacy: string; audience: Record<string, number>; prompts: Record<string, number>; by_tool: Record<string, { teach_served: number }>; daily: null | { retention_days: number; days: { date: string; total: number; by_tool: Record<string, { ok: number; not_found: number; total: number; teach_served: number }>; audience: Record<string, number> }[] } }
 }
 
 async function testServer() {
@@ -229,10 +237,16 @@ async function testServer() {
   try {
     let s = start(3481, env)
     check(await up(3481), 'server starts with MCP_USAGE_DIR set')
-    const st = [await callTool(3481, 'get_dua', { context: 'WO456SENTINEL anxiety' }), await callTool(3481, 'get_dua', { context: 'anxiety' }), await callTool(3481, 'get_name_of_allah', { number: 1 })]
+    const st = [await callTool(3481, 'get_dua', { context: 'WO456SENTINEL anxiety' }), await callTool(3481, 'get_dua', { context: 'anxiety' }), await callTool(3481, 'get_name_of_allah', { number: 1, audience: 'revert' })]
     check(st.every((x) => x === 200), 'three tool calls answered', st)
+    // WO#488: an audience value outside the enum is refused by the schema before the handler,
+    // so it is never counted, and never reaches disk (the sentinel audit below).
+    await callTool(3481, 'get_name_of_allah', { number: 1, audience: 'wo456-audience' })
     const live = await stats(3481)
     check(live.daily?.days[0]?.date === today && live.daily.days[0].total === 3 && live.daily.retention_days === 90, "/stats shows today's unwritten counts before any write", live.daily)
+    check(live.audience.revert === 1 && live.audience.absent === 2 && Object.values(live.audience).reduce((a, b) => a + b, 0) === 3 && live.daily?.days[0]?.audience.revert === 1, 'WO#488: /stats tallies audience (revert 1, absent 2) since start and today; the refused value counts nowhere', live.audience)
+    check(live.by_tool.get_name_of_allah.teach_served === 1 && live.by_tool.get_dua.teach_served === 0 && live.daily?.days[0]?.by_tool.get_name_of_allah.teach_served === 1, 'WO#488: teach_served counts the Name 1 response (teach) and not the soft-block du\'a calls', live.by_tool)
+    check(JSON.stringify(Object.keys(live.prompts).sort()) === JSON.stringify(PROMPT_KEYS) && Object.values(live.prompts).every((n) => n === 0), 'WO#488: /stats carries the prompt counters (none fetched yet)', live.prompts)
     check(!existsSync(path.join(usage, `${today}.json`)), 'control: no file yet (the timer is 5 minutes)')
     check(await stop(s, 'SIGINT') === 0 && existsSync(path.join(usage, `${today}.json`)), 'SIGINT (how Fly stops an idle machine) writes the day file and exits 0', s.out().slice(-300))
 
@@ -297,11 +311,56 @@ function testPublishWorkflow() {
   }
 }
 
+// ---- 7. WO#488 Part B counters, in process ------------------------------------
+async function testWo488Counters() {
+  console.log('\n=== 7. WO#488: teach_served, the audience tally and prompt fetches ===')
+  const dir = tmp()
+  try {
+    const clock = () => new Date('2026-10-22T10:00:00Z')
+    // A day file written by 2.3.x: no teach_served, audience or prompts.
+    writeFileSync(path.join(dir, '2026-10-22.json'), JSON.stringify({ date: '2026-10-22', by_tool: { get_dua: { ok: 2, not_found: 0, error: 0, duration_ms_sum: 4 } } }))
+    const s = new DailyUsageStore(dir, clock)
+    const old = s.days()[0]!
+    check(old.by_tool.get_dua.teach_served === 0 && Object.values(old.audience).every((n) => n === 0) && Object.values(old.prompts).every((n) => n === 0) && old.by_tool.get_dua.ok === 2, 'a 2.3.x day file reads with zero teach, audience and prompts, and its counts kept')
+    s.record('get_name_of_allah', 'ok', 1, true, 'revert')
+    s.record('get_dua', 'ok', 1, false, 'curious')
+    s.record('get_dua', 'ok', 1)
+    // @ts-expect-error a value outside the five buckets is counted as absent, never stored
+    s.record('get_dua', 'ok', 1, false, 'wo456-audience')
+    s.recordPrompt('understand_a_verse')
+    s.recordPrompt('explore_names_of_allah')
+    s.recordPrompt('explore_names_of_allah')
+    // @ts-expect-error a prompt name outside the registered ones is ignored
+    s.recordPrompt('wo456-client')
+    s.flush()
+    const j = JSON.parse(readFileSync(path.join(dir, '2026-10-22.json'), 'utf8'))
+    check(j.by_tool.get_name_of_allah.teach_served === 1 && j.by_tool.get_dua.teach_served === 0 && j.by_tool.get_dua.ok === 5, 'teach_served per tool, beside the outcome counts', j.by_tool)
+    check(JSON.stringify(j.audience) === JSON.stringify({ curious: 1, revert: 1, practising: 0, unknown: 0, absent: 2 }), 'the audience tally: five fixed keys; a missing or unknown value counts as absent', j.audience)
+    check(JSON.stringify(j.prompts) === JSON.stringify({ understand_a_verse: 1, explore_names_of_allah: 2 }), 'prompt fetches by name; an unregistered name is ignored', j.prompts)
+    check(auditDir(dir).length === 0, 'the file holds only allowed keys and no sentinel', auditDir(dir))
+    // The in-memory tier, through the logger.
+    const { logRequest, logPromptFetch, getAggregateSnapshot, resetLoggerForTests } = await import('../src/logging/request-logger.js')
+    resetLoggerForTests()
+    logRequest({ tool: 'get_quran_verse', status: 'ok', duration_ms: 1, teach_served: true, audience: 'practising' })
+    logRequest({ tool: 'get_quran_verse', status: 'ok', duration_ms: 1, audience: 'wo456-audience' })
+    logRequest({ tool: 'find_verses', status: 'not_found', duration_ms: 1, audience: 'unknown' })
+    logPromptFetch('understand_a_verse')
+    const snap = getAggregateSnapshot()
+    check(snap.perTool.get_quran_verse.teach_served === 1 && snap.perTool.find_verses.teach_served === 0, 'in memory: teach_served per tool')
+    check(JSON.stringify(snap.audience) === JSON.stringify({ curious: 0, revert: 0, practising: 1, unknown: 1, absent: 1 }) && !JSON.stringify(snap).includes('wo456-audience'), 'in memory: the audience tally; a non-enum value is absent and appears nowhere', snap.audience)
+    check(snap.prompts.understand_a_verse === 1 && snap.prompts.explore_names_of_allah === 0, 'in memory: prompt fetches by name')
+    resetLoggerForTests()
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
 async function main() {
   testRestartInProcess()
   testAllowedFieldsOnly()
   testRollover()
   testPrune()
+  await testWo488Counters()
   await testServer()
   testPublishWorkflow()
   console.log(`\nWO#456: ${passed} passed, ${failed} failed`)

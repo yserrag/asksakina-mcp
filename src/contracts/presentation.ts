@@ -237,13 +237,19 @@ export const NAME_DIRECTIVES: readonly string[] = [
 export const TEACH_DIRECTIVE =
   'CRITICAL: Teaching order for the accompanying `teach` block. (1) Quote the record first, exactly as provided: the Arabic, the translation, the source and the grading, including a weak grading or a note that none is recorded. (2) Then you may explain in your own words, using only the `teach` fields (key_word, context, misconception) and nothing else, and say that it is context from AskSakina\'s notes, for example "AskSakina\'s notes explain that...". It is not tafsir and not a ruling: do not add your own interpretation of what Allah intends, do not derive a ruling, and do not choose between scholarly positions. (3) Where the notes end, say so, and point the user to a recognised tafsir or a qualified scholar. (4) If a reflection_question is included, offer it verbatim for the user to consider and do not answer it on their behalf. (5) Offer at most one related next step, taken from the `related` list by its label; if there is no `related` list, offer none. (6) If the payload includes a crisis resource block, drop the `teach` content entirely and prioritise the crisis resources. If the user has disclosed distress, grief or crisis in the conversation, quote records only: skip teach, reflection questions and the open door. Quote Arabic terms and script exactly as provided, without altering codepoints or transliterating independently, and present every citation and grading exactly as written, without implying authentication beyond what is explicitly stated, and never softened.'
 
+/** WO#488 Part D (Gem 10, 22 Oct 2026, verbatim). */
+export const TEACH_CONTEXT_BLOCK_LINE =
+  "CRITICAL: Output the `context_block` exactly as provided. Do not split, summarize, or reformat the text before or after the newline (`\\n`). The citations and gradings at the end of the block are mandatory and must remain attached to the context."
+
 /**
  * WO#485, Gem 10 correction of 2.3.0 (22 Oct 2026; docs/wo485-architect.md),
- * verbatim. Same emission condition as TEACH_DIRECTIVE: every response that
- * carries a teach block, and no other.
+ * verbatim; its first line replaced by WO#488 Part D. Same emission
+ * condition as TEACH_DIRECTIVE: every response that carries a teach block,
+ * and no other.
  */
 export const TEACH_BINDING_DIRECTIVES: readonly string[] = [
-  'CRITICAL: You must present the context text and all citations and gradings exactly as provided, bound together in one string. Do not omit the grading.',
+  // WO#488 Part D (Gem 10, 22 Oct 2026, verbatim): replaces the WO#485 binding line.
+  TEACH_CONTEXT_BLOCK_LINE,
   "CRITICAL: Present all explanatory glosses, contexts, and reflections using neutral, educational framing (e.g., 'In Islamic tradition...', 'Muslims believe...'). Do not present them as personalized religious rulings.",
 ]
 
@@ -252,4 +258,6 @@ export const TEACH_BINDING_DIRECTIVES: readonly string[] = [
  * contract). Same emission condition as TEACH_DIRECTIVE.
  */
 export const TEACH_CONTRACT =
-  'Educational Context (Teach): Quote the record first, exactly. Then explain only from the teach block (key word, root, gloss, context, misconception), labelled as context from AskSakina\'s notes, not as tafsir or a ruling; where the notes end, say so and refer to a recognised tafsir or a qualified scholar. Output citations and gradings exactly as written. Offer the reflection question verbatim and do not answer it. Offer at most one related next step. Under no circumstances should this block be rendered if the payload includes a crisis resource block.'
+  'Educational Context (Teach): Quote the record first, exactly. Then explain only from the teach block (key word, root, gloss, context, misconception), labelled as context from AskSakina\'s notes, not as tafsir or a ruling; where the notes end, say so and refer to a recognised tafsir or a qualified scholar. Output citations and gradings exactly as written. Offer the reflection question verbatim and do not answer it. Offer at most one related next step. Under no circumstances should this block be rendered if the payload includes a crisis resource block. ' +
+  // WO#488 Part D (Gem 10, 22 Oct 2026): the context_block line, verbatim.
+  TEACH_CONTEXT_BLOCK_LINE

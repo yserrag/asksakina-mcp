@@ -148,12 +148,7 @@ export const SELF_HARM_KEYWORDS_TR = [
     "nefes alamıyorum",
     "imtihana dayanamıyorum",
 ];
-export const SELF_HARM_KEYWORDS = [
-    ...SELF_HARM_KEYWORDS_EN,
-    ...SELF_HARM_KEYWORDS_ID,
-    ...SELF_HARM_KEYWORDS_UR,
-    ...SELF_HARM_KEYWORDS_AR,
-    ...SELF_HARM_KEYWORDS_TR,
+export const SELF_HARM_KEYWORDS_FA = [
     'خودکشی',
     'خودکشی میکنم',
     'میخوام بمیرم',
@@ -166,6 +161,13 @@ export const SELF_HARM_KEYWORDS = [
     'به خودم صدمه میزنم',
     'دلیلی برای زندگی ندارم',
     'از زندگی خسته شدم',
+    'نمیخواهم زنده باشم',
+    'به زندگیم پایان میدهم',
+    'خسته شدم از زندگی',
+    'کاش بیدار نشم',
+    'mikham bemiram',
+];
+export const SELF_HARM_KEYWORDS_BN = [
     'আত্মহত্যা',
     'আত্মহত্যা করব',
     'মরতে চাই',
@@ -176,8 +178,6 @@ export const SELF_HARM_KEYWORDS = [
     'নিজের ক্ষতি করি',
     'নিজেকে আঘাত করি',
     'বাঁচার কোনো মানে নেই',
-    'نمیخواهم زنده باشم',
-    'به زندگیم پایان میدهم',
     'আত্মহত্যা করবো',
     'মইরা যাইতে চাই',
     'মইরা যেতে চাই',
@@ -185,6 +185,18 @@ export const SELF_HARM_KEYWORDS = [
     'নিজের ক্ষতি করবো',
     'নিজেকে আঘাত করব',
     'নিজেকে আঘাত করবো',
+    'বেঁচে থাকার কোনো অর্থ নেই',
+    'আমার মরে যাওয়াই ভালো',
+    'ami more jete chai',
+];
+export const SELF_HARM_KEYWORDS = [
+    ...SELF_HARM_KEYWORDS_EN,
+    ...SELF_HARM_KEYWORDS_ID,
+    ...SELF_HARM_KEYWORDS_UR,
+    ...SELF_HARM_KEYWORDS_AR,
+    ...SELF_HARM_KEYWORDS_TR,
+    ...SELF_HARM_KEYWORDS_FA,
+    ...SELF_HARM_KEYWORDS_BN,
     'میں مرنا چاہندا',
     'میں مرنا چاہندی',
     'اپنے آپ نوں ختم',
@@ -336,12 +348,7 @@ export const ABUSE_KEYWORDS_TR = [
     "zulme sabretmek",
     "itaat etmek zorunda mıyım",
 ];
-export const ABUSE_KEYWORDS = [
-    ...ABUSE_KEYWORDS_EN,
-    ...ABUSE_KEYWORDS_ID,
-    ...ABUSE_KEYWORDS_UR,
-    ...ABUSE_KEYWORDS_AR,
-    ...ABUSE_KEYWORDS_TR,
+export const ABUSE_KEYWORDS_FA = [
     'کتکم میزنه',
     'کتکم میزند',
     'منو میزنه',
@@ -349,6 +356,13 @@ export const ABUSE_KEYWORDS = [
     'میترسم برم خونه',
     'بهم تجاوز کرد',
     'ازار جنسی',
+    'من را میزند',
+    'میترسم بروم خانه',
+    'به من تجاوز کرد',
+    'mano mizane',
+    'ازش میترسم',
+];
+export const ABUSE_KEYWORDS_BN = [
     'আমাকে মারে',
     'আমাকে মারধর করে',
     'ঘরে ফিরতে ভয় পাই',
@@ -356,9 +370,19 @@ export const ABUSE_KEYWORDS = [
     'আমাকে ধর্ষণ করেছে',
     'ধর্ষিত হয়েছি',
     'যৌন নির্যাতন',
-    'من را میزند',
-    'میترسم بروم خانه',
-    'به من تجاوز کرد',
+    'মারধর করে',
+    'গায়ে হাত তোলে',
+    'অত্যাচার করে',
+    'amake mare',
+];
+export const ABUSE_KEYWORDS = [
+    ...ABUSE_KEYWORDS_EN,
+    ...ABUSE_KEYWORDS_ID,
+    ...ABUSE_KEYWORDS_UR,
+    ...ABUSE_KEYWORDS_AR,
+    ...ABUSE_KEYWORDS_TR,
+    ...ABUSE_KEYWORDS_FA,
+    ...ABUSE_KEYWORDS_BN,
     'اوہ مینوں ماردا اے',
     'مینوں کٹ پیندی اے',
     'بڑا ظلم کردا اے',
@@ -502,7 +526,7 @@ export function detectCrisis(text) {
     if (matchesAnyExcept(ABUSE_KEYWORDS, BARE_NOUN_SET, input)) {
         return { isCrisis: true, crisisType: 'abuse' };
     }
-    if (trFearProximity(text, input)) {
+    if (trFearProximity(text, input) || faFearProximity(text, input) || bnFearProximity(text, input)) {
         return { isCrisis: true, crisisType: 'abuse' };
     }
     const hits = bareNounHits(input);
@@ -522,6 +546,8 @@ const KEYWORDS_BY_LANGUAGE = {
         ['ur', SELF_HARM_KEYWORDS_UR],
         ['ar', SELF_HARM_KEYWORDS_AR],
         ['tr', SELF_HARM_KEYWORDS_TR],
+        ['fa', SELF_HARM_KEYWORDS_FA],
+        ['bn', SELF_HARM_KEYWORDS_BN],
     ],
     abuse: [
         ['en', ABUSE_KEYWORDS_EN],
@@ -529,12 +555,19 @@ const KEYWORDS_BY_LANGUAGE = {
         ['ur', ABUSE_KEYWORDS_UR],
         ['ar', ABUSE_KEYWORDS_AR],
         ['tr', ABUSE_KEYWORDS_TR],
+        ['fa', ABUSE_KEYWORDS_FA],
+        ['bn', ABUSE_KEYWORDS_BN],
     ],
+};
+const FEAR_PROXIMITY = {
+    tr: (text, input) => trFearProximity(text, input),
+    fa: (text, input) => faFearProximity(text, input),
+    bn: (text, input) => bnFearProximity(text, input),
 };
 export function crisisKeywordLanguages(text, crisisType) {
     const input = prepareInput(text);
     return KEYWORDS_BY_LANGUAGE[crisisType]
-        .filter(([language, keywords]) => matchesAny(keywords, input) || (crisisType === 'abuse' && language === 'tr' && trFearProximity(text, input)))
+        .filter(([language, keywords]) => matchesAny(keywords, input) || (crisisType === 'abuse' && !!FEAR_PROXIMITY[language]?.(text, input)))
         .map(([language]) => language);
 }
 export const TR_FEAR_RELATIONS = [
@@ -545,5 +578,37 @@ const TR_FEAR_PROXIMITY = new RegExp(`(?<![\\p{L}\\p{N}])(?:${TR_FEAR_RELATIONS.
 function trFearProximity(text, input) {
     const raw = foldLatin(text.toLowerCase());
     return TR_FEAR_PROXIMITY.test(raw) || input.latin.some((f) => TR_FEAR_PROXIMITY.test(f));
+}
+export const FA_FEAR_RELATIONS = [
+    'شوهرم', 'همسرم', 'پدرم', 'برادرم', 'زنم', 'مادرشوهرم',
+    'خانوادم',
+    '\u0645\u0627\u062F\u0631\u0645',
+    'پدرشوهرم',
+];
+export const FA_FEAR_FROM = 'از';
+export const FA_FEAR_VERB = 'میترسم';
+const NOT_WORD = '(?<![\\p{L}\\p{M}\\p{N}])';
+const WORD_ENDS = '(?![\\p{L}\\p{M}\\p{N}])';
+const UP_TO_THREE_WORDS = '[\\s\\p{P}]+(?:[^\\s\\p{P}]+[\\s\\p{P}]+){0,3}';
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const FA_VERB_NORM = normaliseArabic(FA_FEAR_VERB);
+const FA_FEAR_PROXIMITY = new RegExp(`${NOT_WORD}${escapeRe(normaliseArabic(FA_FEAR_FROM))}[\\s\\p{P}]+(?:${FA_FEAR_RELATIONS.map((w) => escapeRe(normaliseArabic(w))).join('|')})${WORD_ENDS}${UP_TO_THREE_WORDS}${escapeRe(FA_VERB_NORM.slice(0, 2))} ?${escapeRe(FA_VERB_NORM.slice(2))}`, 'u');
+function faFearProximity(text, input) {
+    return FA_FEAR_PROXIMITY.test(normaliseArabic(text)) || FA_FEAR_PROXIMITY.test(input.arabic);
+}
+export const BN_FEAR_RELATIONS = [
+    'স্বামী', 'শাশুড়ি', 'শাশুড়ী', 'শ্বশুর', 'বাবা', 'ভাই',
+    'স্ত্রী',
+    'পরিবার',
+];
+export const BN_FEAR_NOUN = 'ভয়';
+export const BN_FEAR_VERBS = ['করে', 'লাগে', 'করি', 'পাই'];
+const BN_CASE_ENDINGS = ['\u0995\u09C7', '\u09B0', '\u09C7\u09B0', '\u09AF\u09BC\u09C7\u09B0', '\u098F\u09B0'];
+const BN_ALSO = '\u0993';
+const nfc = (s) => s.normalize('NFC');
+const BN_FEAR_PROXIMITY = new RegExp(`${NOT_WORD}(?:${BN_FEAR_RELATIONS.map((w) => escapeRe(nfc(w))).join('|')})(?:${BN_CASE_ENDINGS.map(nfc).join('|')})?(?:${BN_ALSO})?${WORD_ENDS}${UP_TO_THREE_WORDS}${escapeRe(nfc(BN_FEAR_NOUN))}\\s+(?:${BN_FEAR_VERBS.map((v) => escapeRe(nfc(v))).join('|')})`, 'u');
+function bnFearProximity(text, input) {
+    const raw = foldLatin(text.toLowerCase());
+    return BN_FEAR_PROXIMITY.test(raw) || input.latin.some((f) => BN_FEAR_PROXIMITY.test(f));
 }
 //# sourceMappingURL=crisis-detection.js.map

@@ -1,6 +1,9 @@
 import { crisisKeywordLanguages, detectCrisis } from './_synced/crisis-detection.js';
 import { abuseText, selfHarmText, softText } from './crisis-text-l10n.js';
+import { enFallbackAbuseText, enFallbackSelfHarmText } from './crisis-text-en-fallback.js';
+import { crisisEnglishNote } from '../contracts/english-fallback.js';
 import { foldLatin } from './_synced/latin-fold.js';
+import { normaliseArabic } from './_synced/arabic-normalise.js';
 export const SOFT_DISTRESS_KEYWORDS = [
     'anxiety', 'anxious', 'panic',
     'stress', 'stressed', 'overwhelmed',
@@ -73,22 +76,43 @@ function turkishSoftKeyword(input) {
     }
     return undefined;
 }
+export const SOFT_DISTRESS_KEYWORDS_BN = ['খুব একা লাগছে', 'মন খুব খারাপ'];
+export const SOFT_DISTRESS_KEYWORDS_FA = ['دلم گرفته', 'خیلی تنهام', 'حالم بده'];
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const phraseRe = (s) => new RegExp(`(?<![\\p{L}\\p{M}\\p{N}])${escapeRe(s)}(?![\\p{L}\\p{M}\\p{N}])`, 'u');
+const BN_SOFT = SOFT_DISTRESS_KEYWORDS_BN.map((k) => [k, phraseRe(k.normalize('NFC'))]);
+const FA_SOFT = SOFT_DISTRESS_KEYWORDS_FA.map((k) => [k, phraseRe(normaliseArabic(k))]);
+function bnSoftKeyword(input) {
+    const text = input.normalize('NFC');
+    return BN_SOFT.find(([, re]) => re.test(text))?.[0];
+}
+function faSoftKeyword(input) {
+    const text = normaliseArabic(input);
+    return FA_SOFT.find(([, re]) => re.test(text))?.[0];
+}
 export function evaluateDistress(input) {
     const crisis = detectCrisis(input);
     if (crisis.isCrisis) {
         const keywordLanguages = crisis.crisisType === 'none' ? [] : crisisKeywordLanguages(input, crisis.crisisType);
         return { level: 'hard', crisisType: crisis.crisisType, keywordLanguages };
     }
-    const softMatch = softDistressKeyword(input);
-    const trMatch = turkishSoftKeyword(input);
-    if (softMatch || trMatch) {
-        const keywordLanguages = [...(softMatch ? ['en'] : []), ...(trMatch ? ['tr'] : [])];
-        return { level: 'soft', matchedKeyword: softMatch ?? trMatch, keywordLanguages };
+    const matches = [
+        ['en', softDistressKeyword(input)],
+        ['tr', turkishSoftKeyword(input)],
+        ['bn', bnSoftKeyword(input)],
+        ['fa', faSoftKeyword(input)],
+    ];
+    const hit = matches.filter(([, k]) => k);
+    if (hit.length) {
+        return { level: 'soft', matchedKeyword: hit[0][1], keywordLanguages: hit.map(([l]) => l) };
     }
     return { level: 'none' };
 }
+const isEnFallback = (l) => l === 'bn' || l === 'fa';
+const fallbackNote = (l) => ({ translation_note: crisisEnglishNote(l) });
 const IASP = 'https://www.iasp.info/resources/Crisis_Centres/';
 export const US_988_FOUNDER_VERIFIED = false;
+export { BN_FA_LINES_FOUNDER_VERIFIED } from './crisis-text-en-fallback.js';
 const HARD_CRISIS_DIRECTIVE = 'CRITICAL: You MUST output the following crisis resource text exactly as written below. Do not alter it or make it conditional. Do not assess whether the user needs it; output it.';
 const SELF_HARM_LINES_EN = US_988_FOUNDER_VERIFIED
     ? 'Samaritans (UK: 116 123, 24/7) or 988 (US/Canada, 24/7)'
@@ -115,7 +139,8 @@ function selfHarmBlockFor(locale) {
         crisis_type: 'self-harm',
         locale,
         directive: HARD_CRISIS_DIRECTIVE,
-        text: HARD_CRISIS_TEXT[locale],
+        text: isEnFallback(locale) ? enFallbackSelfHarmText(locale) : HARD_CRISIS_TEXT[locale],
+        ...(isEnFallback(locale) ? fallbackNote(locale) : {}),
     };
 }
 export const ABUSE_SENTENCE = 'What you are experiencing is oppression (dhulm), and you are not to blame. Your first duty is to protect your safety, not to endure harm. Professional support is available to help you navigate this safely.';
@@ -134,7 +159,8 @@ function abuseBlockFor(locale) {
         crisis_type: 'abuse',
         locale,
         directive: ABUSE_DIRECTIVE,
-        text: ABUSE_TEXT[locale],
+        text: isEnFallback(locale) ? enFallbackAbuseText(locale, ABUSE_SENTENCE) : ABUSE_TEXT[locale],
+        ...(isEnFallback(locale) ? fallbackNote(locale) : {}),
     };
 }
 export const SOFT_DISTRESS_RESOURCE_BLOCK = {
@@ -146,6 +172,8 @@ export const SOFT_DISTRESS_RESOURCE_BLOCK = {
 function softDistressBlockFor(locale) {
     if (locale === 'en')
         return SOFT_DISTRESS_RESOURCE_BLOCK;
+    if (isEnFallback(locale))
+        return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, ...fallbackNote(locale) };
     return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, text: softText(locale) };
 }
 export function crisisLocaleFor(hint, locale) {

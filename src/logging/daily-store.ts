@@ -2,10 +2,14 @@
 //
 // Same rule as the in-memory counters (WO#360), with one difference: these
 // totals survive a restart. For each tool and each UTC day, the store keeps
-// four numbers and nothing else:
+// five numbers and nothing else:
 //
 //   ok, not_found, error   - how many calls ended each way
 //   duration_ms_sum        - their summed handler time, for an average
+//   teach_served           - how many carried a teach block (WO#488)
+//
+// and, per UTC day across all tools (WO#488), the tally of `audience`
+// values (five fixed keys) and the fetches of each registered prompt.
 //
 // NO IP addresses, user agents, client identifiers, times of individual
 // calls, request params or response payloads. The serialiser below builds
@@ -26,6 +30,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSyn
 import path from 'node:path'
 
 import type { RequestStatus, ToolName } from './request-logger.js'
+import { AUDIENCE_BUCKETS, PROMPT_NAMES, type AudienceBucket, type PromptName } from './counter-keys.js'
 
 export const RETENTION_DAYS = 90
 export const FLUSH_INTERVAL_MS = 5 * 60 * 1000
@@ -38,17 +43,22 @@ export interface DailyToolCounts {
   not_found: number
   error: number
   duration_ms_sum: number
+  teach_served: number
 }
 
 export interface DailyFile {
   date: string
   by_tool: Record<ToolName, DailyToolCounts>
+  audience: Record<AudienceBucket, number>
+  prompts: Record<PromptName, number>
 }
 
-const zero = (): DailyToolCounts => ({ ok: 0, not_found: 0, error: 0, duration_ms_sum: 0 })
+const zero = (): DailyToolCounts => ({ ok: 0, not_found: 0, error: 0, duration_ms_sum: 0, teach_served: 0 })
 const zeroDay = (date: string): DailyFile => ({
   date,
   by_tool: { get_quran_verse: zero(), get_dua: zero(), get_name_of_allah: zero(), find_verses: zero() },
+  audience: Object.fromEntries(AUDIENCE_BUCKETS.map((b) => [b, 0])) as Record<AudienceBucket, number>,
+  prompts: Object.fromEntries(PROMPT_NAMES.map((n) => [n, 0])) as Record<PromptName, number>,
 })
 
 /** UTC calendar day of `when`, as YYYY-MM-DD. */
@@ -72,7 +82,14 @@ const count = (x: unknown): number => (typeof x === 'number' && Number.isFinite(
  */
 export function sanitiseDay(date: string, input: unknown): DailyFile {
   const out = zeroDay(date)
-  const byTool = (input as { by_tool?: Record<string, unknown> } | null)?.by_tool
+  const src = input as { by_tool?: Record<string, unknown>; audience?: Record<string, unknown>; prompts?: Record<string, unknown> } | null
+  // WO#488: a day file written before 2.4.0 has no audience or prompts; it
+  // reads as zeros, which is right (nothing was counted then).
+  const audience = src?.audience
+  if (audience && typeof audience === 'object') for (const b of AUDIENCE_BUCKETS) out.audience[b] = count(audience[b])
+  const prompts = src?.prompts
+  if (prompts && typeof prompts === 'object') for (const n of PROMPT_NAMES) out.prompts[n] = count(prompts[n])
+  const byTool = src?.by_tool
   if (!byTool || typeof byTool !== 'object') return out
   for (const t of TOOLS) {
     const c = byTool[t] as Partial<DailyToolCounts> | undefined
@@ -82,6 +99,7 @@ export function sanitiseDay(date: string, input: unknown): DailyFile {
       not_found: count(c.not_found),
       error: count(c.error),
       duration_ms_sum: count(c.duration_ms_sum),
+      teach_served: count(c.teach_served),
     }
   }
   return out
@@ -95,7 +113,10 @@ function addInto(target: DailyFile, add: DailyFile): void {
     a.not_found += b.not_found
     a.error += b.error
     a.duration_ms_sum += b.duration_ms_sum
+    a.teach_served += b.teach_served
   }
+  for (const k of AUDIENCE_BUCKETS) target.audience[k] += add.audience[k]
+  for (const n of PROMPT_NAMES) target.prompts[n] += add.prompts[n]
 }
 
 export class DailyUsageStore {
@@ -107,17 +128,34 @@ export class DailyUsageStore {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  /** Count one tool call against the UTC day it ended on. No other data is taken. */
-  record(tool: ToolName, status: RequestStatus, durationMs: number): void {
-    if (!TOOLS.includes(tool)) return
+  private today(): DailyFile {
     const day = utcDay(this.now())
     let d = this.pending.get(day)
     if (!d) this.pending.set(day, (d = zeroDay(day)))
+    return d
+  }
+
+  /**
+   * Count one tool call against the UTC day it ended on: its outcome and
+   * duration, whether it carried teach, and its audience bucket (WO#488).
+   * No other data is taken.
+   */
+  record(tool: ToolName, status: RequestStatus, durationMs: number, teachServed = false, audience: AudienceBucket = 'absent'): void {
+    if (!TOOLS.includes(tool)) return
+    const d = this.today()
     const c = d.by_tool[tool]
     if (status === 'ok') c.ok += 1
     else if (status === 'not_found') c.not_found += 1
     else c.error += 1
     c.duration_ms_sum += Math.max(0, Math.round(durationMs))
+    if (teachServed) c.teach_served += 1
+    d.audience[AUDIENCE_BUCKETS.includes(audience) ? audience : 'absent'] += 1
+  }
+
+  /** WO#488: count one prompt fetch against today, by name only. */
+  recordPrompt(name: PromptName): void {
+    if (!PROMPT_NAMES.includes(name)) return
+    this.today().prompts[name] += 1
   }
 
   private file(day: string): string {

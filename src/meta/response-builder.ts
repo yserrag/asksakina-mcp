@@ -10,6 +10,7 @@
  */
 
 import { SAKINA_DISCLAIMER, NOT_FOUND_DISCLAIMER, CRISIS_ONLY_DISCLAIMER } from '../contracts/disclaimers.js'
+import { ENGLISH_FALLBACK_GUARD } from '../contracts/english-fallback.js'
 import {
   QURAN_VERSE_CONTEXT,
   HADITH_CONTEXT,
@@ -192,6 +193,16 @@ function carriesNonEnCrisisBlock(extras: Record<string, unknown> | undefined): b
   return !!block && typeof block.locale === 'string' && block.locale !== 'en'
 }
 
+/**
+ * WO#488 A6: a bn or fa crisis block is the English text with local lines,
+ * and carries `translation_note`. The note and the English-fallback guard go
+ * into CRITICAL_RULES after the anti-translation line (the 2.2.1 pattern).
+ */
+function crisisFallbackDirectives(extras: Record<string, unknown> | undefined): string[] {
+  const block = extras?.crisis_resource as { translation_note?: unknown } | undefined
+  return block && typeof block.translation_note === 'string' ? [block.translation_note, ENGLISH_FALLBACK_GUARD] : []
+}
+
 export function buildResponse<TContent>(
   input: BuilderInput<TContent>,
 ): SakinaResponse<TContent> {
@@ -203,6 +214,7 @@ export function buildResponse<TContent>(
     ...(input.extraDirectives ?? []),
     ...(teach ? [TEACH_DIRECTIVE, ...TEACH_BINDING_DIRECTIVES] : []),
     ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION] : []),
+    ...crisisFallbackDirectives(input.extras),
   ]
   const full = extra.length ? [...meta.directives, ...extra] : meta.directives
   const directives = input.withholdTeach ? full.map(withoutNoTeachClause) : full

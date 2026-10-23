@@ -79,7 +79,7 @@ export async function findVersesHandler(input) {
     const limit = Math.min(Math.max(input.limit ?? FIND_VERSES_DEFAULT_LIMIT, 1), FIND_VERSES_MAX_LIMIT);
     const distress = evaluateDistress(input.query);
     const block = distressBlockFor(distress, locale);
-    const extras = block ? { crisis_resource: block } : undefined;
+    let extras = block ? { crisis_resource: block } : undefined;
     if (distress.level === 'hard') {
         return buildResponse({
             contentType: 'crisis_resource_only',
@@ -98,6 +98,8 @@ export async function findVersesHandler(input) {
         return noResults(input.query, `No theme in the index matched the query. Try one of the available themes.`, extras);
     }
     const themes = matches.map((m) => m.theme);
+    if (!extras && themes.includes('grief'))
+        extras = { crisis_resource: distressBlockFor('soft', locale) };
     const found = await Promise.all(versesForThemes(themes, limit).map((v) => toFoundVerse(v, themes, locale)));
     const withhold = Boolean(extras) || themes.includes('grief');
     const verses = found.map((v) => withTeach(v, `verse:${v.reference}`, { audience: input.audience, locale, withhold }));

@@ -14,12 +14,13 @@ import { ABOUT_RESOURCE_BODY } from './contracts/educational.js';
 import { AUDIENCE_JSON_SCHEMA } from './teach/audience.js';
 import { RATE_LIMIT_BUDGET, RATE_LIMIT_WINDOW_MS, getRateLimiter, probeRateLimiter, } from './safety/rate-limiter.js';
 import { serialiseResponse } from './meta/response-builder.js';
-import { logRequest } from './logging/request-logger.js';
+import { logPromptFetch, logRequest } from './logging/request-logger.js';
+import { exploreNamesArgs, exploreNamesPrompt, readMissingArgumentsAsEmpty, PROMPT_STRINGS, understandAVerseArgs, understandAVersePrompt } from './prompts/learning-journeys.js';
 import { handleStatsRequest } from './logging/stats.js';
 import { enableDailyStore } from './logging/daily-store.js';
 import { extractClientIp } from './logging/geo.js';
 const SERVER_NAME = 'sakina-islamic-knowledge';
-const SERVER_VERSION = '2.3.1';
+const SERVER_VERSION = '2.4.0';
 const SERVER_DESCRIPTION = "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar.";
 const SERVER_CARD = {
     schemaVersion: '2025-07-09',
@@ -135,6 +136,10 @@ const SERVER_CARD = {
             },
         },
     ],
+    prompts: [
+        { name: 'understand_a_verse', description: PROMPT_STRINGS.understandDescription },
+        { name: 'explore_names_of_allah', description: PROMPT_STRINGS.exploreDescription },
+    ],
     resources: [
         {
             uri: 'sakina://about',
@@ -150,7 +155,7 @@ const SERVER_CARD = {
         privacy: {
             tracking: 'none',
             analytics: 'aggregate-only',
-            logging: 'aggregate counters only: per-tool call and status totals. No per-request records, no IPs, no client identifiers, no user-agents, no geolocation, no params, no response payloads. Since-start totals reset on restart; on the hosted server, per-tool daily totals are kept on disk for at most 90 days.',
+            logging: 'aggregate counters only: per-tool call and status totals, teach-served per tool, a tally of audience values, and prompt fetches by name. No per-request records, no IPs, no client identifiers, no user-agents, no geolocation, no other params, no response payloads. Since-start totals reset on restart; on the hosted server, daily totals are kept on disk for at most 90 days.',
         },
     },
 };
@@ -158,11 +163,13 @@ function withLogging(tool, handler) {
     return async (args) => {
         const start = performance.now();
         let status = 'ok';
+        let teachServed = false;
         try {
             const response = await handler(args);
             if (response._sakina_meta?.content_type === 'not_found') {
                 status = 'not_found';
             }
+            teachServed = response._sakina_meta?.presentation_contract?.teach !== undefined;
             return { content: [{ type: 'text', text: serialiseResponse(response) }] };
         }
         catch (err) {
@@ -170,7 +177,17 @@ function withLogging(tool, handler) {
             throw err;
         }
         finally {
-            logRequest({ tool, status, duration_ms: performance.now() - start });
+            logRequest({ tool, status, duration_ms: performance.now() - start, teach_served: teachServed, audience: args.audience });
+        }
+    };
+}
+function withPromptLogging(name, cb) {
+    return (args) => {
+        try {
+            return cb(args);
+        }
+        finally {
+            logPromptFetch(name);
         }
     };
 }
@@ -200,6 +217,9 @@ export function createMcpServer() {
         description: FIND_VERSES_DESCRIPTION,
         inputSchema: findVersesShape,
     }, withLogging('find_verses', findVersesHandler));
+    server.registerPrompt('understand_a_verse', { title: PROMPT_STRINGS.understandTitle, description: PROMPT_STRINGS.understandDescription, argsSchema: understandAVerseArgs }, withPromptLogging('understand_a_verse', understandAVersePrompt));
+    const explore = server.registerPrompt('explore_names_of_allah', { title: PROMPT_STRINGS.exploreTitle, description: PROMPT_STRINGS.exploreDescription, argsSchema: exploreNamesArgs }, withPromptLogging('explore_names_of_allah', exploreNamesPrompt));
+    explore.argsSchema = readMissingArgumentsAsEmpty(exploreNamesArgs);
     server.registerResource('about', 'sakina://about', {
         title: 'About the AskSakina Islamic Knowledge Server',
         description: 'Core directives + the three Gem-cleared educational texts (Quran preservation, hadith grading, madhab attribution). Read this resource before using the tools.',

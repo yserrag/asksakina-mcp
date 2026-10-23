@@ -6,9 +6,10 @@
  * is the full ayah from the scripture module (`getVerseArabic`, Tanzil
  * Uthmani, byte for byte), resolved at bundle time.
  *
- * Lookup is deterministic: the query is normalised and each word is looked
- * up as a theme name or a synonym of one. No embedding, no AI. The synonym
- * map routes a word to an EXISTING theme; it adds no religious content.
+ * Lookup is deterministic: the query is normalised, phrases are matched
+ * first (THEME_PHRASES, WO#488), and each remaining word is looked up as a
+ * theme name or a synonym of one. No embedding, no AI. The synonym map routes
+ * a word to an EXISTING theme; it adds no religious content.
  */
 
 import { readFileSync } from 'node:fs'
@@ -71,17 +72,67 @@ export const THEME_SYNONYMS: Readonly<Record<string, string>> = {
   forgive: 'forgiveness', forgiven: 'forgiveness', repent: 'forgiveness',
   repentance: 'forgiveness', tawbah: 'forgiveness', istighfar: 'forgiveness',
   sin: 'forgiveness', sins: 'forgiveness', mercy: 'forgiveness',
+
+  // WO#488 Part C: the rows Gem 4 and Gem 2 both approved for the same theme
+  // (22 Oct 2026; docs/wo488-architect.md). Every other E.6 row stays out
+  // (docs/mcp-teach-phase0/05-result-shaping.md; scripts/wo488-e6-rows.ts).
+  // Multi-word rows are in THEME_PHRASES.
+  // grief (bereavement: the soft support note attaches and teach is withheld)
+  unhappy: 'grief', miserable: 'grief', crying: 'grief', tears: 'grief', funeral: 'grief',
+  widow: 'grief', widowed: 'grief', orphan: 'grief',
+  // forgiveness
+  guilt: 'forgiveness', guilty: 'forgiveness', regret: 'forgiveness', remorse: 'forgiveness',
+  shame: 'forgiveness', ashamed: 'forgiveness', wrongdoing: 'forgiveness', compassion: 'forgiveness',
+  forgiving: 'forgiveness', merciful: 'forgiveness', rahma: 'forgiveness', rahmah: 'forgiveness',
+  // patience
+  anger: 'patience', angry: 'patience', rage: 'patience', frustrated: 'patience', frustration: 'patience',
+  // encouragement
+  trial: 'encouragement', trials: 'encouragement', struggle: 'encouragement', struggling: 'encouragement',
+  difficult: 'encouragement', difficulties: 'encouragement', relief: 'encouragement', burden: 'encouragement',
+  weak: 'encouragement', weakness: 'encouragement', tired: 'encouragement', tiredness: 'encouragement',
+  exhausted: 'encouragement', burnout: 'encouragement',
+  // gratitude
+  blessed: 'gratitude',
+  // ramadan
+  iftar: 'ramadan', suhoor: 'ramadan', taraweeh: 'ramadan',
+  // friday ("jumu'ah" normalises to "jumuah", above)
+  khutbah: 'friday',
+  // hope
+  optimism: 'hope', optimistic: 'hope',
 }
 
 /**
- * WO#478 (Architect, 20 Oct 2026, phrase fixes only): a word inside one of
- * these phrases must not route to its theme. "loss of faith" is not grief;
- * "fear of Allah" is not anxiety. Checked on the normalised query.
+ * WO#488 Part C: the phrase level, matched on the normalised query BEFORE
+ * any single word, so a phrase's words never reach the word lookup. A phrase
+ * with theme null matches nothing (not_found): "loss of faith" is not grief
+ * and "fear of Allah" is not anxiety (WO#478; Gem 4 and Gem 2, 22 Oct 2026).
+ * The rest are the multi-word rows both Gems approved.
  */
-export const PHRASE_EXCLUSIONS: ReadonlyArray<{ phrase: string; word: string }> = [
-  { phrase: 'loss of faith', word: 'loss' },
-  { phrase: 'fear of allah', word: 'fear' },
+export const THEME_PHRASES: ReadonlyArray<{ phrase: string; theme: string | null }> = [
+  { phrase: 'loss of faith', theme: null },
+  { phrase: 'fear of allah', theme: null },
+  { phrase: 'death of a child', theme: 'grief' },
+  { phrase: 'why me', theme: 'encouragement' },
+  { phrase: 'giving up', theme: 'encouragement' },
+  { phrase: 'thank you allah', theme: 'gratitude' },
+  { phrase: 'grateful heart', theme: 'gratitude' },
+  { phrase: 'night of power', theme: 'ramadan' },
+  { phrase: 'night of decree', theme: 'ramadan' },
+  { phrase: 'give up', theme: 'hope' },
+  { phrase: 'give in', theme: 'hope' },
 ]
+
+/**
+ * WO#478: the words those two not_found phrases keep from their themes.
+ * Derived from THEME_PHRASES; kept for the soft matcher's parity test.
+ */
+export const PHRASE_EXCLUSIONS: ReadonlyArray<{ phrase: string; word: string }> = THEME_PHRASES.filter((p) => p.theme === null).map((p) => ({
+  phrase: p.phrase,
+  word: p.phrase.split(' ')[0]!,
+}))
+
+// Longest first, so "death of a child" is tried before any shorter phrase.
+const PHRASES_BY_LENGTH = [...THEME_PHRASES].map((p) => ({ ...p, words: p.phrase.split(' ') })).sort((a, b) => b.words.length - a.words.length)
 
 export interface ThemeMatch {
   theme: string
@@ -94,13 +145,21 @@ export function matchThemes(query: string): ThemeMatch[] {
   const known = new Set(AVAILABLE_THEMES)
   const lookup = (w: string): string | undefined => (known.has(w) ? w : undefined) ?? THEME_SYNONYMS[w]
   const out: ThemeMatch[] = []
-  const normalised = normalisePhrase(query)
-  const excluded = new Set(PHRASE_EXCLUSIONS.filter((e) => normalised.includes(e.phrase)).map((e) => e.word))
-  for (const word of normalised.split(' ')) {
-    if (!word) continue
-    if (excluded.has(word)) continue
-    const theme = lookup(word) ?? (word.length > 3 && word.endsWith('s') ? lookup(word.slice(0, -1)) : undefined)
-    if (theme && known.has(theme) && !out.some((m) => m.theme === theme)) out.push({ theme, via: word })
+  const add = (theme: string | undefined | null, via: string) => {
+    if (theme && known.has(theme) && !out.some((m) => m.theme === theme)) out.push({ theme, via })
+  }
+  const words = normalisePhrase(query).split(' ').filter(Boolean)
+  for (let i = 0; i < words.length; ) {
+    // The phrase level first: a matched phrase consumes its words.
+    const phrase = PHRASES_BY_LENGTH.find((p) => p.words.every((w, k) => words[i + k] === w))
+    if (phrase) {
+      add(phrase.theme, phrase.phrase)
+      i += phrase.words.length
+      continue
+    }
+    const word = words[i]!
+    add(lookup(word) ?? (word.length > 3 && word.endsWith('s') ? lookup(word.slice(0, -1)) : undefined), word)
+    i += 1
   }
   return out
 }

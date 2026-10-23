@@ -2,6 +2,89 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 2.4.0 (unreleased)
+
+WO#488 and WO#489 (`docs/wo488-architect.md`, `docs/wo489-architect.md`).
+
+**Bengali and Persian crisis coverage (WO#488 Part A).**
+
+- The synced detector adds the Gem 3 phrases of 22 Oct 2026: two Bengali
+  and two Persian self-harm phrases, three Bengali abuse phrases, and four
+  transliterated phrases (two self-harm, two abuse). Two Persian and one
+  Bengali abuse phrase in the WO were already listed and are not repeated.
+- Fear of a person is abuse in Persian and Bengali, by the Turkish
+  proximity design: a relation word and the fear verb with up to three
+  words between, punctuation counting as a separator. The relation lists
+  were approved by Gem 3 (22 Oct), with "father-in-law" added; Bengali
+  also takes the first-person forms, and one Persian phrase ("I am afraid
+  of him/her") is a standalone abuse phrase.
+- Persian is folded before matching, so Persian- and Arabic-keyboard input
+  and ZWNJ meet in one form.
+- Five Bengali and Persian soft phrases give the soft block.
+- Bengali and Persian are keyword languages. With no request locale, a
+  Bengali or Persian crisis or soft keyword gives a `bn` or `fa` block: the
+  English text with local helplines (contiguous digits, country labels), a
+  `translation_note`, and, in `CRITICAL_RULES`, that note and the
+  English-fallback guard after the anti-translation line. No tool takes `bn`
+  or `fa` as a locale. Punjabi still gives the en block.
+- The five bn and fa lines (BD 999, BD 109, Kaan Pete Roi 09612119911,
+  IR 123, IR 1480) are Founder-verified (22 Oct 2026), recorded in
+  `BN_FA_LINES_FOUNDER_VERIFIED`; a block cannot render a line that is not
+  on that record with the same digits. A publish guard (check h) requires
+  exactly those numbers in the bn and fa blocks' `text`, and every tool's
+  schema rejects `bn` and `fa` as a locale (#564, Gem 10 armour).
+- The bare-noun four-gate (WO#265) is unchanged.
+
+**Counters (WO#488 Part B; `docs/mcp-teach-phase0/07-measurement.md` 2).**
+
+- `teach_served` per tool: responses that carried a teach block.
+- `audience`: a tally of the `audience` argument across all tools, five
+  fixed keys (`curious`, `revert`, `practising`, `unknown`, `absent`); a
+  value outside them counts as `absent` and is never stored.
+- `prompts`: fetches per registered prompt name; prompt arguments are never
+  read.
+- Both tiers (since start, and daily on disk for at most 90 days), in
+  `/stats`. A 2.3.x day file reads with these as zero.
+- The privacy texts (README, the `/stats` lines, the server card) name the
+  new counters and the audience tally (Gem 8, 22 Oct 2026).
+
+**`find_verses` synonyms (WO#488 Part C; Gem 4 and Gem 2, 22 Oct 2026).**
+
+- A phrase level runs before the single-word lookup. "loss of faith" and
+  "fear of Allah" match no theme (not_found), and their words no longer
+  reach grief or anxiety.
+- 56 ruled terms route to existing themes: grief, forgiveness, patience,
+  encouragement, gratitude, ramadan, friday and hope. No other proposed row
+  is in the map; "down", "low", "death", "dying" and "mortality" are left
+  out on purpose.
+- A grief route now carries the soft support note even when no soft keyword
+  fired, as `get_dua`'s bereaved route does, and teach stays withheld.
+
+**The `context_block` line (WO#488 Part D; Gem 10, 22 Oct 2026).**
+
+- The first WO#485 binding line ("CRITICAL: You must present the context
+  text and all citations and gradings exactly as provided, bound together
+  in one string. Do not omit the grading.") is replaced, verbatim, by:
+  "CRITICAL: Output the `context_block` exactly as provided. Do not split,
+  summarize, or reformat the text before or after the newline (`\n`). The
+  citations and gradings at the end of the block are mandatory and must
+  remain attached to the context."
+- The same sentence ends `presentation_contract.teach`.
+- Both go out only on responses that carry teach, as before.
+
+**Learning journeys as prompts (WO#489).**
+
+- Two prompts: `understand_a_verse` (`surah`, `ayah`) and
+  `explore_names_of_allah` (`number`, optional; 1 if none is given, and the
+  next Name offered). Each tells the agent to call one tool and follow the
+  rules its response carries and the server's da'wah adab (verbatim). No new
+  religious content; the new connecting strings are pinned in
+  `scripts/test-wo489.ts` for Gem 1 and Gem 10.
+- Under a crisis or soft block a prompt adds nothing.
+- Prompt arguments are never logged or counted; `/stats` counts fetches per
+  prompt name. `what_muslims_believe` and `first_steps_new_muslim` stay
+  parked.
+
 ## 2.3.1 (Gem 10 correction of 2.3.0, 22 Oct 2026)
 
 WO#485 (`docs/wo485-architect.md`). Every response that carries a teach

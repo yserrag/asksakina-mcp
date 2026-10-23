@@ -117,7 +117,7 @@ export async function findVersesHandler(input: FindVersesInput): Promise<SakinaR
 
   const distress = evaluateDistress(input.query)
   const block = distressBlockFor(distress, locale)
-  const extras = block ? { crisis_resource: block } : undefined
+  let extras: { crisis_resource: NonNullable<ReturnType<typeof distressBlockFor>> } | undefined = block ? { crisis_resource: block } : undefined
 
   // Gem 3 ruling (WO#385 for abuse, WO#388 for every hard crisis): the
   // crisis resource is the whole response. This returns before matchThemes,
@@ -146,6 +146,10 @@ export async function findVersesHandler(input: FindVersesInput): Promise<SakinaR
     )
   }
   const themes = matches.map((m) => m.theme)
+  // WO#488 Part C (Gem 4 and Gem 2, 22 Oct 2026): bereavement words reach grief,
+  // so a grief route carries the soft support note even when no soft keyword
+  // fired, as get_dua's bereaved route does (Gem 3).
+  if (!extras && themes.includes('grief')) extras = { crisis_resource: distressBlockFor('soft', locale)! }
   const found = await Promise.all(versesForThemes(themes, limit).map((v) => toFoundVerse(v, themes, locale)))
   // WO#405: teach per verse; WO#478: whenever an entry exists, audience or
   // not. WO#407 (Gem 10): nothing attaches on the grief theme or whenever a

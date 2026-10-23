@@ -1,4 +1,5 @@
 import { SAKINA_DISCLAIMER, NOT_FOUND_DISCLAIMER, CRISIS_ONLY_DISCLAIMER } from '../contracts/disclaimers.js';
+import { ENGLISH_FALLBACK_GUARD } from '../contracts/english-fallback.js';
 import { QURAN_VERSE_CONTEXT, HADITH_CONTEXT, NAMES_OF_ALLAH_CONTEXT, } from '../contracts/educational.js';
 import { QURAN_CONTRACT, HADITH_CONTRACT, NAME_OF_ALLAH_CONTRACT, REFLECTION_CONTRACT, QURAN_DIRECTIVES, VERSE_COLLECTION_DIRECTIVES, DUA_DIRECTIVES, NAME_DIRECTIVES, VOICE_2_RULE, PBUH_RULE, NO_EMOJI_RULE, TEACH_DIRECTIVE, TEACH_BINDING_DIRECTIVES, TEACH_CONTRACT, NO_TEACH_CLAUSE, } from '../contracts/presentation.js';
 const VERSION = '1.0';
@@ -83,6 +84,10 @@ function carriesNonEnCrisisBlock(extras) {
     const block = extras?.crisis_resource;
     return !!block && typeof block.locale === 'string' && block.locale !== 'en';
 }
+function crisisFallbackDirectives(extras) {
+    const block = extras?.crisis_resource;
+    return block && typeof block.translation_note === 'string' ? [block.translation_note, ENGLISH_FALLBACK_GUARD] : [];
+}
 export function buildResponse(input) {
     const meta = metaForType(input.contentType);
     const teach = carriesTeach(input.content);
@@ -90,6 +95,7 @@ export function buildResponse(input) {
         ...(input.extraDirectives ?? []),
         ...(teach ? [TEACH_DIRECTIVE, ...TEACH_BINDING_DIRECTIVES] : []),
         ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION] : []),
+        ...crisisFallbackDirectives(input.extras),
     ];
     const full = extra.length ? [...meta.directives, ...extra] : meta.directives;
     const directives = input.withholdTeach ? full.map(withoutNoTeachClause) : full;

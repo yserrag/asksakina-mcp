@@ -40,6 +40,8 @@ import {
   ABUSE_KEYWORDS_EN,
   ABUSE_KEYWORDS_ID,
   ABUSE_KEYWORDS_TR,
+  ABUSE_KEYWORDS_FA,
+  ABUSE_KEYWORDS_BN,
   ABUSE_KEYWORDS_UR,
   crisisKeywordLanguages,
   detectCrisis,
@@ -50,6 +52,8 @@ import {
   SELF_HARM_KEYWORDS_EN,
   SELF_HARM_KEYWORDS_ID,
   SELF_HARM_KEYWORDS_TR,
+  SELF_HARM_KEYWORDS_FA,
+  SELF_HARM_KEYWORDS_BN,
   SELF_HARM_KEYWORDS_UR,
   type CrisisKeywordLanguage,
 } from '../src/safety/_synced/crisis-detection.js'
@@ -70,13 +74,15 @@ const check = (ok: boolean, m: string, d?: unknown) => {
   }
 }
 
-type Lang = Exclude<CrisisKeywordLanguage, 'en'>
+// The WO#482 languages; bn and fa (keyword languages since WO#488) are tested in test-wo488.
+type Lang = Exclude<CrisisLocale, 'en'>
 const LANGS: readonly Lang[] = ['tr', 'ur', 'id', 'ar']
-const LISTS: Record<'self-harm' | 'abuse', Record<CrisisKeywordLanguage, readonly string[]>> = {
+const LISTS: Record<'self-harm' | 'abuse', Record<Exclude<CrisisKeywordLanguage, 'fa' | 'bn'>, readonly string[]>> = {
   'self-harm': { en: SELF_HARM_KEYWORDS_EN, id: SELF_HARM_KEYWORDS_ID, ur: SELF_HARM_KEYWORDS_UR, ar: SELF_HARM_KEYWORDS_AR, tr: SELF_HARM_KEYWORDS_TR },
   abuse: { en: ABUSE_KEYWORDS_EN, id: ABUSE_KEYWORDS_ID, ur: ABUSE_KEYWORDS_UR, ar: ABUSE_KEYWORDS_AR, tr: ABUSE_KEYWORDS_TR },
 }
 const FULL = { 'self-harm': SELF_HARM_KEYWORDS, abuse: ABUSE_KEYWORDS }
+const PERSIAN_BENGALI = { 'self-harm': [...SELF_HARM_KEYWORDS_FA, ...SELF_HARM_KEYWORDS_BN], abuse: [...ABUSE_KEYWORDS_FA, ...ABUSE_KEYWORDS_BN] }
 // The expected text: the l10n builder for id/ur/ar/tr, the 2.2.1 block for en
 // (a synthetic hint has no keyword languages, so it keeps the locale it is given).
 const textFor = (type: 'self-harm' | 'abuse', l: CrisisLocale) =>
@@ -105,7 +111,8 @@ for (const type of ['self-harm', 'abuse'] as const) {
   check(new Set(parts).size === parts.length, `${type}: the en, id, ur, ar and tr lists share no entry`)
   check(parts.every((k) => FULL[type].includes(k)), `${type}: every per-language entry is in the full list`)
   const rest = FULL[type].filter((k) => !parts.includes(k))
-  check(rest.every((k) => ARABIC_SCRIPT.test(k) || /[ঀ-৿]/.test(k)), `${type}: the ${rest.length} entries left in the full list are Persian, Bengali or Punjabi (Arabic or Bengali script)`)
+  // WO#488: Persian and Bengali have their own lists now (test-wo488), so the rest is those and Punjabi.
+  check(rest.every((k) => ARABIC_SCRIPT.test(k) || /[ঀ-৿]/.test(k) || PERSIAN_BENGALI[type].includes(k)), `${type}: the ${rest.length} entries left in the full list are Persian, Bengali (with their Latin forms) or Punjabi`)
   check(rest.length + parts.length === FULL[type].length, `${type}: the lists and the rest rebuild the full list (${FULL[type].length})`)
   check(LISTS[type].ur.some((k) => ARABIC_SCRIPT.test(k)) && LISTS[type].ur.some((k) => !ARABIC_SCRIPT.test(k)), `${type}: the ur list holds Roman and Urdu-script entries`)
 }
@@ -166,9 +173,10 @@ console.log('\n=== C. the tools, with and without locale ===')
   const two = 'kendimi öldüreceğim, ingin bunuh diri'
   check(evaluateDistress(two).keywordLanguages?.join() === 'id,tr' && served(await call('get_dua', two), 'self-harm', 'en'), 'Turkish plus Indonesian, no locale: en (two languages, not settled)')
   check(served(await call('get_dua', two, 'tr'), 'self-harm', 'tr'), 'Turkish plus Indonesian, locale tr: the explicit locale wins')
-  const fa = SELF_HARM_KEYWORDS.find((k) => k.includes('ی') && !Object.values(LISTS['self-harm']).flat().includes(k) && evaluateDistress(k).level === 'hard')!
-  const faHint = evaluateDistress(fa)
-  check(faHint.level === 'hard' && (faHint.keywordLanguages ?? []).length === 0 && served(await call('get_dua', fa), 'self-harm', 'en'), 'a Persian keyword alone (from the list), no locale: en (no fa block)')
+  // WO#488: Persian and Bengali are keyword languages now (test-wo488); Punjabi still has no block.
+  const pa = SELF_HARM_KEYWORDS.find((k) => !Object.values(LISTS['self-harm']).flat().includes(k) && !PERSIAN_BENGALI['self-harm'].includes(k) && evaluateDistress(k).level === 'hard')!
+  const paHint = evaluateDistress(pa)
+  check(paHint.level === 'hard' && (paHint.keywordLanguages ?? []).length === 0 && served(await call('get_dua', pa), 'self-harm', 'en'), 'a Punjabi keyword alone (from the list), no locale: en (no pa block)')
   const soft = await call('get_dua', 'anxiety')
   check(soft.crisis_resource?.level === 'soft' && soft.crisis_resource.locale === 'en' && soft.crisis_resource.text === distressBlockFor('soft', 'en')!.text, 'soft, no locale: the en soft block (soft follows the request locale)')
   const softTr = await call('get_dua', 'anxiety', 'tr')
@@ -233,7 +241,7 @@ console.log('\n=== G. Gem 3\'s Turkish ruling ===')
 {
   const soft = (q: string) => evaluateDistress(q)
   // 1. Hard
-  check(SELF_HARM_KEYWORDS_TR.includes('umutsuzum') && SELF_HARM_KEYWORDS_TR.includes('umutsuzluk') && SELF_HARM_KEYWORDS.length === 279, 'umutsuzum and umutsuzluk are in SELF_HARM_KEYWORDS_TR (full list 279)')
+  check(SELF_HARM_KEYWORDS_TR.includes('umutsuzum') && SELF_HARM_KEYWORDS_TR.includes('umutsuzluk') && SELF_HARM_KEYWORDS.length === 279 + 6, 'umutsuzum and umutsuzluk are in SELF_HARM_KEYWORDS_TR (full list 279, plus the 6 WO#488 fa and bn entries)')
   for (const q of ['umutsuzum', 'umutsuzluk', 'Umutsuzum', '\u00e7ok umutsuzum art\u0131k', 'umutsuzluk i\u00e7indeyim']) {
     const h = soft(q)
     check(h.level === 'hard' && h.crisisType === 'self-harm' && distressBlockFor(h, 'en')?.locale === 'tr', `"${q}": hard self-harm, the tr block with no locale`)
@@ -313,7 +321,7 @@ console.log('\n=== H. Gem 3 round 2 ===')
   check(!abuseTr('xbabamdan \u00e7ok korkuyorum'), 'the relation word must start a word: "xbabamdan \u00e7ok korkuyorum" is not abuse')
   // dövmesinden and dövecek diye, in both spellings
   for (const q of ['d\u00f6vmesinden korkuyorum', 'beni d\u00f6vmesinden', 'dovmesinden', 'beni d\u00f6vecek diye korkuyorum', 'dovecek diye']) check(abuseTr(q), `"${q}": abuse regardless of relation`)
-  check(ABUSE_KEYWORDS_TR.includes('d\u00f6vmesinden') && ABUSE_KEYWORDS_TR.includes('d\u00f6vecek diye') && ABUSE_KEYWORDS.length === 216, 'both are in ABUSE_KEYWORDS_TR (full list 216)')
+  check(ABUSE_KEYWORDS_TR.includes('d\u00f6vmesinden') && ABUSE_KEYWORDS_TR.includes('d\u00f6vecek diye') && ABUSE_KEYWORDS.length === 216 + 6, 'both are in ABUSE_KEYWORDS_TR (full list 216, plus the 6 WO#488 fa and bn entries)')
   // 2. korku exceptions
   for (const q of ['korkun\u00e7', 'korkun\u00e7 bir g\u00fcn', 'korkunc', 'korkutucu', 'korkutucu bir r\u00fcya', 'beni korkuttu', 'korkutmak']) check(d(q).level === 'none', `"${q}": korku does not fire (korkun\u00e7, korkutucu and the korkut- stem)`)
   for (const q of ['korkuyorum', 'korkular\u0131m', 'korkulu']) check(d(q).level === 'soft' && d(q).matchedKeyword === 'korku', `"${q}": korku still fires`)
@@ -340,22 +348,22 @@ console.log('\n=== H. Gem 3 round 2 ===')
     const bad = list.filter((k) => detectCrisis(k).crisisType !== type || crisisKeywordLanguages(k, type).includes('tr'))
     check(bad.length === 0, `${l} ${type}: all ${list.length} keywords keep their type and never name tr`, bad)
   }
-  const tagged = new Set([...Object.values(LISTS['self-harm']).flat(), ...Object.values(LISTS.abuse).flat()])
+  // WO#488: Persian and Bengali are tagged too (their own lists, tested in test-wo488); the rest is Punjabi.
+  const tagged = new Set([...Object.values(LISTS['self-harm']).flat(), ...Object.values(LISTS.abuse).flat(), ...PERSIAN_BENGALI['self-harm'], ...PERSIAN_BENGALI.abuse])
   const bare = new Set(BARE_NOUN_GUARDS.map((g) => g.kw))
   const rest = [...SELF_HARM_KEYWORDS.map((k) => [k, 'self-harm'] as const), ...ABUSE_KEYWORDS.map((k) => [k, 'abuse'] as const)].filter(([k]) => !tagged.has(k) && !bare.has(k))
   const restBad = rest.filter(([k, type]) => detectCrisis(k).crisisType !== type)
-  check(restBad.length === 0, `Persian, Bengali and Punjabi: all ${rest.length} keywords (bare nouns aside) keep their type`, restBad)
-  // Gem 10 condition 3: a Persian, Bengali or Punjabi keyword alone, no locale, serves the en block.
+  check(restBad.length === 0, `Punjabi: all ${rest.length} keywords keep their type`, restBad)
+  // Gem 10 condition 3: a Punjabi keyword alone, no locale, serves the en block. (Persian and
+  // Bengali did until WO#488, which gives them their own blocks: test-wo488.)
   const restAll = [...SELF_HARM_KEYWORDS, ...ABUSE_KEYWORDS].filter((k) => !tagged.has(k))
   const notEn = restAll.filter((k) => { const h = d(k); return h.level === 'hard' && (distressBlockFor(h, 'en')?.locale !== 'en' || (h.keywordLanguages ?? []).length !== 0) })
   const hardCount = restAll.filter((k) => d(k).level === 'hard').length
-  check(notEn.length === 0 && hardCount === restAll.length - [...bare].filter((k) => d(k).level !== 'hard').length, `Persian, Bengali and Punjabi: every one of the ${restAll.length} keywords (bare nouns included) that fires alone names no language and, with no locale, serves the en block`, notEn)
+  check(notEn.length === 0 && hardCount === restAll.length - [...bare].filter((k) => d(k).level !== 'hard').length, `Punjabi: every one of the ${restAll.length} keywords that fires alone names no language and, with no locale, serves the en block`, notEn)
   {
     const { getDuaHandler } = await import('../src/tools/get-dua.js')
-    const bn = restAll.find((k) => /[\u0980-\u09FF]/.test(k))!
-    const fa = restAll.find((k) => ARABIC_SCRIPT.test(k) && !bare.has(k))!
     const pa = [...restAll].reverse().find((k) => ARABIC_SCRIPT.test(k) && !bare.has(k))!
-    for (const [lang, q] of [['fa (first Persian entry)', fa], ['bn (first Bengali entry)', bn], ['pa (last Punjabi entry)', pa]] as const) {
+    for (const [lang, q] of [['pa (last Punjabi entry)', pa]] as const) {
       const r = (await getDuaHandler({ context: q })) as unknown as { _sakina_meta: { content_type: string }; crisis_resource?: { locale?: string } }
       check(r._sakina_meta.content_type === 'crisis_resource_only' && r.crisis_resource?.locale === 'en', `get_dua, ${lang} keyword alone, no locale: crisis_resource_only with the en block`)
     }

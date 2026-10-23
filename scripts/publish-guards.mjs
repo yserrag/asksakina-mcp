@@ -39,6 +39,11 @@
  *      crisis_resource_only, a crisis_resource block of the right type, no
  *      du'a / verse / Name content). A deploy that regresses any of them
  *      fails the job before npm publish.
+ *   h. #564 (Gem 10 armour, 22 Oct 2026), offline: the bn and fa blocks
+ *      (self-harm and abuse) carry exactly their Founder-verified numbers
+ *      (bn 999, 109, 09612119911; fa 123, 1480), checked in each block's
+ *      `text` node only (scripts/crisis-line-guard.mjs). Any typo, missing or
+ *      extra number fails.
  *   d. .mcp/server.json `description` longer than 100 characters. The MCP
  *      Registry rejects it with HTTP 422 (MCP Registry Publish run #2,
  *      25 Sep 2026: the 600-character description). Counted in Unicode
@@ -48,6 +53,7 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { REQUIRED_LINES, requiredLineProblems } from './crisis-line-guard.mjs'
 
 const args = process.argv.slice(2)
 const opt = (name) => {
@@ -199,6 +205,22 @@ async function offline() {
         checkBannedNumbers(json, where)
         checkPlaceholder(json, where)
       }
+    }
+    // h. #564: the bn and fa blocks, reached by keyword routing (no tool takes
+    // bn or fa as a locale), carry exactly their Founder-verified lines.
+    touch('h. bn/fa Founder-verified lines')
+    for (const [key, expected] of Object.entries(REQUIRED_LINES)) {
+      const [lang, crisisType] = key.split('/')
+      const block = distressBlockFor({ level: 'hard', crisisType, keywordLanguages: [lang] }, 'en')
+      const where = `crisis_resource hard/${crisisType}/${lang} text`
+      if (block?.locale !== lang) {
+        record('h. bn/fa Founder-verified lines', where, `no ${lang} block (got ${block?.locale ?? 'none'})`)
+        continue
+      }
+      blocks++
+      checkBannedNumbers(JSON.stringify(block), where)
+      checkPlaceholder(JSON.stringify(block), where)
+      for (const p of requiredLineProblems(block.text, expected)) record('h. bn/fa Founder-verified lines', where, p)
     }
     if (blocks === 0) record('setup', crisisModule, 'no crisis_resource blocks produced')
   } catch (err) {

@@ -16,7 +16,10 @@
 
 import { crisisKeywordLanguages, detectCrisis, type CrisisKeywordLanguage, type CrisisType } from './_synced/crisis-detection.js'
 import { abuseText, selfHarmText, softText } from './crisis-text-l10n.js'
+import { enFallbackAbuseText, enFallbackSelfHarmText, type EnFallbackLocale } from './crisis-text-en-fallback.js'
+import { crisisEnglishNote } from '../contracts/english-fallback.js'
 import { foldLatin } from './_synced/latin-fold.js'
+import { normaliseArabic } from './_synced/arabic-normalise.js'
 
 export type DistressLevel = 'hard' | 'soft' | 'none'
 
@@ -175,25 +178,65 @@ function turkishSoftKeyword(input: string): string | undefined {
   return undefined
 }
 
+/**
+ * WO#488 A3 (docs/wo488-architect.md): Bengali and Persian soft keywords,
+ * whole phrases at word boundaries (a word is letters, marks and digits: the
+ * vowel signs of both scripts are \p{M}). Persian is matched in
+ * normaliseArabic form, keyword and input alike, so Arabic-keyboard letters
+ * and ZWNJ fold first; Bengali in NFC.
+ */
+export const SOFT_DISTRESS_KEYWORDS_BN: readonly string[] = ['খুব একা লাগছে', 'মন খুব খারাপ']
+export const SOFT_DISTRESS_KEYWORDS_FA: readonly string[] = ['دلم گرفته', 'خیلی تنهام', 'حالم بده']
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const phraseRe = (s: string) => new RegExp(`(?<![\\p{L}\\p{M}\\p{N}])${escapeRe(s)}(?![\\p{L}\\p{M}\\p{N}])`, 'u')
+const BN_SOFT = SOFT_DISTRESS_KEYWORDS_BN.map((k) => [k, phraseRe(k.normalize('NFC'))] as const)
+const FA_SOFT = SOFT_DISTRESS_KEYWORDS_FA.map((k) => [k, phraseRe(normaliseArabic(k))] as const)
+
+function bnSoftKeyword(input: string): string | undefined {
+  const text = input.normalize('NFC')
+  return BN_SOFT.find(([, re]) => re.test(text))?.[0]
+}
+
+function faSoftKeyword(input: string): string | undefined {
+  const text = normaliseArabic(input)
+  return FA_SOFT.find(([, re]) => re.test(text))?.[0]
+}
+
 export function evaluateDistress(input: string): DistressHint {
   const crisis = detectCrisis(input)
   if (crisis.isCrisis) {
     const keywordLanguages = crisis.crisisType === 'none' ? [] : crisisKeywordLanguages(input, crisis.crisisType)
     return { level: 'hard', crisisType: crisis.crisisType, keywordLanguages }
   }
-  // WO#482: a soft hint records its languages too (en, tr), so the soft block
-  // follows the detected language under the hard rule (crisisLocaleFor).
-  const softMatch = softDistressKeyword(input)
-  const trMatch = turkishSoftKeyword(input)
-  if (softMatch || trMatch) {
-    const keywordLanguages: CrisisKeywordLanguage[] = [...(softMatch ? ['en' as const] : []), ...(trMatch ? ['tr' as const] : [])]
-    return { level: 'soft', matchedKeyword: softMatch ?? trMatch, keywordLanguages }
+  // WO#482: a soft hint records its languages too (en, tr; bn and fa since
+  // WO#488), so the soft block follows the detected language under the hard
+  // rule (crisisLocaleFor).
+  const matches: Array<[CrisisKeywordLanguage, string | undefined]> = [
+    ['en', softDistressKeyword(input)],
+    ['tr', turkishSoftKeyword(input)],
+    ['bn', bnSoftKeyword(input)],
+    ['fa', faSoftKeyword(input)],
+  ]
+  const hit = matches.filter(([, k]) => k)
+  if (hit.length) {
+    return { level: 'soft', matchedKeyword: hit[0]![1], keywordLanguages: hit.map(([l]) => l) }
   }
   return { level: 'none' }
 }
 
 /** Request locales the crisis blocks are localised for (matches get_dua). */
 export type CrisisLocale = 'en' | 'id' | 'ur' | 'ar' | 'tr'
+
+/**
+ * The language of a served block: a request locale, or (WO#488) bn or fa,
+ * which no tool takes as a locale and only keyword routing selects. A bn or
+ * fa block is the English text with local lines and an English-fallback
+ * note (crisis-text-en-fallback.ts).
+ */
+export type BlockLocale = CrisisLocale | EnFallbackLocale
+const isEnFallback = (l: BlockLocale): l is EnFallbackLocale => l === 'bn' || l === 'fa'
+const fallbackNote = (l: EnFallbackLocale) => ({ translation_note: crisisEnglishNote(l)! })
 
 const IASP = 'https://www.iasp.info/resources/Crisis_Centres/'
 
@@ -209,6 +252,9 @@ const IASP = 'https://www.iasp.info/resources/Crisis_Centres/'
  * While false, 988 is not served in any block.
  */
 export const US_988_FOUNDER_VERIFIED = false
+
+/** The bn and fa lines' Founder verification (22 Oct 2026); see crisis-text-en-fallback.ts. */
+export { BN_FA_LINES_FOUNDER_VERIFIED } from './crisis-text-en-fallback.js'
 
 const HARD_CRISIS_DIRECTIVE =
   'CRITICAL: You MUST output the following crisis resource text exactly as written below. Do not alter it or make it conditional. Do not assess whether the user needs it; output it.'
@@ -244,14 +290,15 @@ export const HARD_CRISIS_RESOURCE_BLOCK = {
   text: HARD_CRISIS_TEXT.en,
 } as const
 
-function selfHarmBlockFor(locale: CrisisLocale) {
+function selfHarmBlockFor(locale: BlockLocale) {
   if (locale === 'en') return HARD_CRISIS_RESOURCE_BLOCK
   return {
     level: 'hard' as const,
     crisis_type: 'self-harm' as const,
     locale,
     directive: HARD_CRISIS_DIRECTIVE,
-    text: HARD_CRISIS_TEXT[locale],
+    text: isEnFallback(locale) ? enFallbackSelfHarmText(locale) : HARD_CRISIS_TEXT[locale],
+    ...(isEnFallback(locale) ? fallbackNote(locale) : {}),
   }
 }
 
@@ -287,13 +334,14 @@ const ABUSE_TEXT: Record<CrisisLocale, string> = {
   tr: abuseText('tr'),
 }
 
-function abuseBlockFor(locale: CrisisLocale) {
+function abuseBlockFor(locale: BlockLocale) {
   return {
     level: 'hard' as const,
     crisis_type: 'abuse' as const,
     locale,
     directive: ABUSE_DIRECTIVE,
-    text: ABUSE_TEXT[locale],
+    text: isEnFallback(locale) ? enFallbackAbuseText(locale, ABUSE_SENTENCE) : ABUSE_TEXT[locale],
+    ...(isEnFallback(locale) ? fallbackNote(locale) : {}),
   }
 }
 
@@ -316,8 +364,10 @@ export const SOFT_DISTRESS_RESOURCE_BLOCK = {
     'If these feelings become overwhelming, please know support is available. Visit https://www.iasp.info/resources/Crisis_Centres/ for helplines in your region.',
 } as const
 
-function softDistressBlockFor(locale: CrisisLocale) {
+function softDistressBlockFor(locale: BlockLocale) {
   if (locale === 'en') return SOFT_DISTRESS_RESOURCE_BLOCK
+  // WO#488: bn and fa keep the en text, with the English-fallback note.
+  if (isEnFallback(locale)) return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, ...fallbackNote(locale) }
   // WO#481: the text is in the request locale; the directive stays Gem 10's.
   return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, text: softText(locale) }
 }
@@ -328,13 +378,15 @@ function softDistressBlockFor(locale: CrisisLocale) {
  * omitted locale), the block follows the keyword the detector matched: if
  * exactly one of the id, ur, ar or tr lists hit, that language is served,
  * whether or not an English keyword also hit. Two or more of them, or none
- * (English only, or a Persian, Bengali or Punjabi keyword, which have no
- * MCP block), keep en. Soft blocks follow the same rule (Gem 3 ruling,
- * 21 Oct 2026): their keywords are English and Turkish, so a soft block
- * switches only to tr. A bare level ('soft' with no hint, as the bereaved
- * route passes) has no languages and keeps the request locale.
+ * (English only, or a Punjabi keyword, which has no MCP block), keep en.
+ * WO#488: bn and fa are keyword languages too, served as the English text
+ * with local lines. Soft blocks follow the same rule (Gem 3 ruling,
+ * 21 Oct 2026): their keywords are English, Turkish, Bengali and Persian, so
+ * a soft block switches only to tr, bn or fa. A bare level ('soft' with no
+ * hint, as the bereaved route passes) has no languages and keeps the request
+ * locale.
  */
-export function crisisLocaleFor(hint: DistressHint, locale: CrisisLocale): CrisisLocale {
+export function crisisLocaleFor(hint: DistressHint, locale: CrisisLocale): BlockLocale {
   if (locale !== 'en' || hint.level === 'none') return locale
   const matched = (hint.keywordLanguages ?? []).filter((l) => l !== 'en')
   return matched.length === 1 ? matched[0]! : 'en'

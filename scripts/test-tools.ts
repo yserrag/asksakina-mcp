@@ -31,7 +31,8 @@ import { NOT_A_NARRATION_DIRECTIVE, UNGRADED_GRADING_DIRECTIVE } from '../src/co
 import { UNGRADED_SCOPE_HEAD } from '../src/contracts/gem4-wo418.js'
 import { ABUSE_SAFE_DUAS } from '../src/data/abuse-safe-duas.js'
 import { abuseResponse, ABUSE_ORDER_DIRECTIVE } from '../src/tools/get-dua.js'
-import { distressBlockFor, US_988_FOUNDER_VERIFIED, ABUSE_SENTENCE } from '../src/safety/crisis-keywords.js'
+import { distressBlockFor, US_988_FOUNDER_VERIFIED, ABUSE_SENTENCE, BN_FA_LINES_FOUNDER_VERIFIED } from '../src/safety/crisis-keywords.js'
+import { ABUSE_KEYWORDS_BN, ABUSE_KEYWORDS_FA, BARE_NOUN_GUARDS } from '../src/safety/_synced/crisis-detection.js'
 import { L10N_HOURS, L10N_STRINGS } from '../src/safety/crisis-l10n-strings.js'
 import { stripPrependedBasmala, STRIP_PREFIXED_BASMALA, BASMALA_PREFIX_PLAIN, BASMALA_PREFIX_SHADDA, getBasmalaPrefixMismatchCount, bundledPickthall } from '../src/data/quran.js'
 import { TOTAL_NAMES } from '../src/data/names.js'
@@ -627,6 +628,20 @@ async function testAbuseBlock() {
         ? pass(`abuse "${q}" (${locale}): Gem 3 sentence, verified DV lines, no self-harm wording, no du'as at all`)
         : fail(`abuse "${q}" (${locale})`, JSON.stringify({ ct: r._sakina_meta.content_type, cr })),
     )
+  }
+  // Gem 10's standing list of locales whose abuse block serves a Founder-verified
+  // line: bn and fa are on it since #564 (Founder verification, 22 Oct 2026;
+  // BN_FA_LINES_FOUNDER_VERIFIED). They are keyword-routed (no locale argument),
+  // so each case is a keyword from that language's own list, with no locale.
+  const KEYWORD_ROUTED_DV: Record<'bn' | 'fa', string[]> = { bn: ['109', '999'], fa: ['123'] }
+  const bare = new Set(BARE_NOUN_GUARDS.map((g) => g.kw))
+  for (const [l, list] of [['bn', ABUSE_KEYWORDS_BN], ['fa', ABUSE_KEYWORDS_FA]] as const) {
+    const q = list.find((k) => !bare.has(k) && /[\u0600-\u06FF\u0980-\u09FF]/.test(k))!
+    const r = (await getDuaHandler({ context: q })) as unknown as { _sakina_meta: { content_type: string }; crisis_resource?: { crisis_type?: string; locale?: string; text?: string } }
+    const text = r.crisis_resource?.text ?? ''
+    const ok = r._sakina_meta.content_type === 'crisis_resource_only' && r.crisis_resource?.crisis_type === 'abuse' && r.crisis_resource.locale === l &&
+      text.startsWith(ABUSE_SENTENCE) && KEYWORD_ROUTED_DV[l].every((n) => text.includes(`: ${n} (`) && helplines.includes(`phone: '${n}'`) && (BN_FA_LINES_FOUNDER_VERIFIED.lines as Record<string, string>)[Object.entries(BN_FA_LINES_FOUNDER_VERIFIED.lines).find(([, d]) => d === n)![0]] === n)
+    results.push(ok ? pass(`abuse (${l}, keyword-routed, no locale): Gem 3 sentence, Founder-verified lines ${KEYWORD_ROUTED_DV[l].join(', ')}`) : fail(`abuse (${l}, keyword-routed)`, JSON.stringify(r.crisis_resource)))
   }
   const selfHarm = distressBlockFor({ level: 'hard', crisisType: 'self-harm' }, 'en') as { crisis_type?: string; text?: string }
   results.push(

@@ -17,7 +17,8 @@
  * Run: npm run bundle-data && npm run test:wo485
  */
 
-import { TEACH_BINDING_DIRECTIVES, TEACH_DIRECTIVE } from '../src/contracts/presentation.js'
+import { TEACH_BINDING_DIRECTIVES, TEACH_CONTRACT, TEACH_DIRECTIVE } from '../src/contracts/presentation.js'
+import { readFileSync } from 'node:fs'
 import { TEACH_ENTRIES } from '../src/teach/entries.js'
 import type { TeachEntry } from '../src/teach/types.js'
 
@@ -32,11 +33,13 @@ const check = (ok: boolean, m: string, d?: unknown) => {
   }
 }
 
-const LINE1 = 'CRITICAL: You must present the context text and all citations and gradings exactly as provided, bound together in one string. Do not omit the grading.'
+// WO#488 Part D (Gem 10, 22 Oct 2026): the first line is replaced, verbatim (docs/wo488-architect.md).
+const WO485_LINE1 = 'CRITICAL: You must present the context text and all citations and gradings exactly as provided, bound together in one string. Do not omit the grading.'
+const LINE1 = "CRITICAL: Output the `context_block` exactly as provided. Do not split, summarize, or reformat the text before or after the newline (`\\n`). The citations and gradings at the end of the block are mandatory and must remain attached to the context."
 const LINE2 = "CRITICAL: Present all explanatory glosses, contexts, and reflections using neutral, educational framing (e.g., 'In Islamic tradition...', 'Muslims believe...'). Do not present them as personalized religious rulings."
 
 type Teach = { record_id: string; context?: { text: string; citations?: Array<{ text: string; grading?: string }> }; context_block?: string }
-type R = { _sakina_meta: { llm_directives: { CRITICAL_RULES: readonly string[] } } }
+type R = { _sakina_meta: { llm_directives: { CRITICAL_RULES: readonly string[] }; presentation_contract?: { teach?: string } } }
 
 function teachBlocks(r: unknown): Teach[] {
   const out: Teach[] = []
@@ -64,7 +67,11 @@ async function main() {
   const { findVersesHandler } = await import('../src/tools/find-verses.js')
 
   console.log('=== A. the binding lines ===')
-  check(JSON.stringify(TEACH_BINDING_DIRECTIVES) === JSON.stringify([LINE1, LINE2]), 'the two lines are Gem 10\'s text, verbatim')
+  check(JSON.stringify(TEACH_BINDING_DIRECTIVES) === JSON.stringify([LINE1, LINE2]), 'the two lines are Gem 10\'s text, verbatim (the first as replaced by WO#488 Part D)')
+  // WO#488 Part D: the line equals the ruling's text in the archived record, byte for byte.
+  const record = readFileSync(new URL('../../docs/wo488-architect.md', import.meta.url), 'utf-8')
+  check(record.includes(`>   "${LINE1}"`) && LINE1.includes('(`\\n`)') && !LINE1.includes('\n'), 'WO#488 D: the line is the archived ruling\'s text, with a literal backslash-n (not a newline)')
+  check(TEACH_CONTRACT.endsWith(`crisis resource block. ${LINE1}`), 'WO#488 D: presentation_contract.teach ends with the same sentence')
   const entries = TEACH_ENTRIES as Readonly<Record<string, TeachEntry>>
   const callFor = (key: string, audience?: string): Promise<unknown> => {
     const [kind, a, b] = key.split(':')
@@ -82,10 +89,10 @@ async function main() {
       teachResponses++
       const rules = r._sakina_meta.llm_directives.CRITICAL_RULES
       const i = rules.indexOf(TEACH_DIRECTIVE)
-      if (rules.filter((x) => x === LINE1).length !== 1 || rules.filter((x) => x === LINE2).length !== 1 || i < 0 || rules[i + 1] !== LINE1 || rules[i + 2] !== LINE2) bad.push(`${key} audience=${audience}`)
+      if (rules.includes(WO485_LINE1) || r._sakina_meta.presentation_contract?.teach !== TEACH_CONTRACT || rules.filter((x) => x === LINE1).length !== 1 || rules.filter((x) => x === LINE2).length !== 1 || i < 0 || rules[i + 1] !== LINE1 || rules[i + 2] !== LINE2) bad.push(`${key} audience=${audience}`)
     }
   }
-  check(teachResponses >= Object.keys(entries).length && bad.length === 0, `both lines, once each, right after the teach directive, on every teach response (${teachResponses}: every entry, with and without an audience)`, bad)
+  check(teachResponses >= Object.keys(entries).length && bad.length === 0, `both lines, once each, right after the teach directive, the WO#485 line nowhere, and presentation_contract.teach present, on every teach response (${teachResponses}: every entry, with and without an audience)`, bad)
   // find_verses carries teach for a verse with an entry (39:53 on "hope").
   const hope = (await findVersesHandler({ query: 'hope' })) as R
   check(teachBlocks(hope).length > 0 && hope._sakina_meta.llm_directives.CRITICAL_RULES.includes(LINE1) && hope._sakina_meta.llm_directives.CRITICAL_RULES.includes(LINE2), 'find_verses "hope" (teach on 39:53): both lines')
@@ -104,7 +111,7 @@ async function main() {
   for (const [label, p] of without) {
     const r = (await p) as R
     const rules = r._sakina_meta.llm_directives.CRITICAL_RULES
-    check(teachBlocks(r).length === 0 && !rules.includes(LINE1) && !rules.includes(LINE2), `${label}: no teach, neither line`)
+    check(teachBlocks(r).length === 0 && !rules.includes(LINE1) && !rules.includes(LINE2) && r._sakina_meta.presentation_contract?.teach === undefined, `${label}: no teach, neither line, no presentation_contract.teach`)
   }
 
   console.log('\n=== B. context_block ===')

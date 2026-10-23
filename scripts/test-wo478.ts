@@ -247,7 +247,8 @@ async function main() {
     const { NOT_FOUND_DISCLAIMER } = await import('../src/contracts/disclaimers.js')
     check(nf._sakina_meta.content_type === 'not_found' && rules(nf).includes('Suggest the user rephrase or try a related topic.') && !JSON.stringify(nf).includes('consult asksakina.com directly') && NOT_FOUND_DISCLAIMER.endsWith('Suggest the user rephrase or try a related topic.'), 'Gem 4: not_found directive and disclaimer say "try a related topic"; the site link is gone from both')
     const src = readFileSync(new URL('../src/server.ts', import.meta.url), 'utf-8')
-    check(src.includes("'aggregate counters only: per-tool call and status totals. No per-request records, no IPs, no client identifiers, no user-agents, no geolocation, no params, no response payloads. Since-start totals reset on restart; on the hosted server, per-tool daily totals are kept on disk for at most 90 days.'") && !src.includes('Counters reset on restart.'), 'Gem 8: the server card privacy line is the passed text')
+    // WO#488 Part B (Gem 8 approved the draft, 22 Oct 2026) supersedes the WO#478 text.
+    check(src.includes("'aggregate counters only: per-tool call and status totals, teach-served per tool, a tally of audience values, and prompt fetches by name. No per-request records, no IPs, no client identifiers, no user-agents, no geolocation, no other params, no response payloads. Since-start totals reset on restart; on the hosted server, daily totals are kept on disk for at most 90 days.'") && !src.includes('Counters reset on restart.'), 'Gem 8: the server card privacy line is the passed text (WO#488 wording, 90-day disk retention stated)')
   }
 
   console.log('\n=== 6. version ===')

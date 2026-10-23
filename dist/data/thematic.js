@@ -30,25 +30,58 @@ export const THEME_SYNONYMS = {
     forgive: 'forgiveness', forgiven: 'forgiveness', repent: 'forgiveness',
     repentance: 'forgiveness', tawbah: 'forgiveness', istighfar: 'forgiveness',
     sin: 'forgiveness', sins: 'forgiveness', mercy: 'forgiveness',
+    unhappy: 'grief', miserable: 'grief', crying: 'grief', tears: 'grief', funeral: 'grief',
+    widow: 'grief', widowed: 'grief', orphan: 'grief',
+    guilt: 'forgiveness', guilty: 'forgiveness', regret: 'forgiveness', remorse: 'forgiveness',
+    shame: 'forgiveness', ashamed: 'forgiveness', wrongdoing: 'forgiveness', compassion: 'forgiveness',
+    forgiving: 'forgiveness', merciful: 'forgiveness', rahma: 'forgiveness', rahmah: 'forgiveness',
+    anger: 'patience', angry: 'patience', rage: 'patience', frustrated: 'patience', frustration: 'patience',
+    trial: 'encouragement', trials: 'encouragement', struggle: 'encouragement', struggling: 'encouragement',
+    difficult: 'encouragement', difficulties: 'encouragement', relief: 'encouragement', burden: 'encouragement',
+    weak: 'encouragement', weakness: 'encouragement', tired: 'encouragement', tiredness: 'encouragement',
+    exhausted: 'encouragement', burnout: 'encouragement',
+    blessed: 'gratitude',
+    iftar: 'ramadan', suhoor: 'ramadan', taraweeh: 'ramadan',
+    khutbah: 'friday',
+    optimism: 'hope', optimistic: 'hope',
 };
-export const PHRASE_EXCLUSIONS = [
-    { phrase: 'loss of faith', word: 'loss' },
-    { phrase: 'fear of allah', word: 'fear' },
+export const THEME_PHRASES = [
+    { phrase: 'loss of faith', theme: null },
+    { phrase: 'fear of allah', theme: null },
+    { phrase: 'death of a child', theme: 'grief' },
+    { phrase: 'why me', theme: 'encouragement' },
+    { phrase: 'giving up', theme: 'encouragement' },
+    { phrase: 'thank you allah', theme: 'gratitude' },
+    { phrase: 'grateful heart', theme: 'gratitude' },
+    { phrase: 'night of power', theme: 'ramadan' },
+    { phrase: 'night of decree', theme: 'ramadan' },
+    { phrase: 'give up', theme: 'hope' },
+    { phrase: 'give in', theme: 'hope' },
 ];
+export const PHRASE_EXCLUSIONS = THEME_PHRASES.filter((p) => p.theme === null).map((p) => ({
+    phrase: p.phrase,
+    word: p.phrase.split(' ')[0],
+}));
+const PHRASES_BY_LENGTH = [...THEME_PHRASES].map((p) => ({ ...p, words: p.phrase.split(' ') })).sort((a, b) => b.words.length - a.words.length);
 export function matchThemes(query) {
     const known = new Set(AVAILABLE_THEMES);
     const lookup = (w) => (known.has(w) ? w : undefined) ?? THEME_SYNONYMS[w];
     const out = [];
-    const normalised = normalisePhrase(query);
-    const excluded = new Set(PHRASE_EXCLUSIONS.filter((e) => normalised.includes(e.phrase)).map((e) => e.word));
-    for (const word of normalised.split(' ')) {
-        if (!word)
-            continue;
-        if (excluded.has(word))
-            continue;
-        const theme = lookup(word) ?? (word.length > 3 && word.endsWith('s') ? lookup(word.slice(0, -1)) : undefined);
+    const add = (theme, via) => {
         if (theme && known.has(theme) && !out.some((m) => m.theme === theme))
-            out.push({ theme, via: word });
+            out.push({ theme, via });
+    };
+    const words = normalisePhrase(query).split(' ').filter(Boolean);
+    for (let i = 0; i < words.length;) {
+        const phrase = PHRASES_BY_LENGTH.find((p) => p.words.every((w, k) => words[i + k] === w));
+        if (phrase) {
+            add(phrase.theme, phrase.phrase);
+            i += phrase.words.length;
+            continue;
+        }
+        const word = words[i];
+        add(lookup(word) ?? (word.length > 3 && word.endsWith('s') ? lookup(word.slice(0, -1)) : undefined), word);
+        i += 1;
     }
     return out;
 }

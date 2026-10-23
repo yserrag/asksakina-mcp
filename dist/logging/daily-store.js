@@ -1,13 +1,16 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { AUDIENCE_BUCKETS, PROMPT_NAMES } from './counter-keys.js';
 export const RETENTION_DAYS = 90;
 export const FLUSH_INTERVAL_MS = 5 * 60 * 1000;
 const TOOLS = ['get_quran_verse', 'get_dua', 'get_name_of_allah', 'find_verses'];
 const DAY_FILE = /^(\d{4}-\d{2}-\d{2})\.json$/;
-const zero = () => ({ ok: 0, not_found: 0, error: 0, duration_ms_sum: 0 });
+const zero = () => ({ ok: 0, not_found: 0, error: 0, duration_ms_sum: 0, teach_served: 0 });
 const zeroDay = (date) => ({
     date,
     by_tool: { get_quran_verse: zero(), get_dua: zero(), get_name_of_allah: zero(), find_verses: zero() },
+    audience: Object.fromEntries(AUDIENCE_BUCKETS.map((b) => [b, 0])),
+    prompts: Object.fromEntries(PROMPT_NAMES.map((n) => [n, 0])),
 });
 export function utcDay(when) {
     return when.toISOString().slice(0, 10);
@@ -20,7 +23,16 @@ export function oldestKeptDay(today) {
 const count = (x) => (typeof x === 'number' && Number.isFinite(x) && x > 0 ? Math.floor(x) : 0);
 export function sanitiseDay(date, input) {
     const out = zeroDay(date);
-    const byTool = input?.by_tool;
+    const src = input;
+    const audience = src?.audience;
+    if (audience && typeof audience === 'object')
+        for (const b of AUDIENCE_BUCKETS)
+            out.audience[b] = count(audience[b]);
+    const prompts = src?.prompts;
+    if (prompts && typeof prompts === 'object')
+        for (const n of PROMPT_NAMES)
+            out.prompts[n] = count(prompts[n]);
+    const byTool = src?.by_tool;
     if (!byTool || typeof byTool !== 'object')
         return out;
     for (const t of TOOLS) {
@@ -32,6 +44,7 @@ export function sanitiseDay(date, input) {
             not_found: count(c.not_found),
             error: count(c.error),
             duration_ms_sum: count(c.duration_ms_sum),
+            teach_served: count(c.teach_served),
         };
     }
     return out;
@@ -44,7 +57,12 @@ function addInto(target, add) {
         a.not_found += b.not_found;
         a.error += b.error;
         a.duration_ms_sum += b.duration_ms_sum;
+        a.teach_served += b.teach_served;
     }
+    for (const k of AUDIENCE_BUCKETS)
+        target.audience[k] += add.audience[k];
+    for (const n of PROMPT_NAMES)
+        target.prompts[n] += add.prompts[n];
 }
 export class DailyUsageStore {
     dir;
@@ -54,13 +72,17 @@ export class DailyUsageStore {
         this.dir = dir;
         this.now = now;
     }
-    record(tool, status, durationMs) {
-        if (!TOOLS.includes(tool))
-            return;
+    today() {
         const day = utcDay(this.now());
         let d = this.pending.get(day);
         if (!d)
             this.pending.set(day, (d = zeroDay(day)));
+        return d;
+    }
+    record(tool, status, durationMs, teachServed = false, audience = 'absent') {
+        if (!TOOLS.includes(tool))
+            return;
+        const d = this.today();
         const c = d.by_tool[tool];
         if (status === 'ok')
             c.ok += 1;
@@ -69,6 +91,14 @@ export class DailyUsageStore {
         else
             c.error += 1;
         c.duration_ms_sum += Math.max(0, Math.round(durationMs));
+        if (teachServed)
+            c.teach_served += 1;
+        d.audience[AUDIENCE_BUCKETS.includes(audience) ? audience : 'absent'] += 1;
+    }
+    recordPrompt(name) {
+        if (!PROMPT_NAMES.includes(name))
+            return;
+        this.today().prompts[name] += 1;
     }
     file(day) {
         return path.join(this.dir, `${day}.json`);

@@ -56,13 +56,14 @@ import {
   type RateLimitResult,
 } from './safety/rate-limiter.js'
 import { serialiseResponse, type SakinaResponse } from './meta/response-builder.js'
-import { logRequest, type ToolName, type RequestStatus } from './logging/request-logger.js'
+import { logPromptFetch, logRequest, type PromptName, type ToolName, type RequestStatus } from './logging/request-logger.js'
+import { exploreNamesArgs, exploreNamesPrompt, readMissingArgumentsAsEmpty, PROMPT_STRINGS, understandAVerseArgs, understandAVersePrompt } from './prompts/learning-journeys.js'
 import { handleStatsRequest } from './logging/stats.js'
 import { enableDailyStore } from './logging/daily-store.js'
 import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
-const SERVER_VERSION = '2.3.1'
+const SERVER_VERSION = '2.4.0'
 const SERVER_DESCRIPTION =
   "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
@@ -190,6 +191,11 @@ const SERVER_CARD = {
       },
     },
   ],
+  // WO#489: the two learning-journey prompts.
+  prompts: [
+    { name: 'understand_a_verse', description: PROMPT_STRINGS.understandDescription },
+    { name: 'explore_names_of_allah', description: PROMPT_STRINGS.exploreDescription },
+  ],
   resources: [
     {
       uri: 'sakina://about',
@@ -207,8 +213,10 @@ const SERVER_CARD = {
       tracking: 'none',
       analytics: 'aggregate-only',
       // WO#478 (Gem 8 passed, 20 Oct 2026): daily totals on disk since WO#456.
+      // WO#488 Part B (Gem 8 approved the draft with the 90-day disk retention
+      // stated, 22 Oct 2026): the teach, audience and prompt counters.
       logging:
-        'aggregate counters only: per-tool call and status totals. No per-request records, no IPs, no client identifiers, no user-agents, no geolocation, no params, no response payloads. Since-start totals reset on restart; on the hosted server, per-tool daily totals are kept on disk for at most 90 days.',
+        'aggregate counters only: per-tool call and status totals, teach-served per tool, a tally of audience values, and prompt fetches by name. No per-request records, no IPs, no client identifiers, no user-agents, no geolocation, no other params, no response payloads. Since-start totals reset on restart; on the hosted server, daily totals are kept on disk for at most 90 days.',
     },
   },
 } as const
@@ -216,9 +224,10 @@ const SERVER_CARD = {
 /**
  * Wrap a tool handler so every call bumps the in-memory aggregate
  * counters (WO#360). Captures start time, status (ok / not_found /
- * error), and wall-clock duration only — no params, no per-request
- * record. Re-throws errors after counting so the transport's existing
- * error path still runs.
+ * error), and wall-clock duration; WO#488 adds whether the response
+ * carried teach and the bucket of the `audience` argument. No other
+ * param, no per-request record. Re-throws errors after counting so the
+ * transport's existing error path still runs.
  */
 function withLogging<Args extends Record<string, unknown>>(
   tool: ToolName,
@@ -227,17 +236,38 @@ function withLogging<Args extends Record<string, unknown>>(
   return async (args) => {
     const start = performance.now()
     let status: RequestStatus = 'ok'
+    let teachServed = false
     try {
       const response = await handler(args)
       if (response._sakina_meta?.content_type === 'not_found') {
         status = 'not_found'
       }
+      // WO#488: buildResponse sets presentation_contract.teach only when the
+      // content carries a teach block, so this is a key check, not a walk.
+      teachServed = (response._sakina_meta?.presentation_contract as { teach?: unknown } | undefined)?.teach !== undefined
       return { content: [{ type: 'text', text: serialiseResponse(response) }] }
     } catch (err) {
       status = 'error'
       throw err
     } finally {
-      logRequest({ tool, status, duration_ms: performance.now() - start })
+      logRequest({ tool, status, duration_ms: performance.now() - start, teach_served: teachServed, audience: args.audience })
+    }
+  }
+}
+
+/**
+ * WO#488 Part B / WO#489: wrap a prompt callback so each answered fetch adds
+ * one to that prompt's counter. Only the name is counted; the arguments are
+ * passed to the callback and never read, logged or counted here. A fetch
+ * whose arguments fail validation never reaches the callback and is not
+ * counted.
+ */
+function withPromptLogging<Args, R>(name: PromptName, cb: (args: Args) => R): (args: Args) => R {
+  return (args) => {
+    try {
+      return cb(args)
+    } finally {
+      logPromptFetch(name)
     }
   }
 }
@@ -294,6 +324,22 @@ export function createMcpServer(): McpServer {
     },
     withLogging('find_verses', findVersesHandler),
   )
+
+  // ── Prompts (WO#489) ──────────────────────────────────────────────
+
+  server.registerPrompt(
+    'understand_a_verse',
+    { title: PROMPT_STRINGS.understandTitle, description: PROMPT_STRINGS.understandDescription, argsSchema: understandAVerseArgs },
+    withPromptLogging('understand_a_verse', understandAVersePrompt),
+  )
+
+  const explore = server.registerPrompt(
+    'explore_names_of_allah',
+    { title: PROMPT_STRINGS.exploreTitle, description: PROMPT_STRINGS.exploreDescription, argsSchema: exploreNamesArgs },
+    withPromptLogging('explore_names_of_allah', exploreNamesPrompt),
+  )
+  // A fetch with no `arguments` at all starts at Name 1 (readMissingArgumentsAsEmpty).
+  explore.argsSchema = readMissingArgumentsAsEmpty(exploreNamesArgs) as unknown as typeof explore.argsSchema
 
   // ── Resources ─────────────────────────────────────────────────────
 

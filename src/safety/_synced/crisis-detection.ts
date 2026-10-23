@@ -349,13 +349,12 @@ export const SELF_HARM_KEYWORDS_TR = [
   "imtihana dayanamıyorum",
 ]
 
-export const SELF_HARM_KEYWORDS = [
-  ...SELF_HARM_KEYWORDS_EN,
-  ...SELF_HARM_KEYWORDS_ID,
-  ...SELF_HARM_KEYWORDS_UR,
-  ...SELF_HARM_KEYWORDS_AR,
-  ...SELF_HARM_KEYWORDS_TR,
-
+/**
+ * Persian (fa) entries of SELF_HARM_KEYWORDS (WO#488). Moved here unchanged
+ * from the combined list, with the WO#488 additions, so crisisKeywordLanguages
+ * can name the language. The combined list spreads this array back in.
+ */
+export const SELF_HARM_KEYWORDS_FA = [
   // ── Persian / Farsi (fa) — WO#212 A2 ────────────────────────────
   // Stored in normaliseArabic() form (آ→ا etc.) so chat-typed input,
   // which the detector also normalises, matches. Persian letters
@@ -376,6 +375,21 @@ export const SELF_HARM_KEYWORDS = [
   'دلیلی برای زندگی ندارم',  // "no reason to live"
   'از زندگی خسته شدم',       // "tired of life"
 
+  // ── WO#264 — fa/bn dialect additions (Gem 5 string + Gem 3 tier) ──
+  // dialect additions — Gem 5 string + Gem 3 tier (fa self-harm), WO#264
+  'نمیخواهم زنده باشم',
+  'به زندگیم پایان میدهم',
+
+  // ── WO#488 A1 (Gem 3, 22 Oct 2026; docs/wo488-architect.md) ──
+  // Stored like the WO#212 entries above (normaliseArabic form, Persian letters).
+  'خسته شدم از زندگی',     // "I am tired of life"
+  'کاش بیدار نشم',         // "I wish I would not wake up"
+  // Latin (transliterated), matched through the Latin fold.
+  'mikham bemiram',        // "I want to die"
+]
+
+/** Bengali (bn) entries of SELF_HARM_KEYWORDS (WO#488), as SELF_HARM_KEYWORDS_FA. */
+export const SELF_HARM_KEYWORDS_BN = [
   // ── Bengali (bn) — WO#212 A2 ────────────────────────────────────
   // Separate Unicode block (U+0980–09FF); matched via lowercase
   // substring (no Arabic normalisation). Gem 3 (tier) + Gem 5 (strings)
@@ -392,18 +406,7 @@ export const SELF_HARM_KEYWORDS = [
   'নিজেকে আঘাত করি',         // "I hurt myself"
   'বাঁচার কোনো মানে নেই',    // "no reason to live"
 
-
-  // ═══ WO#252-B — Architect-approved crisis expansion (self-harm) ═══════════════
-  // Net-new keywords from the reviewed Gem 2/3/4/5 candidate union, diffed
-  // against the live post-252-A detector. Arabic stored in normaliseArabic()
-  // form; Latin/transliterated lower-cased. Both folded again defensively by
-  // matchesAny at match time.
-  // (Its tr, id, ur and ar entries are in the per-language arrays above, WO#482.)
-
-  // ── WO#264 — fa/bn dialect additions (Gem 5 string + Gem 3 tier) ──
-  // dialect additions — Gem 5 string + Gem 3 tier (fa self-harm), WO#264
-  'نمیخواهم زنده باشم',
-  'به زندگیم پایان میدهم',
+  // ── WO#264 — bn dialect additions (Gem 5 string + Gem 3 tier) ──
   // dialect additions — Gem 5 string + Gem 3 tier (bn self-harm), WO#264
   'আত্মহত্যা করবো',
   'মইরা যাইতে চাই',
@@ -412,6 +415,30 @@ export const SELF_HARM_KEYWORDS = [
   'নিজের ক্ষতি করবো',
   'নিজেকে আঘাত করব',
   'নিজেকে আঘাত করবো',
+
+  // ── WO#488 A1 (Gem 3, 22 Oct 2026; docs/wo488-architect.md) ──
+  // Stored like the WO#212 entries above (NFC, as typed).
+  'বেঁচে থাকার কোনো অর্থ নেই', // "there is no meaning in staying alive"
+  'আমার মরে যাওয়াই ভালো', // "it is better that I die"
+  // Latin (transliterated), matched through the Latin fold.
+  'ami more jete chai',    // "I want to die"
+]
+
+export const SELF_HARM_KEYWORDS = [
+  ...SELF_HARM_KEYWORDS_EN,
+  ...SELF_HARM_KEYWORDS_ID,
+  ...SELF_HARM_KEYWORDS_UR,
+  ...SELF_HARM_KEYWORDS_AR,
+  ...SELF_HARM_KEYWORDS_TR,
+  ...SELF_HARM_KEYWORDS_FA,
+  ...SELF_HARM_KEYWORDS_BN,
+
+  // ═══ WO#252-B — Architect-approved crisis expansion (self-harm) ═══════════════
+  // Net-new keywords from the reviewed Gem 2/3/4/5 candidate union, diffed
+  // against the live post-252-A detector. Arabic stored in normaliseArabic()
+  // form; Latin/transliterated lower-cased. Both folded again defensively by
+  // matchesAny at match time.
+  // (Its tr, id, ur and ar entries are in the per-language arrays above, WO#482; fa and bn, WO#488.)
 
   // ── Punjabi / Shahmukhi (pa) — WO#284 (Gem 2 byte-verified) ─────────
   // Pakistani Punjabi Muslim audience, RTL Shahmukhi. Full phrases only —
@@ -636,13 +663,8 @@ export const ABUSE_KEYWORDS_TR = [
   "itaat etmek zorunda mıyım",
 ]
 
-export const ABUSE_KEYWORDS = [
-  ...ABUSE_KEYWORDS_EN,
-  ...ABUSE_KEYWORDS_ID,
-  ...ABUSE_KEYWORDS_UR,
-  ...ABUSE_KEYWORDS_AR,
-  ...ABUSE_KEYWORDS_TR,
-
+/** Persian (fa) entries of ABUSE_KEYWORDS (WO#488), as SELF_HARM_KEYWORDS_FA. */
+export const ABUSE_KEYWORDS_FA = [
   // ── Persian / Farsi (fa) — WO#212 A2 (Gem 3/5 VERIFIED, WO#266) ────
   // Bare nouns خشونت خانگی + ازار جنسی are frame-gated (WO#265 four-gate).
   'کتکم میزنه',              // "he beats me" (colloquial)
@@ -653,6 +675,22 @@ export const ABUSE_KEYWORDS = [
   'بهم تجاوز کرد',           // "he raped me"
   'ازار جنسی',               // "sexual abuse" (آزار normalised → ازار)
 
+  // ── WO#264 — fa dialect additions (Gem 5 string + Gem 3 tier) ──
+  // dialect additions — Gem 5 string + Gem 3 tier (fa abuse), WO#264
+  'من را میزند',
+  'میترسم بروم خانه',
+  'به من تجاوز کرد',
+
+  // ── WO#488 A1 (Gem 3, 22 Oct 2026; docs/wo488-architect.md) ──
+  // "کتکم میزنه" and "منو میزنه" are already listed above (WO#212); not repeated.
+  // Latin (transliterated), matched through the Latin fold.
+  'mano mizane',           // "he hits me"
+  // Gem 3, 22 Oct 2026 (docs/wo488-architect.md): standalone, no relation needed.
+  'ازش میترسم',            // "I am afraid of him/her"
+]
+
+/** Bengali (bn) entries of ABUSE_KEYWORDS (WO#488), as SELF_HARM_KEYWORDS_FA. */
+export const ABUSE_KEYWORDS_BN = [
   // ── Bengali (bn) — WO#212 A2 (Gem 3/5 VERIFIED, WO#266) ───────────
   // Bare nouns পারিবারিক সহিংসতা + যৌন নির্যাতন are frame-gated (WO#265 four-gate).
   'আমাকে মারে',              // "he hits / beats me"
@@ -663,19 +701,30 @@ export const ABUSE_KEYWORDS = [
   'ধর্ষিত হয়েছি',           // "I was raped"
   'যৌন নির্যাতন',            // "sexual abuse"
 
+  // ── WO#488 A1 (Gem 3, 22 Oct 2026; docs/wo488-architect.md) ──
+  // "আমাকে মারে" is already listed above (WO#212); not repeated.
+  'মারধর করে',             // "beats (me)"
+  'গায়ে হাত তোলে',        // "raises a hand to (me)"
+  'অত্যাচার করে',          // "torments (me)"
+  // Latin (transliterated), matched through the Latin fold.
+  'amake mare',            // "he hits me"
+]
+
+export const ABUSE_KEYWORDS = [
+  ...ABUSE_KEYWORDS_EN,
+  ...ABUSE_KEYWORDS_ID,
+  ...ABUSE_KEYWORDS_UR,
+  ...ABUSE_KEYWORDS_AR,
+  ...ABUSE_KEYWORDS_TR,
+  ...ABUSE_KEYWORDS_FA,
+  ...ABUSE_KEYWORDS_BN,
 
   // ═══ WO#252-B — Architect-approved crisis expansion (abuse) ═══════════════
   // Net-new keywords from the reviewed Gem 2/3/4/5 candidate union, diffed
   // against the live post-252-A detector. Arabic stored in normaliseArabic()
   // form; Latin/transliterated lower-cased. Both folded again defensively by
   // matchesAny at match time.
-  // (Its tr, id, ur and ar entries are in the per-language arrays above, WO#482.)
-
-  // ── WO#264 — fa dialect additions (Gem 5 string + Gem 3 tier) ──
-  // dialect additions — Gem 5 string + Gem 3 tier (fa abuse), WO#264
-  'من را میزند',
-  'میترسم بروم خانه',
-  'به من تجاوز کرد',
+  // (Its tr, id, ur and ar entries are in the per-language arrays above, WO#482; fa and bn, WO#488.)
 
   // ── Punjabi / Shahmukhi (pa) — WO#284 (Gem 2 byte-verified) ─────────
   // Full abuse-disclosure phrases. Two suppress nouns are substrings here
@@ -980,7 +1029,8 @@ export function detectCrisis(text: string): CrisisDetectionResult {
     return { isCrisis: true, crisisType: 'abuse' }
   }
   // WO#482 (Gem 3 round 2): Turkish relational fear, a relation word then "kork".
-  if (trFearProximity(text, input)) {
+  // WO#488 A2: the same rule for Persian and Bengali.
+  if (trFearProximity(text, input) || faFearProximity(text, input) || bnFearProximity(text, input)) {
     return { isCrisis: true, crisisType: 'abuse' }
   }
   // Only bare-noun guards can match now — apply the four-gate suppression.
@@ -999,10 +1049,10 @@ export function detectCrisis(text: string): CrisisDetectionResult {
  * It uses the detector's own prepared input and per-keyword matcher, so a
  * list hits here exactly when it would hit inside detectCrisis. It does not
  * decide whether there is a crisis: call it only after detectCrisis fired.
- * Persian, Bengali and Punjabi entries are not split out, so a hit on one
- * of them alone returns [].
+ * Punjabi entries are not split out, so a hit on one of them alone returns
+ * []. Persian and Bengali are split out since WO#488.
  */
-export type CrisisKeywordLanguage = 'en' | 'id' | 'ur' | 'ar' | 'tr'
+export type CrisisKeywordLanguage = 'en' | 'id' | 'ur' | 'ar' | 'tr' | 'fa' | 'bn'
 
 const KEYWORDS_BY_LANGUAGE: Readonly<Record<'self-harm' | 'abuse', ReadonlyArray<[CrisisKeywordLanguage, ReadonlyArray<string>]>>> = {
   'self-harm': [
@@ -1011,6 +1061,8 @@ const KEYWORDS_BY_LANGUAGE: Readonly<Record<'self-harm' | 'abuse', ReadonlyArray
     ['ur', SELF_HARM_KEYWORDS_UR],
     ['ar', SELF_HARM_KEYWORDS_AR],
     ['tr', SELF_HARM_KEYWORDS_TR],
+    ['fa', SELF_HARM_KEYWORDS_FA],
+    ['bn', SELF_HARM_KEYWORDS_BN],
   ],
   abuse: [
     ['en', ABUSE_KEYWORDS_EN],
@@ -1018,13 +1070,22 @@ const KEYWORDS_BY_LANGUAGE: Readonly<Record<'self-harm' | 'abuse', ReadonlyArray
     ['ur', ABUSE_KEYWORDS_UR],
     ['ar', ABUSE_KEYWORDS_AR],
     ['tr', ABUSE_KEYWORDS_TR],
+    ['fa', ABUSE_KEYWORDS_FA],
+    ['bn', ABUSE_KEYWORDS_BN],
   ],
+}
+
+/** The relational-fear rule for a language, if it has one (abuse only). */
+const FEAR_PROXIMITY: Partial<Record<CrisisKeywordLanguage, (text: string, input: PreparedInput) => boolean>> = {
+  tr: (text, input) => trFearProximity(text, input),
+  fa: (text, input) => faFearProximity(text, input),
+  bn: (text, input) => bnFearProximity(text, input),
 }
 
 export function crisisKeywordLanguages(text: string, crisisType: 'self-harm' | 'abuse'): CrisisKeywordLanguage[] {
   const input = prepareInput(text)
   return KEYWORDS_BY_LANGUAGE[crisisType]
-    .filter(([language, keywords]) => matchesAny(keywords, input) || (crisisType === 'abuse' && language === 'tr' && trFearProximity(text, input)))
+    .filter(([language, keywords]) => matchesAny(keywords, input) || (crisisType === 'abuse' && !!FEAR_PROXIMITY[language]?.(text, input)))
     .map(([language]) => language)
 }
 
@@ -1064,4 +1125,73 @@ const TR_FEAR_PROXIMITY = new RegExp(`(?<![\\p{L}\\p{N}])(?:${TR_FEAR_RELATIONS.
 function trFearProximity(text: string, input: PreparedInput): boolean {
   const raw = foldLatin(text.toLowerCase())
   return TR_FEAR_PROXIMITY.test(raw) || input.latin.some((f) => TR_FEAR_PROXIMITY.test(f))
+}
+
+/**
+ * WO#488 A2 (docs/wo488-architect.md): fear of a person is ABUSE in Persian and
+ * Bengali, by the Turkish design: a relation word and the fear verb in one run
+ * of text, with up to three words between them. Punctuation between them counts
+ * as a separator, like whitespace (the Architect's comma ruling of 21 Oct 2026,
+ * docs/wo482-architect.md), so "relation, fear" still fires.
+ *
+ * The relation lists: the WO's examples plus the drafts, all APPROVED by Gem 3
+ * on 22 Oct 2026, with "father-in-law" added (docs/wo488-architect.md).
+ *
+ * Persian: "از" + relation + "میترسم". Matched on normaliseArabic output, so
+ * Persian and Arabic keyboards (ی/ي, ک/ك) and ZWNJ ("می‌ترسم") all meet in one
+ * form before matching (A4); "می ترسم" with a space also matches.
+ */
+export const FA_FEAR_RELATIONS: ReadonlyArray<string> = [
+  'شوهرم', 'همسرم', 'پدرم', 'برادرم', 'زنم', 'مادرشوهرم',
+  'خانوادم', // draft, approved: "my family" (FA_DISCLOSURE_MARKERS)
+  '\u0645\u0627\u062F\u0631\u0645', // draft, approved: "my mother"
+  'پدرشوهرم', // Gem 3, 22 Oct: "my father-in-law"
+]
+export const FA_FEAR_FROM = 'از'
+export const FA_FEAR_VERB = 'میترسم'
+
+// A word is letters, marks and digits: Persian and Bengali vowel signs are \p{M}.
+const NOT_WORD = '(?<![\\p{L}\\p{M}\\p{N}])'
+const WORD_ENDS = '(?![\\p{L}\\p{M}\\p{N}])'
+const UP_TO_THREE_WORDS = '[\\s\\p{P}]+(?:[^\\s\\p{P}]+[\\s\\p{P}]+){0,3}'
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const FA_VERB_NORM = normaliseArabic(FA_FEAR_VERB)
+const FA_FEAR_PROXIMITY = new RegExp(
+  `${NOT_WORD}${escapeRe(normaliseArabic(FA_FEAR_FROM))}[\\s\\p{P}]+(?:${FA_FEAR_RELATIONS.map((w) => escapeRe(normaliseArabic(w))).join('|')})${WORD_ENDS}${UP_TO_THREE_WORDS}${escapeRe(FA_VERB_NORM.slice(0, 2))} ?${escapeRe(FA_VERB_NORM.slice(2))}`,
+  'u',
+)
+
+/** On normaliseArabic of the raw input, then on the prepared Arabic form. */
+function faFearProximity(text: string, input: PreparedInput): boolean {
+  return FA_FEAR_PROXIMITY.test(normaliseArabic(text)) || FA_FEAR_PROXIMITY.test(input.arabic)
+}
+
+/**
+ * Bengali: relation + "ভয়" + one of BN_FEAR_VERBS: the WO's "করে" and
+ * "লাগে" ("কাছে যেতে ভয় করে" is the first with two words between), and the
+ * first-person "করি" and "পাই" that Gem 3 added on 22 Oct. Negation follows
+ * the verb in Bengali, so "... ভয় লাগে না" also fires; Gem 3 ruled that SAFE.
+ * The relation word may carry a case ending (not separately ruled): -কে, -র, -ের, -য়ের, -এর, then an optional -ও. A closed list, so
+ * "ভাইরাস" ("virus") is not "ভাই". Matched on the raw input lower-cased and NFC
+ * (foldLatin), then on the prepared forms, as the Turkish rule.
+ */
+export const BN_FEAR_RELATIONS: ReadonlyArray<string> = [
+  'স্বামী', 'শাশুড়ি', 'শাশুড়ী', 'শ্বশুর', 'বাবা', 'ভাই',
+  'স্ত্রী', // draft, approved: "wife" (BN_DISCLOSURE_MARKERS)
+  'পরিবার', // draft, approved: "family" (BN_DISCLOSURE_MARKERS)
+]
+export const BN_FEAR_NOUN = 'ভয়'
+export const BN_FEAR_VERBS: ReadonlyArray<string> = ['করে', 'লাগে', 'করি', 'পাই']
+const BN_CASE_ENDINGS = ['\u0995\u09C7', '\u09B0', '\u09C7\u09B0', '\u09AF\u09BC\u09C7\u09B0', '\u098F\u09B0']
+const BN_ALSO = '\u0993'
+const nfc = (s: string) => s.normalize('NFC')
+const BN_FEAR_PROXIMITY = new RegExp(
+  `${NOT_WORD}(?:${BN_FEAR_RELATIONS.map((w) => escapeRe(nfc(w))).join('|')})(?:${BN_CASE_ENDINGS.map(nfc).join('|')})?(?:${BN_ALSO})?${WORD_ENDS}${UP_TO_THREE_WORDS}${escapeRe(nfc(BN_FEAR_NOUN))}\\s+(?:${BN_FEAR_VERBS.map((v) => escapeRe(nfc(v))).join('|')})`,
+  'u',
+)
+
+function bnFearProximity(text: string, input: PreparedInput): boolean {
+  const raw = foldLatin(text.toLowerCase())
+  return BN_FEAR_PROXIMITY.test(raw) || input.latin.some((f) => BN_FEAR_PROXIMITY.test(f))
 }
