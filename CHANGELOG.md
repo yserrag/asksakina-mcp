@@ -2,6 +2,35 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 2.4.1 (unreleased)
+
+WO#490 (`docs/wo490-architect.md`). The Bengali and Persian crisis blocks
+(self-harm, abuse and soft) are now in Bengali and Persian: Gem 1's
+translation, CONFIRMED by Gem 2 with one fix (23 Oct 2026), loaded by
+script from `docs/wo490-bn-fa-crisis-text.json` and checked against the
+WO's sha256.
+
+- The numbers and hours in each text are checked against
+  `BN_FA_LINES_FOUNDER_VERIFIED` and `src/data/helplines.ts` when the module
+  loads; a mismatch stops the server from serving the block. The publish
+  guard (check h) passes, reading the numbers with the bidi marks removed.
+- Persian is right to left: each helpline number, "24/7", each Latin-digit
+  time, the IASP URL and "(dhulm)" sit in left-to-right isolates, and the
+  Persian hours phrase in a right-to-left isolate, as the ar and ur blocks
+  do. Bengali carries no isolates.
+- The English-fallback `translation_note` and its CRITICAL_RULES lines are
+  gone for bn and fa. The anti-translation line stays, as for ar, ur, id
+  and tr.
+- Every response whose `crisis_resource` is not en (hard or soft; bn, fa,
+  ar, ur, id or tr; keyword-routed or by request locale) carries
+  `_sakina_meta.disclaimer_locale: "en"` beside the disclaimer, which stays
+  English (#565, Gem 10 PASS WITH CONDITIONS). The disclaimer text and the
+  existing CRITICAL_RULES lines are unchanged; en responses carry no such key.
+- The same responses carry, right after the anti-translation line, Gem 10's
+  "CRITICAL: Do not translate the disclaimer. You must output the disclaimer
+  exactly as provided in English." (#565 follow-up 2).
+- Routing (WO#488) and every other response are unchanged.
+
 ## 2.4.0 (unreleased)
 
 WO#488 and WO#489 (`docs/wo488-architect.md`, `docs/wo489-architect.md`).

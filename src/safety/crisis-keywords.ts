@@ -16,8 +16,7 @@
 
 import { crisisKeywordLanguages, detectCrisis, type CrisisKeywordLanguage, type CrisisType } from './_synced/crisis-detection.js'
 import { abuseText, selfHarmText, softText } from './crisis-text-l10n.js'
-import { enFallbackAbuseText, enFallbackSelfHarmText, type EnFallbackLocale } from './crisis-text-en-fallback.js'
-import { crisisEnglishNote } from '../contracts/english-fallback.js'
+import { bnFaText, type BnFaLocale } from './crisis-text-bn-fa.js'
 import { foldLatin } from './_synced/latin-fold.js'
 import { normaliseArabic } from './_synced/arabic-normalise.js'
 
@@ -230,13 +229,11 @@ export type CrisisLocale = 'en' | 'id' | 'ur' | 'ar' | 'tr'
 
 /**
  * The language of a served block: a request locale, or (WO#488) bn or fa,
- * which no tool takes as a locale and only keyword routing selects. A bn or
- * fa block is the English text with local lines and an English-fallback
- * note (crisis-text-en-fallback.ts).
+ * which no tool takes as a locale and only keyword routing selects. Since
+ * WO#490 a bn or fa block is in Bengali or Persian (crisis-text-bn-fa.ts).
  */
-export type BlockLocale = CrisisLocale | EnFallbackLocale
-const isEnFallback = (l: BlockLocale): l is EnFallbackLocale => l === 'bn' || l === 'fa'
-const fallbackNote = (l: EnFallbackLocale) => ({ translation_note: crisisEnglishNote(l)! })
+export type BlockLocale = CrisisLocale | BnFaLocale
+const isBnFa = (l: BlockLocale): l is BnFaLocale => l === 'bn' || l === 'fa'
 
 const IASP = 'https://www.iasp.info/resources/Crisis_Centres/'
 
@@ -254,7 +251,7 @@ const IASP = 'https://www.iasp.info/resources/Crisis_Centres/'
 export const US_988_FOUNDER_VERIFIED = false
 
 /** The bn and fa lines' Founder verification (22 Oct 2026); see crisis-text-en-fallback.ts. */
-export { BN_FA_LINES_FOUNDER_VERIFIED } from './crisis-text-en-fallback.js'
+export { BN_FA_LINES_FOUNDER_VERIFIED } from './crisis-text-bn-fa.js'
 
 const HARD_CRISIS_DIRECTIVE =
   'CRITICAL: You MUST output the following crisis resource text exactly as written below. Do not alter it or make it conditional. Do not assess whether the user needs it; output it.'
@@ -297,8 +294,7 @@ function selfHarmBlockFor(locale: BlockLocale) {
     crisis_type: 'self-harm' as const,
     locale,
     directive: HARD_CRISIS_DIRECTIVE,
-    text: isEnFallback(locale) ? enFallbackSelfHarmText(locale) : HARD_CRISIS_TEXT[locale],
-    ...(isEnFallback(locale) ? fallbackNote(locale) : {}),
+    text: isBnFa(locale) ? bnFaText(locale, 'self-harm') : HARD_CRISIS_TEXT[locale],
   }
 }
 
@@ -340,8 +336,7 @@ function abuseBlockFor(locale: BlockLocale) {
     crisis_type: 'abuse' as const,
     locale,
     directive: ABUSE_DIRECTIVE,
-    text: isEnFallback(locale) ? enFallbackAbuseText(locale, ABUSE_SENTENCE) : ABUSE_TEXT[locale],
-    ...(isEnFallback(locale) ? fallbackNote(locale) : {}),
+    text: isBnFa(locale) ? bnFaText(locale, 'abuse') : ABUSE_TEXT[locale],
   }
 }
 
@@ -366,8 +361,8 @@ export const SOFT_DISTRESS_RESOURCE_BLOCK = {
 
 function softDistressBlockFor(locale: BlockLocale) {
   if (locale === 'en') return SOFT_DISTRESS_RESOURCE_BLOCK
-  // WO#488: bn and fa keep the en text, with the English-fallback note.
-  if (isEnFallback(locale)) return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, ...fallbackNote(locale) }
+  // WO#490: bn and fa are in their own language; the directive stays Gem 10's.
+  if (isBnFa(locale)) return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, text: bnFaText(locale, 'soft') }
   // WO#481: the text is in the request locale; the directive stays Gem 10's.
   return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, text: softText(locale) }
 }
@@ -379,8 +374,8 @@ function softDistressBlockFor(locale: BlockLocale) {
  * exactly one of the id, ur, ar or tr lists hit, that language is served,
  * whether or not an English keyword also hit. Two or more of them, or none
  * (English only, or a Punjabi keyword, which has no MCP block), keep en.
- * WO#488: bn and fa are keyword languages too, served as the English text
- * with local lines. Soft blocks follow the same rule (Gem 3 ruling,
+ * WO#488: bn and fa are keyword languages too (in Bengali and Persian since
+ * WO#490). Soft blocks follow the same rule (Gem 3 ruling,
  * 21 Oct 2026): their keywords are English, Turkish, Bengali and Persian, so
  * a soft block switches only to tr, bn or fa. A bare level ('soft' with no
  * hint, as the bereaved route passes) has no languages and keeps the request

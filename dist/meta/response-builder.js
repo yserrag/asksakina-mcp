@@ -1,5 +1,4 @@
 import { SAKINA_DISCLAIMER, NOT_FOUND_DISCLAIMER, CRISIS_ONLY_DISCLAIMER } from '../contracts/disclaimers.js';
-import { ENGLISH_FALLBACK_GUARD } from '../contracts/english-fallback.js';
 import { QURAN_VERSE_CONTEXT, HADITH_CONTEXT, NAMES_OF_ALLAH_CONTEXT, } from '../contracts/educational.js';
 import { QURAN_CONTRACT, HADITH_CONTRACT, NAME_OF_ALLAH_CONTRACT, REFLECTION_CONTRACT, QURAN_DIRECTIVES, VERSE_COLLECTION_DIRECTIVES, DUA_DIRECTIVES, NAME_DIRECTIVES, VOICE_2_RULE, PBUH_RULE, NO_EMOJI_RULE, TEACH_DIRECTIVE, TEACH_BINDING_DIRECTIVES, TEACH_CONTRACT, NO_TEACH_CLAUSE, } from '../contracts/presentation.js';
 const VERSION = '1.0';
@@ -80,13 +79,11 @@ function carriesTeach(value) {
     return Object.values(record).some(carriesTeach);
 }
 export const CRISIS_ANTI_TRANSLATION = 'CRITICAL: Output this crisis resource block exactly as written in its original language. Do not translate, paraphrase, or summarize it. Do not counsel beyond it.';
+export const DISCLAIMER_LOCALE_EN = 'en';
+export const DISCLAIMER_TRANSLATION_LOCK = "CRITICAL: Do not translate the disclaimer. You must output the disclaimer exactly as provided in English.";
 function carriesNonEnCrisisBlock(extras) {
     const block = extras?.crisis_resource;
     return !!block && typeof block.locale === 'string' && block.locale !== 'en';
-}
-function crisisFallbackDirectives(extras) {
-    const block = extras?.crisis_resource;
-    return block && typeof block.translation_note === 'string' ? [block.translation_note, ENGLISH_FALLBACK_GUARD] : [];
 }
 export function buildResponse(input) {
     const meta = metaForType(input.contentType);
@@ -94,8 +91,7 @@ export function buildResponse(input) {
     const extra = [
         ...(input.extraDirectives ?? []),
         ...(teach ? [TEACH_DIRECTIVE, ...TEACH_BINDING_DIRECTIVES] : []),
-        ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION] : []),
-        ...crisisFallbackDirectives(input.extras),
+        ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION, DISCLAIMER_TRANSLATION_LOCK] : []),
     ];
     const full = extra.length ? [...meta.directives, ...extra] : meta.directives;
     const directives = input.withholdTeach ? full.map(withoutNoTeachClause) : full;
@@ -109,6 +105,7 @@ export function buildResponse(input) {
             source: SOURCE,
             content_type: input.contentType,
             disclaimer: meta.disclaimer,
+            ...(carriesNonEnCrisisBlock(input.extras) ? { disclaimer_locale: DISCLAIMER_LOCALE_EN } : {}),
             llm_directives: { CRITICAL_RULES: directives },
             presentation_contract: contract,
             educational_context: meta.educational,

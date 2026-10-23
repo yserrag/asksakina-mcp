@@ -10,7 +10,6 @@
  */
 
 import { SAKINA_DISCLAIMER, NOT_FOUND_DISCLAIMER, CRISIS_ONLY_DISCLAIMER } from '../contracts/disclaimers.js'
-import { ENGLISH_FALLBACK_GUARD } from '../contracts/english-fallback.js'
 import {
   QURAN_VERSE_CONTEXT,
   HADITH_CONTEXT,
@@ -75,6 +74,8 @@ export interface SakinaResponse<TContent> {
     source: string
     content_type: ContentType
     disclaimer: string
+    /** #565 (Gem 10): "en" when the disclaimer is English on a non-en crisis response. */
+    disclaimer_locale?: 'en'
     llm_directives: { CRITICAL_RULES: readonly string[] }
     presentation_contract: Record<string, unknown>
     educational_context: string
@@ -188,19 +189,29 @@ function carriesTeach(value: unknown): boolean {
 export const CRISIS_ANTI_TRANSLATION =
   'CRITICAL: Output this crisis resource block exactly as written in its original language. Do not translate, paraphrase, or summarize it. Do not counsel beyond it.'
 
+/**
+ * #565, Gem 10 PASS WITH CONDITIONS (23 Oct 2026): the disclaimer is English
+ * on every response, and an untranslated disclaimer stays English with an
+ * explicit flag. So a response whose crisis_resource block is not en (hard or
+ * soft; bn, fa, ar, ur, id or tr; by keyword routing or request locale)
+ * carries `_sakina_meta.disclaimer_locale: "en"` beside the disclaimer. The
+ * disclaimer text and CRITICAL_RULES are unchanged; en responses are
+ * byte-identical (no key).
+ */
+export const DISCLAIMER_LOCALE_EN = 'en' as const
+
+/**
+ * #565 follow-up 2, Gem 10 PASS WITH CONDITIONS (23 Oct 2026), verbatim: on
+ * every response that carries disclaimer_locale "en", right after the
+ * anti-translation line. Absent from en responses and from non-en responses
+ * without a crisis block (the same condition as the flag).
+ */
+export const DISCLAIMER_TRANSLATION_LOCK =
+  "CRITICAL: Do not translate the disclaimer. You must output the disclaimer exactly as provided in English."
+
 function carriesNonEnCrisisBlock(extras: Record<string, unknown> | undefined): boolean {
   const block = extras?.crisis_resource as { locale?: unknown } | undefined
   return !!block && typeof block.locale === 'string' && block.locale !== 'en'
-}
-
-/**
- * WO#488 A6: a bn or fa crisis block is the English text with local lines,
- * and carries `translation_note`. The note and the English-fallback guard go
- * into CRITICAL_RULES after the anti-translation line (the 2.2.1 pattern).
- */
-function crisisFallbackDirectives(extras: Record<string, unknown> | undefined): string[] {
-  const block = extras?.crisis_resource as { translation_note?: unknown } | undefined
-  return block && typeof block.translation_note === 'string' ? [block.translation_note, ENGLISH_FALLBACK_GUARD] : []
 }
 
 export function buildResponse<TContent>(
@@ -213,8 +224,7 @@ export function buildResponse<TContent>(
   const extra = [
     ...(input.extraDirectives ?? []),
     ...(teach ? [TEACH_DIRECTIVE, ...TEACH_BINDING_DIRECTIVES] : []),
-    ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION] : []),
-    ...crisisFallbackDirectives(input.extras),
+    ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION, DISCLAIMER_TRANSLATION_LOCK] : []),
   ]
   const full = extra.length ? [...meta.directives, ...extra] : meta.directives
   const directives = input.withholdTeach ? full.map(withoutNoTeachClause) : full
@@ -228,6 +238,7 @@ export function buildResponse<TContent>(
       source: SOURCE,
       content_type: input.contentType,
       disclaimer: meta.disclaimer,
+      ...(carriesNonEnCrisisBlock(input.extras) ? { disclaimer_locale: DISCLAIMER_LOCALE_EN } : {}),
       llm_directives: { CRITICAL_RULES: directives },
       presentation_contract: contract,
       educational_context: meta.educational,

@@ -16,7 +16,7 @@
  * The Quran keeps its own parked-translation note (data/quran.ts).
  */
 
-export type FallbackLocale = 'ar' | 'ur' | 'id' | 'tr' | 'bn' | 'fa'
+export type FallbackLocale = 'ar' | 'ur' | 'id' | 'tr'
 
 /** Gem 10 condition 4, verbatim. */
 export const ENGLISH_FALLBACK_GUARD =
@@ -25,10 +25,9 @@ export const ENGLISH_FALLBACK_GUARD =
 /** Gem 10 condition 3, verbatim. */
 export const TEACH_ENGLISH_NOTE = 'This teaching note is in English.'
 
-// bn and fa (WO#488): only crisis blocks are served in them, by keyword routing.
-const LANGUAGE: Record<FallbackLocale, string> = { ar: 'Arabic', ur: 'Urdu', id: 'Indonesian', tr: 'Turkish', bn: 'Bengali', fa: 'Persian' }
+const LANGUAGE: Record<FallbackLocale, string> = { ar: 'Arabic', ur: 'Urdu', id: 'Indonesian', tr: 'Turkish' }
 
-/** "a" or "an" before the language name (Arabic, Urdu and Indonesian take "an"). */
+/** "a" or "an" before the language name (all four begin with a vowel sound except Turkish). */
 function withArticle(language: string): string {
   return `${/^[AEIOU]/.test(language) ? 'an' : 'a'} ${language}`
 }
@@ -49,15 +48,4 @@ export function nameEnglishNote(locale: string): string | undefined {
   const language = languageOf(locale)
   if (!language) return undefined
   return `Name meanings and reflections are in English; ${withArticle(language)} translation is not yet available. Tell the user the meaning and reflection below are in English.`
-}
-
-/**
- * WO#488 A6: the same note for a bn or fa crisis block, which is the English
- * text with local lines. New wording, adapted to the record (for Gem 1 and
- * Gem 10).
- */
-export function crisisEnglishNote(locale: string): string | undefined {
-  const language = languageOf(locale)
-  if (!language) return undefined
-  return `This crisis resource is in English; ${withArticle(language)} translation is not yet available. Tell the user the crisis resource below is in English.`
 }

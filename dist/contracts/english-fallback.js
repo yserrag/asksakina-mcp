@@ -1,6 +1,6 @@
 export const ENGLISH_FALLBACK_GUARD = "Present the English fallback content exactly as provided. Do not attempt to translate this content into the user's requested language.";
 export const TEACH_ENGLISH_NOTE = 'This teaching note is in English.';
-const LANGUAGE = { ar: 'Arabic', ur: 'Urdu', id: 'Indonesian', tr: 'Turkish', bn: 'Bengali', fa: 'Persian' };
+const LANGUAGE = { ar: 'Arabic', ur: 'Urdu', id: 'Indonesian', tr: 'Turkish' };
 function withArticle(language) {
     return `${/^[AEIOU]/.test(language) ? 'an' : 'a'} ${language}`;
 }
@@ -18,11 +18,5 @@ export function nameEnglishNote(locale) {
     if (!language)
         return undefined;
     return `Name meanings and reflections are in English; ${withArticle(language)} translation is not yet available. Tell the user the meaning and reflection below are in English.`;
-}
-export function crisisEnglishNote(locale) {
-    const language = languageOf(locale);
-    if (!language)
-        return undefined;
-    return `This crisis resource is in English; ${withArticle(language)} translation is not yet available. Tell the user the crisis resource below is in English.`;
 }
 //# sourceMappingURL=english-fallback.js.map

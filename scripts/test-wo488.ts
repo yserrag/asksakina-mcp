@@ -47,7 +47,7 @@ import { matchThemes, THEME_PHRASES, THEME_SYNONYMS } from '../src/data/thematic
 import { normalisePhrase } from '../src/data/context-matcher.js'
 import { E6_ROWS, NOT_FOUND_PHRASES } from './wo488-e6-rows.js'
 import { BN_FA_LINES_FOUNDER_VERIFIED, US_988_FOUNDER_VERIFIED } from '../src/safety/crisis-keywords.js'
-import { enFallbackAbuseText } from '../src/safety/crisis-text-en-fallback.js'
+import { bnFaText, verifyBnFaLines } from '../src/safety/crisis-text-bn-fa.js'
 // @ts-expect-error a plain .mjs module, no types
 import { lineNumbersIn, REQUIRED_LINES, requiredLineProblems } from './crisis-line-guard.mjs'
 import { findVersesShape } from '../src/tools/find-verses.js'
@@ -101,22 +101,18 @@ const fires = (s: string, type: 'self-harm' | 'abuse', lang: 'bn' | 'fa') => {
   return r.isCrisis && r.crisisType === type && JSON.stringify(langsOf(s)) === JSON.stringify([lang])
 }
 
-// The pinned bn and fa block texts (A6), for Gem 1.
+// The bn and fa block texts. Since WO#490 they are Gem 1's translation (test-wo490
+// checks them against the archived file and its sha256, and the fa isolates);
+// WO#490 also removed the English-fallback note.
 const IASP = 'https://www.iasp.info/resources/Crisis_Centres/'
-const OPENING = 'If you are in immediate danger or having thoughts of harming yourself, please reach out for help right now.'
-const CALL = 'Call your local emergency services, or contact a crisis helpline:'
-const VISIT = `Or visit ${IASP} for international crisis lines.`
-const DANGER = 'If you are in immediate danger, call your local emergency services.'
 const PINNED = {
-  'bn self-harm': [OPENING, CALL, 'National Emergency Service (Bangladesh): 999 (24/7)', 'Kaan Pete Roi (Bangladesh): 09612119911 (Daily, 3:00 PM to 3:00 AM Bangladesh time)', VISIT].join('\n'),
-  'bn abuse': [ABUSE_SENTENCE, 'National Helpline for Violence Against Women and Children (Bangladesh): 109 (24/7)', 'National Emergency Service (Bangladesh): 999 (24/7)', DANGER].join('\n'),
-  'fa self-harm': [OPENING, CALL, 'State Welfare Organisation social emergency line (Iran): 123 (24/7)', 'State Welfare Organisation counselling line (Iran): 1480 (8:00 to 24:00 Iran time)', VISIT].join('\n'),
-  'fa abuse': [ABUSE_SENTENCE, 'State Welfare Organisation social emergency line (Iran): 123 (24/7)', DANGER].join('\n'),
+  'bn self-harm': bnFaText('bn', 'self-harm'),
+  'bn abuse': bnFaText('bn', 'abuse'),
+  'fa self-harm': bnFaText('fa', 'self-harm'),
+  'fa abuse': bnFaText('fa', 'abuse'),
 } as const
-const NOTE = {
-  bn: 'This crisis resource is in English; a Bengali translation is not yet available. Tell the user the crisis resource below is in English.',
-  fa: 'This crisis resource is in English; a Persian translation is not yet available. Tell the user the crisis resource below is in English.',
-} as const
+/** The text with its bidi isolates removed (the guard reads numbers this way). */
+const plain = (s: string) => s.replace(/[\u2066-\u2069]/gu, '')
 
 async function main() {
   console.log('=== A1. the net-new phrases ===')
@@ -218,7 +214,7 @@ async function main() {
     const l = isBn(s) ? 'bn' : 'fa'
     const h = evaluateDistress(s)
     const b = distressBlockFor(h, 'en') as { level?: string; locale?: string; text?: string; translation_note?: string }
-    check(h.level === 'soft' && JSON.stringify(h.keywordLanguages) === JSON.stringify([l]) && b.level === 'soft' && b.locale === l && b.text === SOFT_DISTRESS_RESOURCE_BLOCK.text && b.translation_note === NOTE[l] && !detectCrisis(s).isCrisis, `"${s}": soft (not crisis), names ${l}, serves the en soft text as a ${l} block with the note`)
+    check(h.level === 'soft' && JSON.stringify(h.keywordLanguages) === JSON.stringify([l]) && b.level === 'soft' && b.locale === l && b.text === bnFaText(l, 'soft') && b.translation_note === undefined && !detectCrisis(s).isCrisis, `"${s}": soft (not crisis), names ${l}, serves the ${l} soft text as a ${l} block, with no English-fallback note (WO#490)`)
   }
   for (const s of A3.filter((x) => !isBn(x))) {
     const v = toArabic(s)
@@ -273,12 +269,11 @@ async function main() {
   for (const [key, text] of Object.entries(PINNED)) {
     const [l, type] = key.split(' ') as ['bn' | 'fa', 'self-harm' | 'abuse']
     const b = distressBlockFor({ level: 'hard', crisisType: type, keywordLanguages: [l] }, 'en') as { locale?: string; text?: string; translation_note?: string; crisis_type?: string }
-    check(b.locale === l && b.crisis_type === type && b.text === text && b.translation_note === NOTE[l], `${key}: the pinned text, locale ${l}, with the note`, b.text)
+    check(b.locale === l && b.crisis_type === type && b.text === text && b.translation_note === undefined, `${key}: the ${l} text, locale ${l}, no translation_note (WO#490)`, b.text)
   }
   check(Object.values(PINNED).every((t) => !/—/.test(t) && !/\d[ -]\d/.test(t)), 'no em dash; every number is contiguous digits')
-  const enSelf = distressBlockFor({ level: 'hard', crisisType: 'self-harm' }, 'en')!.text
   const enAbuse = distressBlockFor({ level: 'hard', crisisType: 'abuse' }, 'en')!.text
-  check(enSelf.startsWith(OPENING) && enAbuse.startsWith(ABUSE_SENTENCE) && enAbuse.endsWith(DANGER), 'the reused sentences are the en blocks\' own (opening, abuse sentence, danger line)')
+  check(enAbuse.startsWith(ABUSE_SENTENCE) && !Object.values(PINNED).some((t) => t.includes(ABUSE_SENTENCE)), 'the en abuse block keeps its sentence; no bn or fa block carries English text (WO#490)')
   // Routing rules.
   check(crisisLocaleFor({ level: 'hard', crisisType: 'self-harm', keywordLanguages: ['en', 'bn'] }, 'en') === 'bn', 'English plus Bengali, no locale: bn')
   check(crisisLocaleFor({ level: 'hard', crisisType: 'self-harm', keywordLanguages: ['fa', 'ur'] }, 'en') === 'en', 'Persian plus Urdu, no locale: en (two languages)')
@@ -311,12 +306,12 @@ async function main() {
       const r = (await call(q)) as R
       const rules = r._sakina_meta.llm_directives.CRITICAL_RULES
       const i = rules.indexOf(CRISIS_ANTI_TRANSLATION)
-      check(r._sakina_meta.content_type === 'crisis_resource_only' && r.crisis_resource?.locale === l && r.crisis_resource.text === PINNED[`${l} ${type}`] && r.crisis_resource.translation_note === NOTE[l] && i >= 0 && rules[i + 1] === NOTE[l] && rules[i + 2] === ENGLISH_FALLBACK_GUARD, `${name}, ${l} ${type}, no locale: the ${l} block; CRITICAL_RULES carry the anti-translation line, then the note, then the English-fallback guard`)
+      check(r._sakina_meta.content_type === 'crisis_resource_only' && r.crisis_resource?.locale === l && r.crisis_resource.text === PINNED[`${l} ${type}`] && r.crisis_resource.translation_note === undefined && i >= 0 && !rules.includes(ENGLISH_FALLBACK_GUARD), `${name}, ${l} ${type}, no locale: the ${l} block; CRITICAL_RULES carry the anti-translation line and no English-fallback guard (WO#490)`)
       const explicit = (await call(q, 'id')) as R
-      check(explicit.crisis_resource?.locale === 'id' && !explicit._sakina_meta.llm_directives.CRITICAL_RULES.includes(NOTE[l]), `${name}, ${l} ${type}, locale id: the explicit locale wins, no note`)
+      check(explicit.crisis_resource?.locale === 'id', `${name}, ${l} ${type}, locale id: the explicit locale wins`)
     }
     const soft = (await call(A3[2]!)) as R
-    if (name === 'get_dua') check(soft.crisis_resource?.level === 'soft' && soft.crisis_resource.locale === 'fa' && soft._sakina_meta.llm_directives.CRITICAL_RULES.includes(NOTE.fa), `${name}, fa soft phrase: a fa soft block with the note`)
+    if (name === 'get_dua') check(soft.crisis_resource?.level === 'soft' && soft.crisis_resource.locale === 'fa' && soft.crisis_resource.text === bnFaText('fa', 'soft') && soft._sakina_meta.llm_directives.CRITICAL_RULES.includes(CRISIS_ANTI_TRANSLATION) && !soft._sakina_meta.llm_directives.CRITICAL_RULES.includes(ENGLISH_FALLBACK_GUARD), `${name}, fa soft phrase: the fa soft block, the anti-translation line, no English-fallback guard`)
     const enCase = (await call('I want to kill myself')) as R
     check(enCase.crisis_resource?.locale === 'en' && !enCase._sakina_meta.llm_directives.CRITICAL_RULES.includes(ENGLISH_FALLBACK_GUARD) && enCase.crisis_resource.translation_note === undefined, `${name}, English crisis: the en block, no note, no guard (unchanged)`)
   }
@@ -405,14 +400,13 @@ async function main() {
     check(JSON.stringify(v.lines) === JSON.stringify({ 'bn-emergency-999': '999', 'bd-mowca-109': '109', 'bn-kaan-pete-roi': '09612119911', 'fa-emergency-123': '123', 'fa-social-emergency-1480': '1480' }), '1. exactly the five lines the Founder verified: BD 999, BD 109, Kaan Pete Roi 09612119911, IR 123, IR 1480')
     const ids = [...new Set(Object.values(EN_FALLBACK_IDS).flatMap((b) => [...b['self-harm'], ...b.abuse]))]
     check(ids.every((id) => (v.lines as Record<string, string>)[id] === EN_FALLBACK_FIELDS[id]!.phone.replace(/[ -]/g, '')), '1. every line a bn or fa block lists is Founder-verified, with the same digits as helplines.ts')
-    // Control: an unverified number cannot be rendered.
-    const f109 = EN_FALLBACK_FIELDS['bd-mowca-109']!
-    const saved = f109.phone
-    f109.phone = '1090'
+    // Control: an unverified number cannot be served. WO#490: the check runs on the
+    // translated text when the module loads (verifyBnFaLines); a changed number throws.
     let threw = ''
-    try { enFallbackAbuseText('bn', ABUSE_SENTENCE) } catch (e) { threw = String(e) }
-    f109.phone = saved
-    check(threw.includes('not a Founder-verified line') && enFallbackAbuseText('bn', ABUSE_SENTENCE) === PINNED['bn abuse'], '1. control: a changed number (109 -> 1090) throws instead of rendering; restored, the block is the pinned text')
+    try { verifyBnFaLines('bn', 'abuse', PINNED['bn abuse'].replace(': 109 (', ': 1090 (')) } catch (e) { threw = String(e) }
+    let ok = true
+    try { verifyBnFaLines('bn', 'abuse', PINNED['bn abuse']) } catch { ok = false }
+    check(threw.includes('the Founder-verified bd-mowca-109 is 109') && ok, '1. control: a changed number (109 -> 1090) in the text throws; the served text passes')
 
     // 2. The publish guard (check h), scoped to crisis_resource.text.
     check(JSON.stringify(REQUIRED_LINES) === JSON.stringify({ 'bn/self-harm': ['999', '09612119911'], 'bn/abuse': ['109', '999'], 'fa/self-harm': ['123', '1480'], 'fa/abuse': ['123'] }), '2. the guard requires bn 999, 109, 09612119911 and fa 123, 1480, per block')
@@ -425,13 +419,13 @@ async function main() {
     const controls: Array<[string, string, string[]]> = [
       ['a typo (09612119911 -> 09612119191)', bnSelf.replace('09612119911', '09612119191'), REQUIRED_LINES['bn/self-harm']],
       ['a missing line (109 removed)', PINNED['bn abuse'].split('\n').filter((x) => !x.includes(': 109 (')).join('\n'), REQUIRED_LINES['bn/abuse']],
-      ['a digit dropped (1480 -> 148)', PINNED['fa self-harm'].replace(': 1480 (', ': 148 ('), REQUIRED_LINES['fa/self-harm']],
+      ['a digit dropped (1480 -> 148)', plain(PINNED['fa self-harm']).replace(': 1480 (', ': 148 ('), REQUIRED_LINES['fa/self-harm']],
       ['separators kept (09612-119911)', bnSelf.replace('09612119911', '09612-119911'), REQUIRED_LINES['bn/self-harm']],
       ['an extra line', `${PINNED['fa abuse']}\nOther line (Iran): 1234 (24/7)`, REQUIRED_LINES['fa/abuse']],
     ]
     for (const [label, text, expected] of controls) check(requiredLineProblems(text, expected).length > 0, `2. negative control, ${label}: the guard fails`, requiredLineProblems(text, expected))
     // Scope: 1480 elsewhere in a payload (a Hijri year) does not satisfy it; only the text node counts.
-    const noLine = PINNED['fa self-harm'].split('\n').filter((x) => !x.includes(': 1480 (')).join('\n')
+    const noLine = plain(PINNED['fa self-harm']).split('\n').filter((x) => !x.includes(': 1480 (')).join('\n')
     const payload = { crisis_resource: { text: noLine }, content: { hijri_year: 1480, note: 'Muharram 1480' } }
     check(requiredLineProblems(payload.crisis_resource.text, REQUIRED_LINES['fa/self-harm']).join() === 'missing 1480' && JSON.stringify(payload).includes('1480'), '2. scope: with 1480 only outside the text node (a Hijri year), the guard still reports "missing 1480"')
     check(JSON.stringify(lineNumbersIn(PINNED['fa self-harm'])) === '["123","1480"]', '2. only the helpline lines\' numbers are read: hours ("24/7", "8:00 to 24:00") are not')
@@ -442,7 +436,8 @@ async function main() {
       const tmp = mkdtempSync(path.join(PKG, '.wo564-guard-'))
       try {
         for (const d of ['data', 'dist', '.mcp', path.join('src', 'safety', '_synced')]) cpSync(path.join(PKG, d), path.join(tmp, d), { recursive: true })
-        for (const f of ['crisis-en-fallback-strings.js', 'crisis-text-en-fallback.js']) {
+        // WO#490: the number is in the fields, the Founder record and the translated text.
+        for (const f of ['crisis-en-fallback-strings.js', 'crisis-text-bn-fa.js', 'crisis-bn-fa-strings.js']) {
           const p = path.join(tmp, 'dist', 'safety', f)
           // The field (09612-119911) and the Founder record (09612119911) both changed, as a mistaken edit to both would.
           writeFileSync(p, readFileSync(p, 'utf-8').split('09612119911').join('09612119191').split('09612-119911').join('09612-119191'))

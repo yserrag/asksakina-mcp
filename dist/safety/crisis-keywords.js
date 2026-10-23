@@ -1,7 +1,6 @@
 import { crisisKeywordLanguages, detectCrisis } from './_synced/crisis-detection.js';
 import { abuseText, selfHarmText, softText } from './crisis-text-l10n.js';
-import { enFallbackAbuseText, enFallbackSelfHarmText } from './crisis-text-en-fallback.js';
-import { crisisEnglishNote } from '../contracts/english-fallback.js';
+import { bnFaText } from './crisis-text-bn-fa.js';
 import { foldLatin } from './_synced/latin-fold.js';
 import { normaliseArabic } from './_synced/arabic-normalise.js';
 export const SOFT_DISTRESS_KEYWORDS = [
@@ -108,11 +107,10 @@ export function evaluateDistress(input) {
     }
     return { level: 'none' };
 }
-const isEnFallback = (l) => l === 'bn' || l === 'fa';
-const fallbackNote = (l) => ({ translation_note: crisisEnglishNote(l) });
+const isBnFa = (l) => l === 'bn' || l === 'fa';
 const IASP = 'https://www.iasp.info/resources/Crisis_Centres/';
 export const US_988_FOUNDER_VERIFIED = false;
-export { BN_FA_LINES_FOUNDER_VERIFIED } from './crisis-text-en-fallback.js';
+export { BN_FA_LINES_FOUNDER_VERIFIED } from './crisis-text-bn-fa.js';
 const HARD_CRISIS_DIRECTIVE = 'CRITICAL: You MUST output the following crisis resource text exactly as written below. Do not alter it or make it conditional. Do not assess whether the user needs it; output it.';
 const SELF_HARM_LINES_EN = US_988_FOUNDER_VERIFIED
     ? 'Samaritans (UK: 116 123, 24/7) or 988 (US/Canada, 24/7)'
@@ -139,8 +137,7 @@ function selfHarmBlockFor(locale) {
         crisis_type: 'self-harm',
         locale,
         directive: HARD_CRISIS_DIRECTIVE,
-        text: isEnFallback(locale) ? enFallbackSelfHarmText(locale) : HARD_CRISIS_TEXT[locale],
-        ...(isEnFallback(locale) ? fallbackNote(locale) : {}),
+        text: isBnFa(locale) ? bnFaText(locale, 'self-harm') : HARD_CRISIS_TEXT[locale],
     };
 }
 export const ABUSE_SENTENCE = 'What you are experiencing is oppression (dhulm), and you are not to blame. Your first duty is to protect your safety, not to endure harm. Professional support is available to help you navigate this safely.';
@@ -159,8 +156,7 @@ function abuseBlockFor(locale) {
         crisis_type: 'abuse',
         locale,
         directive: ABUSE_DIRECTIVE,
-        text: isEnFallback(locale) ? enFallbackAbuseText(locale, ABUSE_SENTENCE) : ABUSE_TEXT[locale],
-        ...(isEnFallback(locale) ? fallbackNote(locale) : {}),
+        text: isBnFa(locale) ? bnFaText(locale, 'abuse') : ABUSE_TEXT[locale],
     };
 }
 export const SOFT_DISTRESS_RESOURCE_BLOCK = {
@@ -172,8 +168,8 @@ export const SOFT_DISTRESS_RESOURCE_BLOCK = {
 function softDistressBlockFor(locale) {
     if (locale === 'en')
         return SOFT_DISTRESS_RESOURCE_BLOCK;
-    if (isEnFallback(locale))
-        return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, ...fallbackNote(locale) };
+    if (isBnFa(locale))
+        return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, text: bnFaText(locale, 'soft') };
     return { ...SOFT_DISTRESS_RESOURCE_BLOCK, locale, text: softText(locale) };
 }
 export function crisisLocaleFor(hint, locale) {

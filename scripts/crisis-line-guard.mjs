@@ -9,6 +9,11 @@
  * " (" in "Name (Country): number (hours)", so hours such as "24/7" or
  * "8:00 to 24:00" are not mistaken for numbers. The set must equal the
  * expected set exactly: a typo, a missing number or an extra one fails.
+ *
+ * WO#490: the fa text isolates each number in LRI ... PDI (U+2066 ... U+2069),
+ * as the ar and ur blocks do, so the isolate marks are removed before the
+ * numbers are read. Removing them adds or changes no digit, and the
+ * expected numbers and the exact-set rule are unchanged.
  */
 
 /** The numbers each bn and fa block must carry (WO#488 A6, Founder-verified). */
@@ -21,7 +26,7 @@ export const REQUIRED_LINES = {
 
 /** The helpline numbers in a block text, as written (digits, spaces, hyphens, +). */
 export function lineNumbersIn(text) {
-  return [...String(text).matchAll(/\): (\+?[0-9][0-9 -]*[0-9]|[0-9]) \(/g)].map((m) => m[1])
+  return [...String(text).replace(/[\u2066-\u2069]/gu, '').matchAll(/\): (\+?[0-9][0-9 -]*[0-9]|[0-9]) \(/g)].map((m) => m[1])
 }
 
 /**

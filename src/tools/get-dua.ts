@@ -88,7 +88,7 @@ export const getDuaShape = {
   locale: z
     .enum(['en', 'id', 'ur', 'ar', 'tr'])
     .optional()
-    .describe('Locale; defaults to "en". Du\'a records are English for every locale; a crisis resource is given in the request locale, or, with no locale or "en", in the language of the crisis words (Indonesian, Urdu, Arabic or Turkish; Bengali and Persian get the English text with local helplines).'),
+    .describe('Locale; defaults to "en". Du\'a records are English for every locale; a crisis resource is given in the request locale, or, with no locale or "en", in the language of the crisis words (Indonesian, Urdu, Arabic, Turkish, Bengali or Persian).'),
   audience: audienceArg,
   limit: z
     .number()
