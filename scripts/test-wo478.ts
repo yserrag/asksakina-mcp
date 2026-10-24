@@ -168,9 +168,9 @@ async function main() {
     check(teachBlocks(h).length === 1 && teachBlocks(h)[0]!.record_id === 'verse:39:53', 'find_verses "hope", no audience: 39:53 carries teach')
     const d = await dua({ id: 'D00068' })
     check(teachBlocks(d)[0]?.audience === 'unknown', 'get_dua {id: D00068}, no audience: teach (audience unknown)')
-    // WO#484: 2:255 and Name 2 now carry entries; 2:256 and Name 11 do not.
-    const none = [await verse({ surah: 2, ayah: 256 }), await name({ number: 11 }), await dua({ context: 'travel' })]
-    check(none.every((r) => teachBlocks(r).length === 0 && !rules(r).includes(TEACH_DIRECTIVE)), 'no entry: no teach and no teach directive (2:256, Name 11, travel)')
+    // WO#484: 2:255 and Name 2 now carry entries; Name 11 does not. WO#495: 2:256 does, so 2:257.
+    const none = [await verse({ surah: 2, ayah: 257 }), await name({ number: 11 }), await dua({ context: 'travel' })]
+    check(none.every((r) => teachBlocks(r).length === 0 && !rules(r).includes(TEACH_DIRECTIVE)), 'no entry: no teach and no teach directive (2:257, Name 11, travel)')
     const held = [await dua({ context: 'anxiety' }), await find({ query: 'despair' }), await dua({ context: 'bereaved' })]
     check(held.every((r) => teachBlocks(r).length === 0), 'support block and grief route: nothing attaches, audience or not')
     const ur = [await name({ number: 1, locale: 'ur' }), await dua({ id: 'D00068', locale: 'ar' })]
@@ -214,16 +214,17 @@ async function main() {
 
   console.log('\n=== 5. phrase fixes ===')
   check(PHRASE_EXCLUSIONS.length === 2 && SOFT_PHRASE_EXCLUSIONS.length === 2, 'exactly the two phrases, in both matchers (no synonym map in 2.2.0)')
-  check(matchThemes('loss of faith').length === 0 && matchThemes('Loss of Faith').length === 0, '"loss of faith" matches no theme')
+  // WO#495: "loss of faith" now routes to faith_and_guidance (a phrase, so never grief).
+  check(JSON.stringify(matchThemes('loss of faith').map((m) => m.theme)) === '["faith_and_guidance"]' && JSON.stringify(matchThemes('Loss of Faith').map((m) => m.theme)) === '["faith_and_guidance"]', '"loss of faith" matches faith_and_guidance only, never grief (WO#495)')
   check(matchThemes('fear of Allah').length === 0, '"fear of Allah" matches no theme')
   check(matchThemes('loss')[0]?.theme === 'grief' && matchThemes('fear')[0]?.theme === 'anxiety', 'controls: "loss" is grief, "fear" is anxiety')
-  check(matchThemes('loss of faith and hope')[0]?.theme === 'hope', 'other words in the same query still match')
+  check(matchThemes('loss of faith and hope').some((m) => m.theme === 'hope') && !matchThemes('loss of faith and hope').some((m) => m.theme === 'grief'), 'other words in the same query still match')
   check(evaluateDistress('loss of faith').level === 'none' && evaluateDistress('fear of Allah').level === 'none', 'neither phrase is a soft distress signal')
   check(evaluateDistress('loss of a friend').level === 'soft' && evaluateDistress('fear').level === 'soft', 'controls: "loss of a friend" and "fear" still are')
   check(evaluateDistress('anxiety and fear of Allah').level === 'soft', 'another soft keyword in the same input still counts')
   {
     const lf = await find({ query: 'loss of faith' })
-    check(lf._sakina_meta.content_type === 'not_found' && lf.crisis_resource === undefined, 'find_verses "loss of faith": not_found, no support block')
+    check(lf._sakina_meta.content_type === 'verse_collection' && lf.crisis_resource === undefined, 'find_verses "loss of faith": faith_and_guidance verses, no support block (WO#495)')
     const fa = await find({ query: 'fear of Allah' })
     check(fa._sakina_meta.content_type === 'not_found' && fa.crisis_resource === undefined, 'find_verses "fear of Allah": not_found, no support block')
   }

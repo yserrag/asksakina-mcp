@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { fetchQuranVerse, PARKED_TRANSLATION_LOCALES } from '../data/quran.js';
-import { AVAILABLE_THEMES, matchThemes, versesForThemes } from '../data/thematic.js';
+import { AVAILABLE_THEMES, matchThemes, versesForMatches } from '../data/thematic.js';
 import { distressBlockFor, evaluateDistress } from '../safety/crisis-keywords.js';
 import { buildResponse } from '../meta/response-builder.js';
 import { audienceArg } from '../teach/audience.js';
 import { withTeach } from '../teach/attach.js';
+export const HEALING_DIRECTIVE = 'These verses are offered as spiritual comfort and do not replace professional medical care. If the user is unwell, encourage them to seek qualified medical help.';
 export const FIND_VERSES_DEFAULT_LIMIT = 5;
 export const FIND_VERSES_MAX_LIMIT = 10;
 export const findVersesShape = {
@@ -100,7 +101,9 @@ export async function findVersesHandler(input) {
     const themes = matches.map((m) => m.theme);
     if (!extras && themes.includes('grief'))
         extras = { crisis_resource: distressBlockFor('soft', locale) };
-    const found = await Promise.all(versesForThemes(themes, limit).map((v) => toFoundVerse(v, themes, locale)));
+    if (!extras && themes.includes('companionship'))
+        extras = { crisis_resource: distressBlockFor('soft', locale) };
+    const found = await Promise.all(versesForMatches(matches, limit).map((v) => toFoundVerse(v, themes, locale)));
     const withhold = Boolean(extras) || themes.includes('grief');
     const verses = found.map((v) => withTeach(v, `verse:${v.reference}`, { audience: input.audience, locale, withhold }));
     const parked = PARKED_TRANSLATION_LOCALES[locale];
@@ -115,11 +118,14 @@ export async function findVersesHandler(input) {
         },
         extras,
         withholdTeach: withhold,
-        extraDirectives: parked
-            ? [
-                `The translations are English (Pickthall) because a licensed ${parked} translation is not yet available. Present them as English and state that note. You MUST NOT translate them into ${parked} yourself or present them as a ${parked} translation.`,
-            ]
-            : undefined,
+        extraDirectives: [
+            ...(parked
+                ? [
+                    `The translations are English (Pickthall) because a licensed ${parked} translation is not yet available. Present them as English and state that note. You MUST NOT translate them into ${parked} yourself or present them as a ${parked} translation.`,
+                ]
+                : []),
+            ...(themes.includes('healing') ? [HEALING_DIRECTIVE] : []),
+        ],
     });
 }
 //# sourceMappingURL=find-verses.js.map

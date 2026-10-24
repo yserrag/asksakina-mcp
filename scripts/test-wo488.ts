@@ -44,6 +44,7 @@ import { EN_COUNTRY_NAMES, EN_FALLBACK_FIELDS, EN_FALLBACK_IDS } from '../src/sa
 import { CRISIS_ANTI_TRANSLATION } from '../src/meta/response-builder.js'
 import { ENGLISH_FALLBACK_GUARD } from '../src/contracts/english-fallback.js'
 import { matchThemes, THEME_PHRASES, THEME_SYNONYMS } from '../src/data/thematic.js'
+import { THEMES_2_5_0 } from '../src/data/themes-2-5-0.js'
 import { normalisePhrase } from '../src/data/context-matcher.js'
 import { E6_ROWS, NOT_FOUND_PHRASES } from './wo488-e6-rows.js'
 import { BN_FA_LINES_FOUNDER_VERIFIED, US_988_FOUNDER_VERIFIED } from '../src/safety/crisis-keywords.js'
@@ -356,21 +357,34 @@ async function main() {
   const wrongRoute = shippedTerms.filter(([term, theme]) => JSON.stringify(routed(term)) !== JSON.stringify([theme]))
   check(wrongRoute.length === 0, `every shipped term (${shippedTerms.length}) routes to its theme, and only that one`, wrongRoute)
   for (const r of E6_ROWS.filter((x) => x.status === 'covered')) check(r.terms.every((term) => routed(term)[0] === r.theme), `covered before WO#488, unchanged: ${r.terms.join(', ')} -> ${r.theme}`)
+  // WO#495 (2.5.0) routes some of WO#488's not_found terms to its new themes (THEMES_2_5_0;
+  // test-wo495 checks each route). WO#488's rows stay as ruled; the terms it now routes are
+  // set aside here and checked to reach a 2.5.0 theme, and every other term is unchanged.
+  const w495Theme = new Map(THEMES_2_5_0.flatMap((t) => [...t.words, ...t.phrases].map((term) => [normalisePhrase(term), t.theme] as const)))
+  const w495Themes = new Set(THEMES_2_5_0.map((t) => t.theme))
+  const by495 = (term: string) => w495Theme.has(normalisePhrase(term))
   for (const r of notRouted) {
-    const wrong = r.terms.filter((term) => routed(term).length !== 0)
-    check(wrong.length === 0, `${r.status} (${r.note ?? r.proposed}): ${r.terms.join(', ')} return no theme`, wrong)
+    const still = r.terms.filter((term) => !by495(term))
+    const wrong = still.filter((term) => routed(term).length !== 0)
+    const moved = r.terms.filter(by495)
+    const movedWrong = moved.filter((term) => !(routed(term).length === 1 && w495Themes.has(routed(term)[0]!)))
+    check(wrong.length === 0 && movedWrong.length === 0, `${r.status} (${r.note ?? r.proposed}): ${still.join(', ') || '(none)'} return no theme${moved.length ? `; ${moved.join(', ')} route to a WO#495 theme` : ''}`, [...wrong, ...movedWrong])
   }
-  for (const q of NOT_FOUND_PHRASES) check(routed(q).length === 0 && routed(q.toUpperCase()).length === 0, `"${q}" (phrase level): no theme`)
-  // Nothing unruled is in the map: its keys are main's 76 plus the shipped single words.
+  for (const q of NOT_FOUND_PHRASES.filter((q) => !by495(q))) check(routed(q).length === 0 && routed(q.toUpperCase()).length === 0, `"${q}" (phrase level): no theme`)
+  check(JSON.stringify(routed('loss of faith')) === '["faith_and_guidance"]' && JSON.stringify(routed('LOSS OF FAITH')) === '["faith_and_guidance"]', '"loss of faith" (phrase level): faith_and_guidance (WO#495)')
+  // Nothing unruled is in the map: its keys are main's 76, the shipped single words and WO#495's words.
   const shippedWords = shippedTerms.map(([term]) => normalisePhrase(term)).filter((w) => !w.includes(' '))
-  const added = Object.keys(THEME_SYNONYMS).slice(76)
-  check(Object.keys(THEME_SYNONYMS).length === 76 + added.length && added.every((k) => shippedWords.includes(k)) && shippedWords.every((w) => w === 'jumuah' || added.includes(w)), `THEME_SYNONYMS is main's 76 keys plus the ${added.length} shipped single words, nothing else`, added.filter((k) => !shippedWords.includes(k)))
+  const w495Words = THEMES_2_5_0.flatMap((t) => t.words.map(normalisePhrase))
+  const baseKeys = Object.keys(THEME_SYNONYMS).filter((k) => !w495Words.includes(k))
+  const added = baseKeys.slice(76)
+  check(baseKeys.length === 76 + added.length && added.every((k) => shippedWords.includes(k)) && shippedWords.every((w) => w === 'jumuah' || added.includes(w)) && w495Words.every((w) => w in THEME_SYNONYMS), `THEME_SYNONYMS is main's 76 keys, the ${added.length} shipped single words and WO#495's ${w495Words.length} words, nothing else`, added.filter((k) => !shippedWords.includes(k)))
   const phrases = THEME_PHRASES.filter((p) => p.theme).map((p) => p.phrase)
-  check(JSON.stringify([...phrases].sort()) === JSON.stringify(shippedTerms.map(([term]) => term).filter((term) => term.includes(' ')).sort()), `THEME_PHRASES holds exactly the ${phrases.length} shipped multi-word terms, plus the two not_found phrases`, phrases)
-  const excludedTerms = notRouted.flatMap((r) => r.terms.map(normalisePhrase))
-  check(!excludedTerms.some((term) => term in THEME_SYNONYMS || THEME_PHRASES.some((p) => p.phrase === term)), 'no excluded or not_found term is a key or a phrase')
+  const wantPhrases = [...shippedTerms.map(([term]) => term).filter((term) => term.includes(' ')), ...THEMES_2_5_0.flatMap((t) => t.phrases)]
+  check(JSON.stringify([...phrases].sort()) === JSON.stringify(wantPhrases.sort()), `THEME_PHRASES holds exactly the ${phrases.length} shipped and WO#495 multi-word terms, plus the not_found phrase`, phrases)
+  const excludedTerms = notRouted.flatMap((r) => r.terms.map(normalisePhrase)).filter((term) => !w495Theme.has(term))
+  check(!excludedTerms.some((term) => term in THEME_SYNONYMS || THEME_PHRASES.some((p) => p.phrase === term)), 'no excluded or not_found term is a key or a phrase (WO#495 routes set aside)')
   // The phrase level runs first.
-  check(JSON.stringify(routed('loss of faith and hope')) === '["hope"]' && JSON.stringify(routed('fear of Allah, fear of the future')) === '["anxiety"]', 'a not_found phrase consumes only its own words: other words still route')
+  check(JSON.stringify(routed('loss of faith and hope')) === '["faith_and_guidance","hope"]' && JSON.stringify(routed('fear of Allah, fear of the future')) === '["anxiety"]', 'a not_found phrase consumes only its own words: other words still route')
   check(JSON.stringify(routed('give up')) === '["hope"]' && JSON.stringify(routed('giving up')) === '["encouragement"]' && routed('give').length === 0 && routed('up').length === 0, '"give up" is hope and "giving up" encouragement; their words alone route nowhere')
   check(JSON.stringify(routed('death of a child')) === '["grief"]' && routed('death').length === 0 && routed('child').length === 0, '"death of a child" is grief; "death" and "child" alone are not_found')
   check(JSON.stringify(routed("Jumu'ah khutbah")) === '["friday"]' && JSON.stringify(routed('Thank you Allah')) === '["gratitude"]', 'case and the apostrophe fold before the phrase level')
@@ -383,7 +397,8 @@ async function main() {
   check(griefUr.crisis_resource?.level === 'soft' && griefUr.crisis_resource.locale === 'ur', 'find_verses "widow", locale ur: the soft note in the request locale')
   const anger = await fv('anger')
   check(anger.content.matched_themes?.[0]?.theme === 'patience' && anger.crisis_resource === undefined, 'find_verses "anger": patience, no soft note (not a grief route)')
-  for (const q of [...NOT_FOUND_PHRASES, 'death', 'down', 'low', 'lonely', 'money', 'exam']) {
+  // WO#495: "loss of faith", "lonely" and "money" now route (test-wo495); "debt" and "exam" do not.
+  for (const q of [...NOT_FOUND_PHRASES.filter((q) => !by495(q)), 'death', 'down', 'low', 'debt', 'exam']) {
     const r = await fv(q)
     check(r._sakina_meta.content_type === 'not_found', `find_verses "${q}": not_found`)
   }

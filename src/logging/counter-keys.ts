@@ -8,5 +8,5 @@ export function audienceBucket(value: unknown): AudienceBucket {
 }
 
 /** WO#488 Part B: the registered prompts (WO#489), fixed at build time. */
-export const PROMPT_NAMES = ['understand_a_verse', 'explore_names_of_allah'] as const
+export const PROMPT_NAMES = ['understand_a_verse', 'explore_names_of_allah', 'what_muslims_believe', 'first_steps_new_muslim'] as const
 export type PromptName = (typeof PROMPT_NAMES)[number]

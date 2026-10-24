@@ -1,4 +1,5 @@
 import { getNameByNumber } from '../data/names.js';
+import { REVERT_NOTES } from '../contracts/learn-content.js';
 import { TEACH_ENTRIES } from './entries.js';
 function relatedWire(ref) {
     switch (ref.kind) {
@@ -57,19 +58,32 @@ function teachWire(key, entry, audience) {
     };
     return block;
 }
+function audienceNote(key, audience) {
+    if (audience !== 'revert')
+        return undefined;
+    const note = REVERT_NOTES[key];
+    if (!note)
+        return undefined;
+    const citations = note.citations.map((c) => (c.grading ? { text: c.text, grading: c.grading } : { text: c.text }));
+    const cited = citations.map((c) => (c.grading ? `${c.text} (${c.grading})` : c.text)).join('; ');
+    return { audience: 'revert', text: note.text, citations, note_block: citations.length ? `${note.text}\n${cited}` : note.text };
+}
 export function withTeach(record, key, opts) {
     if (opts.withhold)
         return record;
     if ((opts.locale ?? 'en') !== 'en')
         return record;
-    const entry = TEACH_ENTRIES[key];
-    if (!entry || entry.locale !== 'en')
+    const found = TEACH_ENTRIES[key];
+    const entry = found && found.locale === 'en' ? found : undefined;
+    const note = audienceNote(key, opts.audience);
+    if (!entry && !note)
         return record;
-    const related = (entry.related?.refs ?? []).map(relatedWire).filter((r) => r !== null);
+    const related = (entry?.related?.refs ?? []).map(relatedWire).filter((r) => r !== null);
     return {
         ...record,
-        teach: teachWire(key, entry, opts.audience ?? 'unknown'),
+        ...(entry ? { teach: teachWire(key, entry, opts.audience ?? 'unknown') } : {}),
         ...(related.length ? { related } : {}),
+        ...(note ? { audience_note: note } : {}),
     };
 }
 //# sourceMappingURL=attach.js.map

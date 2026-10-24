@@ -14,7 +14,7 @@ function emptyCounters() {
     };
 }
 export const emptyAudience = () => ({ curious: 0, revert: 0, practising: 0, unknown: 0, absent: 0 });
-export const emptyPrompts = () => ({ understand_a_verse: 0, explore_names_of_allah: 0 });
+export const emptyPrompts = () => ({ understand_a_verse: 0, explore_names_of_allah: 0, what_muslims_believe: 0, first_steps_new_muslim: 0 });
 let counters = emptyCounters();
 let audience = emptyAudience();
 let prompts = emptyPrompts();

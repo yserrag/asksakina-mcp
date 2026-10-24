@@ -98,7 +98,7 @@ async function main() {
   check(teachBlocks(hope).length > 0 && hope._sakina_meta.llm_directives.CRITICAL_RULES.includes(LINE1) && hope._sakina_meta.llm_directives.CRITICAL_RULES.includes(LINE2), 'find_verses "hope" (teach on 39:53): both lines')
 
   const without: Array<[string, Promise<unknown>]> = [
-    ['get_quran_verse 2:256 (no entry)', getQuranVerseHandler({ surah: 2, ayah: 256 })],
+    ['get_quran_verse 2:257 (no entry; WO#495 gave 2:256 one)', getQuranVerseHandler({ surah: 2, ayah: 257 })],
     ['get_name_of_allah 11 (no entry)', getNameOfAllahHandler({ number: 11 })],
     ['get_dua "travel"', getDuaHandler({ context: 'travel' })],
     ['get_dua "anxiety" (soft block)', getDuaHandler({ context: 'anxiety' })],
@@ -158,7 +158,8 @@ async function main() {
       }
     }
   }
-  check(seen === 132 && badNewline.length === 0, `all ${seen} teach responses: every context_block has exactly one "\\n", directly before the first citation, and no context-to-citation space join`, badNewline)
+  // WO#495: 45 entries (2:256 added), three calls each.
+  check(seen === 135 && badNewline.length === 0, `all ${seen} teach responses: every context_block has exactly one "\\n", directly before the first citation, and no context-to-citation space join`, badNewline)
   check(blocks.filter((b) => !b.context).every((b) => b.context_block === undefined), `no context, no context_block (${blocks.filter((b) => !b.context).length} blocks)`)
   // The existing fields are unchanged: context is built from the entry exactly as before.
   const unchanged = withCtx.every((b) => {

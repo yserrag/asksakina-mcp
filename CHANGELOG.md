@@ -2,6 +2,40 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 2.5.0 (unreleased)
+
+WO#495 (`docs/wo495-architect.md`; Gems 1-7, the Architect's rulings of 24 Oct 2026).
+
+- **Fifteen `find_verses` themes**, from the FINAL table (section 4): each
+  theme's verses in the ruled order, protection narrowed per trigger (Gem 3),
+  89:1-2 kept adjacent, "loss of faith" now routing to faith_and_guidance.
+  Struck words stay as they were. Companionship carries the soft support block
+  (Gem 3) and no teaching content; healing carries one directive line (medical
+  care; Gem 10 PASS, G10-1). 89:1 and 89:2 take their Arabic from `public/quran`
+  with the scripture module's one transform, because the module does not carry
+  them yet (`OUTSIDE_MODULE`; the bundle fails on any other miss).
+- **Abuse-word hold** (the Builder's; Architect KEEP, Gem 3 CONFIRMED for this
+  release, Gem 10 PASS): the crisis detector does not
+  read "abuse" or "abusive" alone (WO#488 E.5), so without a hold "my parents
+  abuse me" would have reached 17:24 and "abusive marriage" 30:21. A query
+  carrying an abuse word reaches none of the fifteen themes. Crisis routing
+  is unchanged.
+- **Two journey prompts**, `what_muslims_believe` and `first_steps_new_muslim`,
+  line for line as approved (docs/wo492-journeys-part4.md), and the six
+  `sakina://learn/...` resources they read, generated from the app's seed
+  modules and the rulings (`scripts/wo495-learn-content.ts --check` in
+  prepublish). Arguments are refused without echo.
+- **`audience_note`** (Field 5, revert only): six notes, each with its own
+  citations, and one directive (Gem 10 PASS, G10-2). Withheld wherever teach is.
+- **Teach entry 2:256** (J1 item 6; Field 1 Gem 2, Field 4 Gem 3, no Field 2;
+  publish: Gem 10 PASS, G10-7).
+- **No note on 39:53.** Gem 10 blocked the drafted note (it quoted and cited
+  25:70); it is removed, and `test:wo495` fails if any note cites or quotes
+  (8+ words of Pickthall) a verse other than its own record's.
+- **get_dua id allowlist**: D00234 (Sahih al-Bukhari 744), the du'a J3 step 2
+  names, joins D00060 and D00068 (Gem 10 PASS, G10-10).
+- `/stats` counts the two new prompts by name. `test:wo495` (157 checks).
+
 ## 2.4.2 (unreleased)
 
 WO#494 Part 0 (`docs/wo494-architect.md`). Pickthall 31:14 now reads

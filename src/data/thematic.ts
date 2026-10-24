@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { normalisePhrase } from './context-matcher.js'
+import { THEMES_2_5_0 } from './themes-2-5-0.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = path.resolve(HERE, '..', '..', 'data')
@@ -37,7 +38,7 @@ export const THEMATIC_INDEX = JSON.parse(
 export const AVAILABLE_THEMES: readonly string[] = [...new Set(THEMATIC_INDEX.flatMap((v) => v.themes))]
 
 /** Single words -> theme. Theme names themselves match directly. */
-export const THEME_SYNONYMS: Readonly<Record<string, string>> = {
+const BASE_SYNONYMS: Readonly<Record<string, string>> = {
   // anxiety
   anxious: 'anxiety', worry: 'anxiety', worried: 'anxiety', worrying: 'anxiety',
   stress: 'anxiety', stressed: 'anxiety', overwhelmed: 'anxiety', panic: 'anxiety',
@@ -101,6 +102,12 @@ export const THEME_SYNONYMS: Readonly<Record<string, string>> = {
   optimism: 'hope', optimistic: 'hope',
 }
 
+/** WO#495: the 2.5.0 themes' single-word triggers. An older route wins any clash (there is none). */
+export const THEME_SYNONYMS: Readonly<Record<string, string>> = {
+  ...Object.fromEntries(THEMES_2_5_0.flatMap((t) => t.words.map((w) => [w, t.theme]))),
+  ...BASE_SYNONYMS,
+}
+
 /**
  * WO#488 Part C: the phrase level, matched on the normalised query BEFORE
  * any single word, so a phrase's words never reach the word lookup. A phrase
@@ -109,7 +116,7 @@ export const THEME_SYNONYMS: Readonly<Record<string, string>> = {
  * The rest are the multi-word rows both Gems approved.
  */
 export const THEME_PHRASES: ReadonlyArray<{ phrase: string; theme: string | null }> = [
-  { phrase: 'loss of faith', theme: null },
+  // WO#495: "loss of faith" routes to faith_and_guidance (it was not_found); see THEMES_2_5_0.
   { phrase: 'fear of allah', theme: null },
   { phrase: 'death of a child', theme: 'grief' },
   { phrase: 'why me', theme: 'encouragement' },
@@ -120,16 +127,19 @@ export const THEME_PHRASES: ReadonlyArray<{ phrase: string; theme: string | null
   { phrase: 'night of decree', theme: 'ramadan' },
   { phrase: 'give up', theme: 'hope' },
   { phrase: 'give in', theme: 'hope' },
+  // WO#495: the 2.5.0 themes' phrase triggers
+  ...THEMES_2_5_0.flatMap((t) => t.phrases.map((phrase) => ({ phrase, theme: t.theme }))),
 ]
 
 /**
  * WO#478: the words those two not_found phrases keep from their themes.
  * Derived from THEME_PHRASES; kept for the soft matcher's parity test.
  */
-export const PHRASE_EXCLUSIONS: ReadonlyArray<{ phrase: string; word: string }> = THEME_PHRASES.filter((p) => p.theme === null).map((p) => ({
-  phrase: p.phrase,
-  word: p.phrase.split(' ')[0]!,
-}))
+export const PHRASE_EXCLUSIONS: ReadonlyArray<{ phrase: string; word: string }> = [
+  ...THEME_PHRASES.filter((p) => p.theme === null).map((p) => ({ phrase: p.phrase, word: p.phrase.split(' ')[0]! })),
+  // WO#495: "loss of faith" now routes to faith_and_guidance, and its "loss" still never reaches grief.
+  { phrase: 'loss of faith', word: 'loss' },
+]
 
 // Longest first, so "death of a child" is tried before any shorter phrase.
 const PHRASES_BY_LENGTH = [...THEME_PHRASES].map((p) => ({ ...p, words: p.phrase.split(' ') })).sort((a, b) => b.words.length - a.words.length)
@@ -139,6 +149,17 @@ export interface ThemeMatch {
   /** The query word that matched. */
   via: string
 }
+
+/**
+ * WO#495 safety hold (the Builder's; Architect KEEP, Gem 3 CONFIRMED for 2.5.0, Gem 10 PASS G10-9;
+ * the next crisis-routing release gives these words the abuse block instead): the crisis
+ * detector does not read these words alone (WO#488 E.5: "abuse" is not_found
+ * with no block), so "my parents abuse me" or "abusive marriage" would reach a
+ * 2.5.0 theme (17:24, 30:21). A query carrying one reaches no 2.5.0 theme: it
+ * is answered as 2.4 answered it. Crisis routing is unchanged.
+ */
+export const ABUSE_WORDS: readonly string[] = ['abuse', 'abused', 'abuses', 'abusing', 'abusive', 'abuser', 'abusers', 'violence', 'violent']
+const NEW_THEMES = new Set(THEMES_2_5_0.map((t) => t.theme))
 
 /** Themes named by the query, in the order their words appear, deduplicated. */
 export function matchThemes(query: string): ThemeMatch[] {
@@ -160,6 +181,28 @@ export function matchThemes(query: string): ThemeMatch[] {
     const word = words[i]!
     add(lookup(word) ?? (word.length > 3 && word.endsWith('s') ? lookup(word.slice(0, -1)) : undefined), word)
     i += 1
+  }
+  return words.some((w) => ABUSE_WORDS.includes(w)) ? out.filter((m) => !NEW_THEMES.has(m.theme)) : out
+}
+
+const NEW_THEME = new Map(THEMES_2_5_0.map((t) => [t.theme, t]))
+
+/**
+ * WO#495: verses for the matched themes. A 2.5.0 theme serves its refs in the
+ * ruled order (narrowed per trigger where refsByTrigger says so: protection);
+ * an older theme serves the index order, as versesForThemes does. Each ref once.
+ */
+export function versesForMatches(matches: readonly ThemeMatch[], limit: number): ThematicVerseEntry[] {
+  const out: ThematicVerseEntry[] = []
+  for (const m of matches) {
+    const t = NEW_THEME.get(m.theme)
+    const pool = t
+      ? (t.refsByTrigger?.[m.via] ?? t.refs).map((ref) => THEMATIC_INDEX.find((v) => v.ref === ref)).filter((v): v is ThematicVerseEntry => Boolean(v))
+      : THEMATIC_INDEX.filter((v) => v.themes.includes(m.theme))
+    for (const v of pool) {
+      if (out.length >= limit) return out
+      if (!out.includes(v)) out.push(v)
+    }
   }
   return out
 }

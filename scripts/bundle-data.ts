@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url'
 import { ALL_DUAS, CORPUS_DUAS, DUA_CATEGORIES } from '../../src/data/duas/index.js'
 import { namesOfAllah } from '../../src/lib/data/99-names.js'
 import { THEMATIC_VERSES } from '../../src/lib/data/thematic-verses.js'
-import { getVerseArabic } from '../../src/lib/scripture/index.js'
+import { getVerseArabic, stripOpenFathatanSpace } from '../../src/lib/scripture/index.js'
 import { QURAN_PICKTHALL } from '../../src/lib/scripture/_generated/quran-pickthall.js'
 import { SURAHS } from '../../src/lib/data/quran-metadata.js'
 import { QURANIC_LABELS, skeleton } from './quranic-labels.js'
@@ -44,7 +44,9 @@ import { QURANIC_DUA_TEXT, SERVE_QURANIC_DUA_TEXT_FROM_SCRIPTURE } from '../../s
 import { MIXED_DUA_SPANS } from '../../src/data/duas/quranic-spans-mixed.js'
 import { ends, makePickthallRule } from '../../src/lib/scripture/pickthall-rule.js'
 import { TEACH_ENTRIES } from '../src/teach/entries.js'
+import { OUTSIDE_MODULE, THEMES_2_5_0 } from '../src/data/themes-2-5-0.js'
 import { buildDuaIdAllowlist, validateTeachEntries } from '../src/teach/validate.js'
+import { JOURNEY_DUA_IDS } from '../src/prompts/learning-journeys.js'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(SCRIPT_DIR, '..')
@@ -251,6 +253,15 @@ async function bundleNames() {
 // the scripture module (Tanzil, byte for byte). The index's translation and
 // context strings are not bundled either; find_verses fetches the full-ayah
 // Pickthall at runtime, as get_quran_verse does.
+/** Tanzil Uthmani from public/quran, the scripture module's own source, for a verse the module does not carry, read as getVerseArabic reads the module. */
+function sourceArabic(surah: number, ayah: number): string {
+  const d = JSON.parse(readFileSync(path.join(MAIN_REPO, 'public', 'quran', 'en.pickthall', `${surah}.json`), 'utf-8')) as { verses: Array<{ verse_number: number; text_uthmani: string }> }
+  const v = d.verses.find((x) => x.verse_number === ayah)
+  if (!v) throw new Error(`public/quran: no ${surah}:${ayah}`)
+  // The same and only transform getVerseArabic applies to the stored Tanzil bytes.
+  return stripOpenFathatanSpace(v.text_uthmani)
+}
+
 async function bundleThematicVerses() {
   const byRef = new Map<string, { ref: string; surah: number; ayah: number; themes: string[]; arabic: string }>()
   for (const v of THEMATIC_VERSES) {
@@ -263,7 +274,32 @@ async function bundleThematicVerses() {
     }
     byRef.set(ref, { ref, surah: v.surah, ayah: v.verse, themes: [v.theme], arabic: getVerseArabic(ref) })
   }
-  console.log(`bundling thematic verses (${THEMATIC_VERSES.length} index entries, ${byRef.size} distinct verses)`)
+  // WO#495: the 2.5.0 themes (src/data/themes-2-5-0.ts), after the app's index. A ref the
+  // index already holds gains the theme; a new ref takes its Arabic from the scripture module,
+  // or from public/quran (the module's own source) where the module does not carry it.
+  let fromSource = 0
+  for (const t of THEMES_2_5_0) {
+    for (const ref of t.refs) {
+      const entry = byRef.get(ref)
+      if (entry) {
+        if (!entry.themes.includes(t.theme)) entry.themes.push(t.theme)
+        continue
+      }
+      const [s, a] = ref.split(':').map(Number) as [number, number]
+      let arabic: string
+      let inModule = true
+      try {
+        arabic = getVerseArabic(ref)
+      } catch {
+        inModule = false
+        arabic = sourceArabic(s, a)
+        fromSource++
+      }
+      if (inModule === OUTSIDE_MODULE.includes(ref)) throw new Error(`thematic 2.5.0 ${ref}: ${inModule ? 'the scripture module now carries it; drop it from OUTSIDE_MODULE' : 'not in the scripture module and not listed in OUTSIDE_MODULE'}`)
+      byRef.set(ref, { ref, surah: s, ayah: a, themes: [t.theme], arabic })
+    }
+  }
+  console.log(`bundling thematic verses (${THEMATIC_VERSES.length} index entries + ${THEMES_2_5_0.length} 2.5.0 themes, ${byRef.size} distinct verses, ${fromSource} Arabic from public/quran)`)
   await writeJson(path.join(OUT_DATA_DIR, 'thematic-verses.json'), [...byRef.values()])
 }
 
@@ -364,8 +400,9 @@ async function checkTeachEntries() {
   }
   console.log(`  teach entries: ${Object.keys(TEACH_ENTRIES).length} checked, 0 refused`)
   // Flag 3 ruling (widened in WO#405): get_dua resolves an id only if it is
-  // a teach record or a signed related list names it.
-  const allowlist = buildDuaIdAllowlist(TEACH_ENTRIES)
+  // a teach record or a signed related list names it. WO#495: or a journey
+  // prompt names it (JOURNEY_DUA_IDS: D00234, J3 step 2; for Gem 10).
+  const allowlist = [...new Set([...buildDuaIdAllowlist(TEACH_ENTRIES), ...JOURNEY_DUA_IDS])].sort()
   await writeJson(path.join(OUT_DATA_DIR, 'dua-id-allowlist.json'), allowlist)
   console.log(`  dua id allowlist: ${allowlist.length} ids`)
 }

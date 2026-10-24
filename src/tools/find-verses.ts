@@ -15,11 +15,15 @@
 
 import { z } from 'zod'
 import { fetchQuranVerse, PARKED_TRANSLATION_LOCALES } from '../data/quran.js'
-import { AVAILABLE_THEMES, matchThemes, versesForThemes, type ThematicVerseEntry } from '../data/thematic.js'
+import { AVAILABLE_THEMES, matchThemes, versesForMatches, type ThematicVerseEntry } from '../data/thematic.js'
 import { distressBlockFor, evaluateDistress } from '../safety/crisis-keywords.js'
 import { buildResponse, type SakinaResponse } from '../meta/response-builder.js'
 import { audienceArg } from '../teach/audience.js'
 import { withTeach } from '../teach/attach.js'
+
+/** WO#495: one directive line on every healing response (Gem 4's note; the Builder's wording, Gem 10 PASS, G10-1). */
+export const HEALING_DIRECTIVE =
+  'These verses are offered as spiritual comfort and do not replace professional medical care. If the user is unwell, encourage them to seek qualified medical help.'
 
 export const FIND_VERSES_DEFAULT_LIMIT = 5
 export const FIND_VERSES_MAX_LIMIT = 10
@@ -150,7 +154,9 @@ export async function findVersesHandler(input: FindVersesInput): Promise<SakinaR
   // so a grief route carries the soft support note even when no soft keyword
   // fired, as get_dua's bereaved route does (Gem 3).
   if (!extras && themes.includes('grief')) extras = { crisis_resource: distressBlockFor('soft', locale)! }
-  const found = await Promise.all(versesForThemes(themes, limit).map((v) => toFoundVerse(v, themes, locale)))
+  // WO#495 (Gem 3): the companionship theme (loneliness) carries the soft support block too.
+  if (!extras && themes.includes('companionship')) extras = { crisis_resource: distressBlockFor('soft', locale)! }
+  const found = await Promise.all(versesForMatches(matches, limit).map((v) => toFoundVerse(v, themes, locale)))
   // WO#405: teach per verse; WO#478: whenever an entry exists, audience or
   // not. WO#407 (Gem 10): nothing attaches on the grief theme or whenever a
   // support block is attached.
@@ -173,10 +179,14 @@ export async function findVersesHandler(input: FindVersesInput): Promise<SakinaR
     extras,
     withholdTeach: withhold,
     // Same rule as get_quran_verse (WO#385 item 4).
-    extraDirectives: parked
-      ? [
-          `The translations are English (Pickthall) because a licensed ${parked} translation is not yet available. Present them as English and state that note. You MUST NOT translate them into ${parked} yourself or present them as a ${parked} translation.`,
-        ]
-      : undefined,
+    extraDirectives: [
+      ...(parked
+        ? [
+            `The translations are English (Pickthall) because a licensed ${parked} translation is not yet available. Present them as English and state that note. You MUST NOT translate them into ${parked} yourself or present them as a ${parked} translation.`,
+          ]
+        : []),
+      // WO#495 (Gem 4, hifz al-nafs; Gem 10 PASS, G10-1): the healing theme.
+      ...(themes.includes('healing') ? [HEALING_DIRECTIVE] : []),
+    ],
   })
 }

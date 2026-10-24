@@ -16,12 +16,13 @@ import { AUDIENCE_JSON_SCHEMA } from './teach/audience.js';
 import { RATE_LIMIT_BUDGET, RATE_LIMIT_WINDOW_MS, getRateLimiter, probeRateLimiter, } from './safety/rate-limiter.js';
 import { serialiseResponse } from './meta/response-builder.js';
 import { logPromptFetch, logRequest } from './logging/request-logger.js';
-import { exploreNamesArgs, exploreNamesPrompt, readMissingArgumentsAsEmpty, PROMPT_STRINGS, understandAVerseArgs, understandAVersePrompt } from './prompts/learning-journeys.js';
+import { exploreNamesArgs, exploreNamesPrompt, firstStepsArgs, firstStepsPrompt, JOURNEY_STRINGS, readMissingArgumentsAsEmpty, PROMPT_STRINGS, understandAVerseArgs, understandAVersePrompt, whatMuslimsBelieveArgs, whatMuslimsBelievePrompt, } from './prompts/learning-journeys.js';
+import { LEARN_RESOURCES } from './contracts/learn-resources.js';
 import { handleStatsRequest } from './logging/stats.js';
 import { enableDailyStore } from './logging/daily-store.js';
 import { extractClientIp } from './logging/geo.js';
 const SERVER_NAME = 'sakina-islamic-knowledge';
-const SERVER_VERSION = '2.4.2';
+const SERVER_VERSION = '2.5.0';
 const SERVER_DESCRIPTION = "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar.";
 const SERVER_CARD = {
     schemaVersion: '2025-07-09',
@@ -140,12 +141,15 @@ const SERVER_CARD = {
     prompts: [
         { name: 'understand_a_verse', description: PROMPT_STRINGS.understandDescription },
         { name: 'explore_names_of_allah', description: PROMPT_STRINGS.exploreDescription },
+        { name: 'what_muslims_believe', description: JOURNEY_STRINGS.believeDescription },
+        { name: 'first_steps_new_muslim', description: JOURNEY_STRINGS.firstStepsDescription },
     ],
     resources: [
         {
             uri: 'sakina://about',
             description: "Read-once briefing on the server's seven core directives and three educational dawah texts (Quran preservation, hadith grading, madhab attribution). Agents should fetch this resource before using the tools.",
         },
+        ...LEARN_RESOURCES.map(({ uri, description }) => ({ uri, description })),
     ],
     capabilities: {
         rateLimit: {
@@ -226,6 +230,10 @@ export function createMcpServer() {
     server.registerPrompt('understand_a_verse', { title: PROMPT_STRINGS.understandTitle, description: PROMPT_STRINGS.understandDescription, argsSchema: understandAVerseArgs }, withPromptLogging('understand_a_verse', understandAVersePrompt));
     const explore = server.registerPrompt('explore_names_of_allah', { title: PROMPT_STRINGS.exploreTitle, description: PROMPT_STRINGS.exploreDescription, argsSchema: exploreNamesArgs }, withPromptLogging('explore_names_of_allah', exploreNamesPrompt));
     explore.argsSchema = readMissingArgumentsAsEmpty(exploreNamesArgs);
+    const believe = server.registerPrompt('what_muslims_believe', { title: JOURNEY_STRINGS.believeTitle, description: JOURNEY_STRINGS.believeDescription, argsSchema: whatMuslimsBelieveArgs }, withPromptLogging('what_muslims_believe', whatMuslimsBelievePrompt));
+    believe.argsSchema = readMissingArgumentsAsEmpty(whatMuslimsBelieveArgs);
+    const firstSteps = server.registerPrompt('first_steps_new_muslim', { title: JOURNEY_STRINGS.firstStepsTitle, description: JOURNEY_STRINGS.firstStepsDescription, argsSchema: firstStepsArgs }, withPromptLogging('first_steps_new_muslim', firstStepsPrompt));
+    firstSteps.argsSchema = readMissingArgumentsAsEmpty(firstStepsArgs);
     server.registerResource('about', 'sakina://about', {
         title: 'About the AskSakina Islamic Knowledge Server',
         description: 'Core directives + the three Gem-cleared educational texts (Quran preservation, hadith grading, madhab attribution). Read this resource before using the tools.',
@@ -239,6 +247,11 @@ export function createMcpServer() {
             },
         ],
     }));
+    for (const r of LEARN_RESOURCES) {
+        server.registerResource(r.name, r.uri, { title: r.title, description: r.description, mimeType: 'text/markdown' }, async () => ({
+            contents: [{ uri: r.uri, mimeType: 'text/markdown', text: r.text }],
+        }));
+    }
     return server;
 }
 async function readJsonBody(req) {

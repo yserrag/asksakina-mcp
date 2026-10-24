@@ -29,6 +29,7 @@ import {
   NO_EMOJI_RULE,
   TEACH_DIRECTIVE,
   TEACH_BINDING_DIRECTIVES,
+  AUDIENCE_NOTE_DIRECTIVE,
   TEACH_CONTRACT,
   NO_TEACH_CLAUSE,
 } from '../contracts/presentation.js'
@@ -171,6 +172,15 @@ function withoutNoTeachClause(directive: string): string {
   return directive.endsWith(NO_TEACH_SUFFIX) ? directive.slice(0, -NO_TEACH_SUFFIX.length) : directive
 }
 
+/** WO#495: true when any record in the content carries an audience_note (Field 5). */
+function carriesAudienceNote(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(carriesAudienceNote)
+  if (!value || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  if (record.audience_note && typeof record.audience_note === 'object') return true
+  return Object.values(record).some(carriesAudienceNote)
+}
+
 /** True when any record in the content carries a teach block (WO#405). */
 function carriesTeach(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(carriesTeach)
@@ -224,6 +234,7 @@ export function buildResponse<TContent>(
   const extra = [
     ...(input.extraDirectives ?? []),
     ...(teach ? [TEACH_DIRECTIVE, ...TEACH_BINDING_DIRECTIVES] : []),
+    ...(carriesAudienceNote(input.content) ? [AUDIENCE_NOTE_DIRECTIVE] : []),
     ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION, DISCLAIMER_TRANSLATION_LOCK] : []),
   ]
   const full = extra.length ? [...meta.directives, ...extra] : meta.directives

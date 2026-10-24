@@ -56,6 +56,12 @@ const GEM3_B2_112_3 = signedB2(3, 'WO#484 batch 2, approved as reworded by Gem 3
  */
 const GEM10_B2: readonly SignOff[] = [{ gem: 10, ruling: 'WO#484 delegated PASS (Architect)', date: '2026-10-22' }]
 
+/** WO#495 (MCP 2.5.0): docs/wo495-architect.md, section 2 (J1 item 6, Field 1) and section 5 (Field 4). */
+const GEM2_W495: readonly SignOff[] = [{ gem: 2, ruling: 'WO#495 Part B, J1 item 6 Field 1 (Gem 2 + Gem 2 follow-up item 2)', date: '2026-10-24' }]
+const GEM3_W495: readonly SignOff[] = [{ gem: 3, ruling: 'WO#495 Part B additions (Gem 3), J1 item 6 Field 4', date: '2026-10-24' }]
+/** Gem 10's publish review of the 2.5.0 brief: G10-7 PASS (docs/wo495-architect.md §10). */
+const GEM10_W495: readonly SignOff[] = [{ gem: 10, ruling: 'WO#495 Gem 10 brief, G10-7 PASS (docs/wo495-architect.md §10)', date: '2026-10-24' }]
+
 export const TEACH_ENTRIES: Readonly<Partial<Record<TeachKey, TeachEntry>>> = {
   'dua:D00068': {
     record: { kind: 'dua', id: 'D00068' },
@@ -1015,5 +1021,25 @@ export const TEACH_ENTRIES: Readonly<Partial<Record<TeachKey, TeachEntry>>> = {
     },
     related: { refs: [{ kind: 'name', number: 9 }, { kind: 'verse', ref: '1:2' }], reviewedBy: GEM2_B2 },
     publishReviewedBy: GEM10_B2,
+  },
+  // WO#495 (MCP 2.5.0), J1 item 6: the teach entry the "What do Muslims believe?" journey reaches.
+  // Field 1: Gem 2 (Arabic = the module's first two tokens of 2:256; transliteration and root as ruled;
+  // gloss = the draft's candidate, Pickthall's two words). Field 2: REJECTED by Gem 4, left out.
+  // Field 4: Gem 3. Publish: Gem 10 PASS (G10-7).
+  'verse:2:256': {
+    record: { kind: 'verse', ref: '2:256' },
+    locale: 'en',
+    key_word: {
+      words: [{ arabic: '\u0644\u064e\u0627\u0653 \u0627\u0650\u0655\u0643\u06e1\u0631\u064e\u0627\u0647\u064e', transliteration: 'l\u0101 ikr\u0101ha' }],
+      root: '\u0643 \u0631 \u0647',
+      root_transliteration: 'k-r-h',
+      gloss: 'no compulsion',
+      reviewedBy: GEM2_W495,
+    },
+    reflection: {
+      text: "How does knowing that faith must be freely chosen, without pressure or compulsion, change the way you view your own spiritual journey and the patience you extend to yourself?",
+      reviewedBy: GEM3_W495,
+    },
+    publishReviewedBy: GEM10_W495,
   },
 }

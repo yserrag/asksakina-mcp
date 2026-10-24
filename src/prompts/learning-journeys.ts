@@ -4,8 +4,11 @@
  *
  * Two of the four journeys ship, built only on records and teach entries that
  * are already Gem-approved: `understand_a_verse` and `explore_names_of_allah`.
- * `what_muslims_believe` and `first_steps_new_muslim` stay parked (they need
- * authored content).
+ * WO#495 (MCP 2.5.0) adds the two parked ones, `what_muslims_believe` and
+ * `first_steps_new_muslim`: their authored prose is in the learn resources
+ * (contracts/learn-content.ts), their messages are the strings below
+ * (JOURNEY_STRINGS, Gems 1, 6, 7 and 3 approved; docs/wo495-architect.md
+ * section 7), in the order docs/wo492-journeys-part4.md gives them.
  *
  * A prompt adds no religious content. Its message tells the agent to call one
  * tool and then follow the rules that tool's response already carries
@@ -21,7 +24,7 @@
  */
 
 import { z } from 'zod'
-import { DAWAH_ADAB_BLOCK } from '../contracts/instructions.js'
+import { DAWAH_ADAB_BLOCK, OPEN_DOOR_LINE } from '../contracts/instructions.js'
 
 /** Every new string the two prompts add (WO#489 item 2). Gem 1 APPROVED all of them as they are (22 Oct 2026). */
 export const PROMPT_STRINGS = {
@@ -37,6 +40,43 @@ export const PROMPT_STRINGS = {
   nextName: 'Offer one next step only: Name {next} (call get_name_of_allah with number {next} if the user says yes).',
   block: 'If a response carries a crisis_resource block, follow its directive and add nothing: no reflection question and no next step.',
 } as const
+
+/**
+ * WO#495: the new strings of the two journey prompts (docs/wo492-journeys-part4.md,
+ * "Every new string (N), once"; all five messages approved by Gems 1, 6, 7 and 3).
+ * Changed for the build (Gem 10 PASS, G10-3 and G10-4): callDua names the du'a by id (D00234,
+ * Sahih al-Bukhari 744, as ruled), because "context repentance and limit 1" would
+ * serve the category's first du'a (D00231, a general supplication). The titles,
+ * descriptions and argument descriptions are new (the Builder's; Gem 10 PASS, G10-3).
+ */
+export const JOURNEY_STRINGS = {
+  believeTitle: 'What do Muslims believe?',
+  believeDescription: "What Muslims believe, from AskSakina's records: Surah Al-Ikhlas, the Name Ar-Rahman, a reviewed overview of the articles of faith and the pillars, and Quran 2:256.",
+  audienceArg: 'curious, revert or practising; defaults to curious',
+  firstStepsTitle: 'First steps as a new Muslim',
+  firstStepsDescription: 'For a new Muslim, one step at a time: 1 One God and His mercy, 2 what has passed is forgiven, 3 prayer step by step, 4 your people.',
+  stepArg: 'Step 1-4; defaults to 1',
+  readAbout: 'Read the resource sakina://about first. It frames how sources are cited; do not show it to the user.',
+  audience: 'Pass audience {audience} on every tool call.',
+  readResource: 'Read the resource {uri} and present it verbatim, with its citations.',
+  followUps: 'Answer follow-up questions only from these records and the resource. Where scholars differ, say so without choosing; where the notes end, say so and refer the user to a qualified scholar.',
+  nextJ1: 'Offer one next step only: the understand_a_verse prompt on 2:255, or explore_names_of_allah on Name 2.',
+  openDoor: 'At the close, offer this line once, verbatim, unless a crisis_resource block appeared or the user has disclosed distress: "{line}"',
+  revertCare: "Do not answer questions about the user's family, marriage, name, work or food: refer them to a qualified scholar. Never judge the user's former faith or family, and never tell the user whether they are or are not Muslim.",
+  noOpenDoor: 'Do not offer the open door.',
+  noAsk: 'Do not ask the user to say the shahada.',
+  close: 'Close with one line: when you are ready, step {next}. Offer no list of further practices.',
+  callDua: 'Call the get_dua tool with id D00234.',
+  fatihaApp: 'For the rest of Al-Fatiha, point the user to the AskSakina app; do not quote it from memory.',
+  nextJ3: 'Offer one next step only: the understand_a_verse prompt on 1:1, or explore_names_of_allah.',
+} as const
+
+/**
+ * The du'a ids a journey prompt names (J3 step 2: Sahih al-Bukhari 744). get_dua
+ * resolves an id only from its allowlist (WO#390), so bundle-data adds these to it;
+ * test-wo495 checks every id the prompts name is listed here. Gem 10 PASS (G10-10).
+ */
+export const JOURNEY_DUA_IDS: readonly string[] = ['D00234']
 
 /** Argument descriptions reused from the tools' own schemas (not new). */
 const SURAH_ARG = 'Surah number, 1-114'
@@ -82,6 +122,63 @@ const message = (description: string, lines: string[]): PromptResult => ({
   description,
   messages: [{ role: 'user', content: { type: 'text', text: lines.join('\n') } }],
 })
+
+/**
+ * One of a fixed set. Not z.enum: its error message quotes the value it
+ * received, and a refused argument must never be echoed (WO#489).
+ */
+const oneOf = (values: readonly string[]) => z.string().refine((s) => values.includes(s), { message: `must be one of: ${values.join(', ')}` })
+
+export const whatMuslimsBelieveArgs = {
+  audience: oneOf(['curious', 'revert', 'practising']).optional().describe(JOURNEY_STRINGS.audienceArg),
+}
+
+export const firstStepsArgs = {
+  step: oneOf(['1', '2', '3', '4']).optional().describe(JOURNEY_STRINGS.stepArg),
+}
+
+const J = JOURNEY_STRINGS
+const verse = (surah: number, ayah: number) => fill(PROMPT_STRINGS.callVerse, { surah, ayah })
+const name = (number: number) => fill(PROMPT_STRINGS.callName, { number })
+const read = (uri: string) => fill(J.readResource, { uri })
+
+/** J1 item 1 (docs/wo492-journeys-part4.md), line for line. */
+export function whatMuslimsBelievePrompt(args: { audience?: string }): PromptResult {
+  const audience = args.audience ?? 'curious'
+  return message(J.believeDescription, [
+    J.readAbout,
+    fill(J.audience, { audience }),
+    verse(112, 1),
+    verse(112, 2),
+    verse(112, 3),
+    verse(112, 4),
+    name(1),
+    read('sakina://learn/what-muslims-believe'),
+    verse(2, 256),
+    PROMPT_STRINGS.follow,
+    DAWAH_ADAB_BLOCK,
+    J.followUps,
+    J.nextJ1,
+    fill(J.openDoor, { line: OPEN_DOOR_LINE }),
+    PROMPT_STRINGS.block,
+  ])
+}
+
+/** J3 item 1, steps 1 to 4 (docs/wo492-journeys-part4.md), line for line. One step per fetch. */
+export function firstStepsPrompt(args: { step?: string }): PromptResult {
+  const step = Number(args.step ?? '1')
+  const revert = fill(J.audience, { audience: 'revert' })
+  const rules = [PROMPT_STRINGS.follow, DAWAH_ADAB_BLOCK, J.revertCare, J.noOpenDoor, PROMPT_STRINGS.block]
+  const lines =
+    step === 1
+      ? [revert, read('sakina://learn/first-steps#shahada'), J.noAsk, verse(112, 1), verse(112, 2), verse(112, 3), verse(112, 4), name(1), name(2), ...rules, fill(J.close, { next: 2 })]
+      : step === 2
+        ? [revert, verse(8, 38), read('sakina://learn/first-steps#forgiven'), name(34), verse(39, 53), J.callDua, ...rules, fill(J.close, { next: 3 })]
+        : step === 3
+          ? [revert, read('sakina://learn/first-steps#wudu'), read('sakina://learn/first-steps#first-prayer'), verse(1, 1), J.fatihaApp, ...rules, fill(J.close, { next: 4 })]
+          : [revert, read('sakina://learn/first-steps#community'), ...rules, J.nextJ3]
+  return message(J.firstStepsDescription, lines)
+}
 
 export function understandAVersePrompt(args: { surah: string; ayah: string }): PromptResult {
   return message(PROMPT_STRINGS.understandDescription, [

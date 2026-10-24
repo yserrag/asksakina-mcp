@@ -2,7 +2,8 @@
  * get_dua `id` allowlist (WO#390, Architect ruling on flag 3).
  *
  * Built at bundle time from the Gem-2-signed `related` lists in
- * src/teach/entries.ts (scripts/bundle-data.ts). An open id lookup would make
+ * src/teach/entries.ts (scripts/bundle-data.ts), and (WO#495) the ids a
+ * journey prompt names (JOURNEY_DUA_IDS). An open id lookup would make
  * the whole corpus enumerable outside the armor (WO#86 corpus, Gem 10 WO#343
  * concern), so get_dua resolves ONLY these ids. Empty while no teach content
  * exists. A missing file fails closed: nothing resolves.

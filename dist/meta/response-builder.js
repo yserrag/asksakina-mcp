@@ -1,6 +1,6 @@
 import { SAKINA_DISCLAIMER, NOT_FOUND_DISCLAIMER, CRISIS_ONLY_DISCLAIMER } from '../contracts/disclaimers.js';
 import { QURAN_VERSE_CONTEXT, HADITH_CONTEXT, NAMES_OF_ALLAH_CONTEXT, } from '../contracts/educational.js';
-import { QURAN_CONTRACT, HADITH_CONTRACT, NAME_OF_ALLAH_CONTRACT, REFLECTION_CONTRACT, QURAN_DIRECTIVES, VERSE_COLLECTION_DIRECTIVES, DUA_DIRECTIVES, NAME_DIRECTIVES, VOICE_2_RULE, PBUH_RULE, NO_EMOJI_RULE, TEACH_DIRECTIVE, TEACH_BINDING_DIRECTIVES, TEACH_CONTRACT, NO_TEACH_CLAUSE, } from '../contracts/presentation.js';
+import { QURAN_CONTRACT, HADITH_CONTRACT, NAME_OF_ALLAH_CONTRACT, REFLECTION_CONTRACT, QURAN_DIRECTIVES, VERSE_COLLECTION_DIRECTIVES, DUA_DIRECTIVES, NAME_DIRECTIVES, VOICE_2_RULE, PBUH_RULE, NO_EMOJI_RULE, TEACH_DIRECTIVE, TEACH_BINDING_DIRECTIVES, AUDIENCE_NOTE_DIRECTIVE, TEACH_CONTRACT, NO_TEACH_CLAUSE, } from '../contracts/presentation.js';
 const VERSION = '1.0';
 const SOURCE = 'AskSakina Islamic Knowledge Server (asksakina.com)';
 function metaForType(contentType) {
@@ -68,6 +68,16 @@ const NO_TEACH_SUFFIX = ` ${NO_TEACH_CLAUSE}`;
 function withoutNoTeachClause(directive) {
     return directive.endsWith(NO_TEACH_SUFFIX) ? directive.slice(0, -NO_TEACH_SUFFIX.length) : directive;
 }
+function carriesAudienceNote(value) {
+    if (Array.isArray(value))
+        return value.some(carriesAudienceNote);
+    if (!value || typeof value !== 'object')
+        return false;
+    const record = value;
+    if (record.audience_note && typeof record.audience_note === 'object')
+        return true;
+    return Object.values(record).some(carriesAudienceNote);
+}
 function carriesTeach(value) {
     if (Array.isArray(value))
         return value.some(carriesTeach);
@@ -91,6 +101,7 @@ export function buildResponse(input) {
     const extra = [
         ...(input.extraDirectives ?? []),
         ...(teach ? [TEACH_DIRECTIVE, ...TEACH_BINDING_DIRECTIVES] : []),
+        ...(carriesAudienceNote(input.content) ? [AUDIENCE_NOTE_DIRECTIVE] : []),
         ...(carriesNonEnCrisisBlock(input.extras) ? [CRISIS_ANTI_TRANSLATION, DISCLAIMER_TRANSLATION_LOCK] : []),
     ];
     const full = extra.length ? [...meta.directives, ...extra] : meta.directives;

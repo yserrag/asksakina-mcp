@@ -143,7 +143,9 @@ async function main() {
   check(!strings.some((s) => /\b(SAW|PBUH)\b/i.test(s)), 'no "SAW" or "PBUH"')
 
   console.log('\n=== E. the release gate ===')
-  check(publishGateErrors(ENTRIES).length === 0 && Object.keys(ENTRIES).length === 44, 'the release gate passes for all 44 entries (batch 2: the delegated Gem 10 sign-off, 22 Oct 2026)', publishGateErrors(ENTRIES))
+  // WO#495 added verse:2:256, pending its own Gem 10 review (test-teach, test-wo495); these are the 44 before it.
+  const w484 = Object.fromEntries(Object.entries(ENTRIES).filter(([k]) => k !== 'verse:2:256'))
+  check(publishGateErrors(w484).length === 0 && Object.keys(w484).length === 44, 'the release gate passes for all 44 entries (batch 2: the delegated Gem 10 sign-off, 22 Oct 2026)', publishGateErrors(w484))
   const unsigned = Object.fromEntries(APPROVED.map((a) => [a.record, { ...entry(a.record), publishReviewedBy: [] }]))
   const refused = publishGateErrors(unsigned as unknown as Record<string, TeachEntry>).map((e) => e.replace(/: entry \(publish\) lacks sign-off from Gem 10$/, ''))
   check(JSON.stringify(refused.sort()) === JSON.stringify(APPROVED.map((a) => a.record).sort()), 'control: without that sign-off, the gate refuses exactly the 38 batch 2 entries')

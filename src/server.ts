@@ -58,13 +58,26 @@ import {
 } from './safety/rate-limiter.js'
 import { serialiseResponse, type SakinaResponse } from './meta/response-builder.js'
 import { logPromptFetch, logRequest, type PromptName, type ToolName, type RequestStatus } from './logging/request-logger.js'
-import { exploreNamesArgs, exploreNamesPrompt, readMissingArgumentsAsEmpty, PROMPT_STRINGS, understandAVerseArgs, understandAVersePrompt } from './prompts/learning-journeys.js'
+import {
+  exploreNamesArgs,
+  exploreNamesPrompt,
+  firstStepsArgs,
+  firstStepsPrompt,
+  JOURNEY_STRINGS,
+  readMissingArgumentsAsEmpty,
+  PROMPT_STRINGS,
+  understandAVerseArgs,
+  understandAVersePrompt,
+  whatMuslimsBelieveArgs,
+  whatMuslimsBelievePrompt,
+} from './prompts/learning-journeys.js'
+import { LEARN_RESOURCES } from './contracts/learn-resources.js'
 import { handleStatsRequest } from './logging/stats.js'
 import { enableDailyStore } from './logging/daily-store.js'
 import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
-const SERVER_VERSION = '2.4.2'
+const SERVER_VERSION = '2.5.0'
 const SERVER_DESCRIPTION =
   "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
@@ -196,6 +209,9 @@ const SERVER_CARD = {
   prompts: [
     { name: 'understand_a_verse', description: PROMPT_STRINGS.understandDescription },
     { name: 'explore_names_of_allah', description: PROMPT_STRINGS.exploreDescription },
+    // WO#495: the two journeys.
+    { name: 'what_muslims_believe', description: JOURNEY_STRINGS.believeDescription },
+    { name: 'first_steps_new_muslim', description: JOURNEY_STRINGS.firstStepsDescription },
   ],
   resources: [
     {
@@ -203,6 +219,8 @@ const SERVER_CARD = {
       description:
         "Read-once briefing on the server's seven core directives and three educational dawah texts (Quran preservation, hadith grading, madhab attribution). Agents should fetch this resource before using the tools.",
     },
+    // WO#495: the journeys' reviewed texts.
+    ...LEARN_RESOURCES.map(({ uri, description }) => ({ uri, description })),
   ],
   capabilities: {
     rateLimit: {
@@ -349,6 +367,21 @@ export function createMcpServer(): McpServer {
   // A fetch with no `arguments` at all starts at Name 1 (readMissingArgumentsAsEmpty).
   explore.argsSchema = readMissingArgumentsAsEmpty(exploreNamesArgs) as unknown as typeof explore.argsSchema
 
+  // WO#495: the two journeys. Every argument is optional, so a fetch with no `arguments` is read as {}.
+  const believe = server.registerPrompt(
+    'what_muslims_believe',
+    { title: JOURNEY_STRINGS.believeTitle, description: JOURNEY_STRINGS.believeDescription, argsSchema: whatMuslimsBelieveArgs },
+    withPromptLogging('what_muslims_believe', whatMuslimsBelievePrompt),
+  )
+  believe.argsSchema = readMissingArgumentsAsEmpty(whatMuslimsBelieveArgs) as unknown as typeof believe.argsSchema
+
+  const firstSteps = server.registerPrompt(
+    'first_steps_new_muslim',
+    { title: JOURNEY_STRINGS.firstStepsTitle, description: JOURNEY_STRINGS.firstStepsDescription, argsSchema: firstStepsArgs },
+    withPromptLogging('first_steps_new_muslim', firstStepsPrompt),
+  )
+  firstSteps.argsSchema = readMissingArgumentsAsEmpty(firstStepsArgs) as unknown as typeof firstSteps.argsSchema
+
   // ── Resources ─────────────────────────────────────────────────────
 
   server.registerResource(
@@ -370,6 +403,13 @@ export function createMcpServer(): McpServer {
       ],
     }),
   )
+
+  // WO#495: the journeys' reviewed texts, served verbatim.
+  for (const r of LEARN_RESOURCES) {
+    server.registerResource(r.name, r.uri, { title: r.title, description: r.description, mimeType: 'text/markdown' }, async () => ({
+      contents: [{ uri: r.uri, mimeType: 'text/markdown', text: r.text }],
+    }))
+  }
 
   return server
 }

@@ -42,7 +42,8 @@ const TOOLS = ['get_quran_verse', 'get_dua', 'get_name_of_allah', 'find_verses']
 // WO#488 Part B: teach_served per tool; the audience tally and prompts at the top level.
 const COUNTER_KEYS = ['duration_ms_sum', 'error', 'not_found', 'ok', 'teach_served']
 const AUDIENCE_KEYS = ['absent', 'curious', 'practising', 'revert', 'unknown']
-const PROMPT_KEYS = ['explore_names_of_allah', 'understand_a_verse']
+// WO#495: the two journey prompts are registered, so counted.
+const PROMPT_KEYS = ['explore_names_of_allah', 'first_steps_new_muslim', 'understand_a_verse', 'what_muslims_believe']
 const SENTINELS = ['WO456SENTINEL', '203.0.113.77', 'wo456-agent', 'wo456-client', 'wo456-audience']
 
 /** Every file in `dir` is YYYY-MM-DD.json holding exactly the allowed shape. */
@@ -336,7 +337,7 @@ async function testWo488Counters() {
     const j = JSON.parse(readFileSync(path.join(dir, '2026-10-22.json'), 'utf8'))
     check(j.by_tool.get_name_of_allah.teach_served === 1 && j.by_tool.get_dua.teach_served === 0 && j.by_tool.get_dua.ok === 5, 'teach_served per tool, beside the outcome counts', j.by_tool)
     check(JSON.stringify(j.audience) === JSON.stringify({ curious: 1, revert: 1, practising: 0, unknown: 0, absent: 2 }), 'the audience tally: five fixed keys; a missing or unknown value counts as absent', j.audience)
-    check(JSON.stringify(j.prompts) === JSON.stringify({ understand_a_verse: 1, explore_names_of_allah: 2 }), 'prompt fetches by name; an unregistered name is ignored', j.prompts)
+    check(JSON.stringify(j.prompts) === JSON.stringify({ understand_a_verse: 1, explore_names_of_allah: 2, what_muslims_believe: 0, first_steps_new_muslim: 0 }), 'prompt fetches by name; an unregistered name is ignored', j.prompts)
     check(auditDir(dir).length === 0, 'the file holds only allowed keys and no sentinel', auditDir(dir))
     // The in-memory tier, through the logger.
     const { logRequest, logPromptFetch, getAggregateSnapshot, resetLoggerForTests } = await import('../src/logging/request-logger.js')

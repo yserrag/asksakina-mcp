@@ -38,7 +38,8 @@ import { L10N_HOURS, L10N_STRINGS } from '../src/safety/crisis-l10n-strings.js'
 import { stripPrependedBasmala, STRIP_PREFIXED_BASMALA, BASMALA_PREFIX_PLAIN, BASMALA_PREFIX_SHADDA, getBasmalaPrefixMismatchCount, bundledPickthall } from '../src/data/quran.js'
 import { TOTAL_NAMES } from '../src/data/names.js'
 import { readFileSync } from 'node:fs'
-import { getVerseArabic, getVerseClause } from '../../src/lib/scripture/index.js'
+import { getVerseArabic, getVerseClause, stripOpenFathatanSpace } from '../../src/lib/scripture/index.js'
+import { OUTSIDE_MODULE } from '../src/data/themes-2-5-0.js'
 import { skeleton, FASTTRACK_RATIFIED, QURANIC_LABELS } from './quranic-labels.js'
 
 const BUNDLED_FULL = JSON.parse(
@@ -1173,10 +1174,18 @@ async function testBereavedRoute() {
 // translation and surah names come from it.
 async function testFindVerses() {
   console.log('\n=== find_verses (WO#386) ===')
+  // WO#495: the refs the module does not carry (OUTSIDE_MODULE) carry public/quran's
+  // text_uthmani with the module's one transform, i.e. what the module would serve.
+  const expectedArabic = (ref: string) => {
+    if (!OUTSIDE_MODULE.includes(ref)) return getVerseArabic(ref)
+    const [s, a] = ref.split(':').map(Number) as [number, number]
+    const d = JSON.parse(readFileSync(new URL(`../../public/quran/en.pickthall/${s}.json`, import.meta.url), 'utf-8')) as { verses: Array<{ verse_number: number; text_uthmani: string }> }
+    return stripOpenFathatanSpace(d.verses.find((x) => x.verse_number === a)!.text_uthmani)
+  }
   results.push(
-    THEMATIC_INDEX.length > 0 && THEMATIC_INDEX.every((v) => v.arabic === getVerseArabic(v.ref))
-      ? pass(`bundled index: all ${THEMATIC_INDEX.length} verses carry getVerseArabic bytes`)
-      : fail('bundled index Arabic', THEMATIC_INDEX.filter((v) => v.arabic !== getVerseArabic(v.ref)).map((v) => v.ref).join(', ')),
+    THEMATIC_INDEX.length > 0 && THEMATIC_INDEX.every((v) => v.arabic === expectedArabic(v.ref))
+      ? pass(`bundled index: all ${THEMATIC_INDEX.length} verses carry getVerseArabic bytes (${OUTSIDE_MODULE.join(', ')}: public/quran's, transformed as the module does)`)
+      : fail('bundled index Arabic', THEMATIC_INDEX.filter((v) => v.arabic !== expectedArabic(v.ref)).map((v) => v.ref).join(', ')),
   )
   type V = { reference: string; arabic: string; translation: string | null; translation_note?: string; surah_name_english?: string; relevance_note: string }
   type R = {

@@ -27,6 +27,7 @@
  */
 
 import { getNameByNumber } from '../data/names.js'
+import { REVERT_NOTES } from '../contracts/learn-content.js'
 import { TEACH_ENTRIES } from './entries.js'
 import type { Audience, RelatedRef, RelatedRefWire, TeachBlockWire, TeachEntry, TeachKey, WireAudience } from './types.js'
 
@@ -105,16 +106,44 @@ function teachWire(key: TeachKey, entry: TeachEntry, audience: WireAudience): Te
   return block
 }
 
-/** The record with `teach` and `related` appended, or the same record. */
+/**
+ * WO#495 (MCP 2.5.0), Field 5: AskSakina's note for a new Muslim (J3 item 8,
+ * Gems 6 and 7), served only when the caller sends `audience: "revert"`. It
+ * is its own key, not a rewrite of a teach field, because the notes carry
+ * their own citations (Quran 112:1, Sunan Abi Dawud 832); and it attaches whether
+ * or not the record has a teach entry (the Bukhari 744 du'a has none). The
+ * same conditions withhold it as withhold teach.
+ */
+export interface AudienceNoteWire {
+  audience: 'revert'
+  text: string
+  citations: Array<{ text: string; grading?: string }>
+  /** The text, then (where citations exist) a newline and "Text (Grading)" joined with "; ", as context_block. */
+  note_block: string
+}
+
+function audienceNote(key: TeachKey, audience: Audience | undefined): AudienceNoteWire | undefined {
+  if (audience !== 'revert') return undefined
+  const note = REVERT_NOTES[key]
+  if (!note) return undefined
+  const citations = note.citations.map((c) => (c.grading ? { text: c.text, grading: c.grading } : { text: c.text }))
+  const cited = citations.map((c) => (c.grading ? `${c.text} (${c.grading})` : c.text)).join('; ')
+  return { audience: 'revert', text: note.text, citations, note_block: citations.length ? `${note.text}\n${cited}` : note.text }
+}
+
+/** The record with `teach`, `related` and (WO#495) `audience_note` appended, or the same record. */
 export function withTeach<T extends object>(record: T, key: TeachKey, opts: AttachOptions): T {
   if (opts.withhold) return record
   if ((opts.locale ?? 'en') !== 'en') return record
-  const entry = TEACH_ENTRIES[key]
-  if (!entry || entry.locale !== 'en') return record
-  const related = (entry.related?.refs ?? []).map(relatedWire).filter((r): r is RelatedRefWire => r !== null)
+  const found = TEACH_ENTRIES[key]
+  const entry = found && found.locale === 'en' ? found : undefined
+  const note = audienceNote(key, opts.audience)
+  if (!entry && !note) return record
+  const related = (entry?.related?.refs ?? []).map(relatedWire).filter((r): r is RelatedRefWire => r !== null)
   return {
     ...record,
-    teach: teachWire(key, entry, opts.audience ?? 'unknown'),
+    ...(entry ? { teach: teachWire(key, entry, opts.audience ?? 'unknown') } : {}),
     ...(related.length ? { related } : {}),
+    ...(note ? { audience_note: note } : {}),
   }
 }

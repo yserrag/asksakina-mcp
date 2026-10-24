@@ -27,5 +27,5 @@
     "../src/lib/utils/arabic-normalise.ts",
     "../src/lib/utils/distress-detection.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "scripts/wo495-learn-content.ts"]
 }

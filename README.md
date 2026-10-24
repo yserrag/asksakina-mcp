@@ -12,7 +12,7 @@
 
 ## What it provides
 
-Four lookup tools, two learning-journey prompts and one canonical resource over the Model Context Protocol. Every record is sourced from AskSakina's main app (`asksakina.com`), so each MCP release matches what the public app surfaced when it was built.
+Four lookup tools, four learning-journey prompts and seven resources over the Model Context Protocol. Every record is sourced from AskSakina's main app (`asksakina.com`), so each MCP release matches what the public app surfaced when it was built.
 
 | Tool | What it does |
 |---|---|
@@ -22,7 +22,10 @@ Four lookup tools, two learning-journey prompts and one canonical resource over 
 | `find_verses` | Quran verses by topic keyword, from AskSakina's thematic verse index |
 | `understand_a_verse` (prompt) | Fetch one verse by surah and ayah, then present it with its teaching notes, if any |
 | `explore_names_of_allah` (prompt) | Fetch one Name by number (1 if none is given), then present it and offer the next Name |
+| `what_muslims_believe` (prompt) | Surah Al-Ikhlas, the Name Ar-Rahman, a reviewed overview of the articles of faith and the pillars, and Quran 2:256 |
+| `first_steps_new_muslim` (prompt) | For a new Muslim, one step at a time (1-4): One God and His mercy, what has passed is forgiven, prayer step by step, your people |
 | `sakina://about` (resource) | Read-once briefing — seven core directives plus three Gem-cleared dawah texts (Quran preservation, hadith grading, madhab attribution) |
+| `sakina://learn/...` (resources, 2.5.0) | The six reviewed texts the two journeys read, served verbatim |
 
 ---
 
@@ -160,6 +163,8 @@ Plus optional `locale` (`tr` returns the English meaning and reflection).
 
 Topic lookup beside `get_quran_verse`'s reference lookup (WO#386). The query is normalised and each word is matched to a theme of AskSakina's thematic verse index (anxiety, gratitude, patience, trust, grief, hope, forgiveness, morning, friday, ramadan, encouragement), by theme name or a fixed synonym list. Deterministic: no embedding, no AI call.
 
+2.5.0 (WO#495) adds fifteen themes, each with its verses in a ruled order: companionship, family_and_marriage, hereafter, parents, night_and_rest, character, justice, protection, quran_and_knowledge, faith_and_guidance, prophets_and_creation, seasons, provision, healing and certainty. Companionship (loneliness) carries the soft support block, as grief does, and no teaching content. Healing carries one more directive: the verses are spiritual comfort and do not replace medical care. A query that carries an abuse word the crisis detector does not read alone ("abuse", "abusive", "violence" and their forms) reaches none of the fifteen and is answered as 2.4 answered it.
+
 Each verse carries `reference` (surah:ayah), `arabic` (the full ayah from the scripture module, Tanzil Uthmani, byte for byte), `translation` (full-ayah Pickthall, fetched as `get_quran_verse` fetches it), the surah names, and a `relevance_note` saying which theme lists it. The note is not commentary. If the upstream is unreachable, the Arabic is still served and `translation` is `null` with a note.
 
 No match returns `content_type: "not_found"` with `verses: []`, `no_results: true` and the list of available themes, not an error. Crisis detection runs first, as on `get_dua`: any hard crisis (self-harm or abuse) returns `crisis_resource_only`, with no verses and no theme list.
@@ -196,7 +201,17 @@ Two prompts, for clients that show MCP prompts (for example as slash commands). 
 - Arguments are strings of digits, checked before the prompt runs; anything else is refused with `-32602` and the value is not echoed. Whether an ayah exists in its surah is answered by the tool (`not_found`), as for a direct call.
 - If a response carries a `crisis_resource` block (crisis or soft support), the message tells the agent to follow that block's directive and add nothing: no reflection question and no next step.
 - Prompt arguments are never logged or counted. `/stats` counts only how many times each prompt was fetched, by name.
-- Two further journeys, `what_muslims_believe` and `first_steps_new_muslim`, are parked: they need authored content that has not been reviewed.
+
+### Prompts: the two journeys (2.5.0)
+
+| Prompt | Arguments | What it asks the agent to do |
+|---|---|---|
+| `what_muslims_believe` | `audience` (`curious`, `revert` or `practising`), optional; `curious` if none is given | Read `sakina://about`; fetch 112:1-4, Name 1, the resource `sakina://learn/what-muslims-believe` and 2:256; follow-ups only from those records; one next step; the open-door line at most once, never after a crisis block or distress |
+| `first_steps_new_muslim` | `step` (`1` to `4`), optional; `1` if none is given | One step per fetch, always with `audience` `revert`: 1 the shahada (without asking the user to say it), 112:1-4, Names 1 and 2; 2 8:38, the resource on forgiveness, Name 34, 39:53 and the du'a Sahih al-Bukhari 744 (`get_dua` id `D00234`); 3 wudu and the first prayer, 1:1; 4 finding a community. No open door. |
+
+- Arguments are checked before the prompt runs; anything else is refused with `-32602` and the value is not echoed.
+- The resources (`sakina://learn/what-muslims-believe`, `sakina://learn/first-steps#shahada`, `#forgiven`, `#wudu`, `#first-prayer`, `#community`) are built by script from the app's own reviewed seed modules and the Gems' rulings (`scripts/wo495-learn-content.ts`); the build fails if the committed text differs.
+- **Notes for a new Muslim (`audience_note`).** With `audience: "revert"`, six records carry AskSakina's note for a new Muslim (112:1, 1:1, Names 1, 2 and 34, and the du'a D00234), with its own citations and a `note_block` to quote exactly. It is withheld wherever teach is withheld (crisis, support block, grief, non-English locale).
 
 ---
 
@@ -422,7 +437,7 @@ Payload shape:
     "find_verses":       { "total": N, "ok": N, "not_found": N, "error": N, "avg_response_ms": N, "teach_served": N }
   },
   "audience": { "curious": N, "revert": N, "practising": N, "unknown": N, "absent": N },
-  "prompts": { "understand_a_verse": N, "explore_names_of_allah": N },
+  "prompts": { "understand_a_verse": N, "explore_names_of_allah": N, "what_muslims_believe": N, "first_steps_new_muslim": N },
   "rate_limiter": {
     "state": "upstash",
     "upstash_configured": true,
@@ -439,7 +454,7 @@ Payload shape:
       { "date": "2026-10-12", "total": N,
         "by_tool": { "get_dua": { "total": N, "ok": N, "not_found": N, "error": N, "avg_response_ms": N, "teach_served": N }, … },
         "audience": { "curious": N, "revert": N, "practising": N, "unknown": N, "absent": N },
-        "prompts": { "understand_a_verse": N, "explore_names_of_allah": N } }
+        "prompts": { "understand_a_verse": N, "explore_names_of_allah": N, "what_muslims_believe": N, "first_steps_new_muslim": N } }
     ]
   }
 }
