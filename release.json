@@ -1,8 +1,8 @@
 {
-  "version": "2.4.1",
-  "sakinaCommit": "a65acb042b8d7265501f159a42899680e4fe9058",
-  "integrity": "sha512-w1SixSBy3x2XqdYR7RBEyJFkN9WP57cZNB2WyzH/lvtzeVRpyrpVl9a8gV5coo6ftyIB/fvoTZ/pKQMEYlbotA==",
-  "shasum": "1faa96f4acb865b97a5d1a1cd14f584934372054",
-  "entryCount": 103,
+  "version": "2.4.2",
+  "sakinaCommit": "0aa5470c1d2e11dcf73a5cda4258326a1978851f",
+  "integrity": "sha512-AnyrpqmPnfDmcYJujc+LT0Oci9cIJxdDBRuyldrqUEgjk2QpXsMpCUSwaoU2MtokL0tXSGuaOikwHhxX+9D16w==",
+  "shasum": "e99fb3d531978f1bef1c993450dd26018cf02607",
+  "entryCount": 105,
   "note": "Written by mcp-server/scripts/build-mirror.mjs in the AskSakina repository. The publish workflow refuses a tarball whose integrity differs."
 }

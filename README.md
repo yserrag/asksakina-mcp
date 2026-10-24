@@ -6,7 +6,7 @@
 
 > **Specialist-AI-reviewed Islamic knowledge for AI agents.** Quranic verses, a curated du'a corpus, and the 99 Names of Allah — reviewed across the four mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali) through AskSakina's structured specialist-AI review chain, which is not a substitute for a qualified scholar. Every response is wrapped in a presentation contract so agents cannot silently misrepresent the content.
 
-**Architectural posture:** *"AskSakina ships records, agents ship answers."* The server is a reference library, not an advisor. Each response includes a `_sakina_meta` envelope with disclaimer, LLM directives, presentation contract, and educational context. What the calling agent does with the record is its responsibility — but every response arms the agent with enough structural context to make mishandling difficult and trackable.
+**Architectural posture:** *"AskSakina ships records, agents ship answers."* The server is a reference library, not an advisor. Each response includes a `_sakina_meta` envelope with disclaimer, LLM directives, presentation contract, and educational context. What the calling agent does with the record is its responsibility: every response carries explicit instructions for handling it, but the server cannot make another AI follow them.
 
 ---
 
@@ -30,7 +30,7 @@ Four lookup tools, two learning-journey prompts and one canonical resource over 
 
 ### `get_quran_verse`
 
-Verbatim Quranic verse lookup by surah:ayah. Returns the canonical AskSakina envelope with Arabic text, translation, surah name (Arabic + English), and the `quran` presentation contract — no paraphrasing, surah:ayah citation required, "Translation of the Meaning" labelling.
+Verbatim Quranic verse lookup by surah:ayah. Returns the canonical AskSakina envelope with Arabic text, translation, surah name (Arabic + English), and the `quran` presentation contract, which instructs the agent not to paraphrase, to cite surah:ayah, and to label the translation "Translation of the Meaning".
 
 **Parameters**
 
@@ -225,8 +225,21 @@ Every tool returns the same shape:
 }
 ```
 
-The envelope is the contract: `_sakina_meta.presentation_contract` tells the agent how to render the record, `disclaimer` tells the agent what claims it cannot make on its own authority, and `crisis_resource` overrides everything when a user's distress crosses a safety threshold.
+The envelope is the contract: `_sakina_meta.presentation_contract` tells the agent how to render the record, `disclaimer` tells the agent what claims it cannot make on its own authority, and `crisis_resource` asks the agent to put the crisis resource before everything else when a user's distress crosses a safety threshold. These are instructions to the client AI; the server cannot force another AI to follow them.
 
+
+### Structured output (2.4.2)
+
+Each tool publishes an `outputSchema` and returns the envelope twice: as `structuredContent` (an object) and as the text content (the same envelope as JSON text, unchanged from earlier releases). The two always hold the same data. The schema per tool (`src/contracts/output-schemas.ts`):
+
+| Tool | `content_type` | `content` |
+|---|---|---|
+| `get_quran_verse` | `quran_verse`, `not_found` | the verse (surah number and names, ayah, `arabic_text`, `translation`, `translation_source`, `translation_language`; optional `teach`, `related`), or `{ requested, reason }` |
+| `get_dua` | `dua_collection`, `not_found`, `crisis_resource_only` | `{ context, matched_by, duas[], total_results, total_available, truncated, grading_summary }`, or `{ requested, reason }`, or `{ requested, withheld, reason }` |
+| `get_name_of_allah` | `name_of_allah`, `not_found`, `crisis_resource_only` | the Name (`name_block`, `number`, `arabic`, `transliteration`, `english_meaning`, `reflection`, `quranic_references`; optional `teach`, `related`), or `{ requested, reason }`, or `{ requested, withheld, reason }` |
+| `find_verses` | `verse_collection`, `not_found`, `crisis_resource_only` | `{ query, matched_themes[], verses[], total_results, no_results }`, or the no-match shape (`available_themes`), or `{ requested, withheld, reason }` |
+
+Every response carries `_sakina_meta` (`version`, `source`, `content_type`, `disclaimer`, optional `disclaimer_locale`, `llm_directives.CRITICAL_RULES`, `presentation_contract`, `educational_context`) and, where a crisis or soft support block applies, `crisis_resource` (`level`, optional `crisis_type`, `locale`, `directive`, `text`). Every object is open: a field added in a later release does not fail a client that validates.
 ---
 
 ## Quick start

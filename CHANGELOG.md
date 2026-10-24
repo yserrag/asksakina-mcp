@@ -2,6 +2,40 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 2.4.2 (unreleased)
+
+WO#494 Part 0 (`docs/wo494-architect.md`). Pickthall 31:14 now reads
+"And We have enjoined upon man concerning his parents", not "partners".
+The digital Pickthall (fawazahmed0, alquran.cloud) carries "partners";
+Pickthall's text is "parents" (Gem 2, confirmed 24 Oct 2026).
+
+- The fix is the Pickthall errata list (`src/lib/quran/pickthall-errata.json`,
+  `docs/pickthall-errata.md`), one row. The app's `public/quran/en.pickthall`
+  carries it, and `data/pickthall.json` is bundled from that, under
+  contentVersion `quran-2026-10-24-wo494p0`. The other 6,235 verses are
+  byte-identical to 2.4.1's bundle (sha256 pinned in `test:wo494`).
+- `get_quran_verse` 31:14 serves the corrected English; the upstream
+  supplies only the Arabic and the surah name, as since 2.1.0 (WO#444).
+- The mcp-deploy live byte-check now also requires each erratum verse to
+  serve its corrected text byte for byte. `pickthall-upstream-diff` counts
+  an erratum as an expected word change.
+
+WO#496 (external review, 24 Oct 2026).
+
+- **Quick start.** Every stdio example on asksakina.com/mcp (the npx line,
+  Claude Desktop and Cursor) now passes `--stdio`, as the README already did.
+  Without it the package starts the HTTP server and a stdio client gets no
+  answer. `test:wo496` extracts every example from the page and the README,
+  checks its arguments against the flags the entrypoint reads, and runs the
+  built package through `npx` with those exact arguments to an MCP initialize.
+- **Structured output.** All four tools publish an `outputSchema` and return
+  `structuredContent` (the envelope as an object) beside the text content.
+  The text content is unchanged, byte for byte (byte-identity hashes equal to
+  the same build without WO#496, on all four audiences). The schemas are open objects: a field added
+  later does not fail a validating client.
+- **Wording.** The README says the presentation contract instructs the client
+  AI; it does not claim to enforce anything on another AI.
+
 ## 2.4.1 (unreleased)
 
 WO#490 (`docs/wo490-architect.md`). The Bengali and Persian crisis blocks

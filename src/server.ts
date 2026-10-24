@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { OUTPUT_SCHEMAS } from './contracts/output-schemas.js'
 
 import {
   GET_QURAN_VERSE_DESCRIPTION,
@@ -63,7 +64,7 @@ import { enableDailyStore } from './logging/daily-store.js'
 import { extractClientIp } from './logging/geo.js'
 
 const SERVER_NAME = 'sakina-islamic-knowledge'
-const SERVER_VERSION = '2.4.1'
+const SERVER_VERSION = '2.4.2'
 const SERVER_DESCRIPTION =
   "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar."
 
@@ -232,7 +233,7 @@ const SERVER_CARD = {
 function withLogging<Args extends Record<string, unknown>>(
   tool: ToolName,
   handler: (args: Args) => Promise<SakinaResponse<unknown>>,
-): (args: Args) => Promise<{ content: Array<{ type: 'text'; text: string }> }> {
+): (args: Args) => Promise<{ content: Array<{ type: 'text'; text: string }>; structuredContent: Record<string, unknown> }> {
   return async (args) => {
     const start = performance.now()
     let status: RequestStatus = 'ok'
@@ -245,7 +246,10 @@ function withLogging<Args extends Record<string, unknown>>(
       // WO#488: buildResponse sets presentation_contract.teach only when the
       // content carries a teach block, so this is a key check, not a walk.
       teachServed = (response._sakina_meta?.presentation_contract as { teach?: unknown } | undefined)?.teach !== undefined
-      return { content: [{ type: 'text', text: serialiseResponse(response) }] }
+      // WO#496: the text content is unchanged (byte-identical); structuredContent
+      // is the same envelope, parsed back from that text, so the two cannot differ.
+      const text = serialiseResponse(response)
+      return { content: [{ type: 'text', text }], structuredContent: JSON.parse(text) as Record<string, unknown> }
     } catch (err) {
       status = 'error'
       throw err
@@ -291,6 +295,7 @@ export function createMcpServer(): McpServer {
       title: GET_QURAN_VERSE_TITLE,
       description: GET_QURAN_VERSE_DESCRIPTION,
       inputSchema: getQuranVerseShape,
+      outputSchema: OUTPUT_SCHEMAS.get_quran_verse,
     },
     withLogging('get_quran_verse', getQuranVerseHandler),
   )
@@ -301,6 +306,7 @@ export function createMcpServer(): McpServer {
       title: GET_DUA_TITLE,
       description: GET_DUA_DESCRIPTION,
       inputSchema: getDuaShape,
+      outputSchema: OUTPUT_SCHEMAS.get_dua,
     },
     withLogging('get_dua', getDuaHandler),
   )
@@ -311,6 +317,7 @@ export function createMcpServer(): McpServer {
       title: GET_NAME_TITLE,
       description: GET_NAME_DESCRIPTION,
       inputSchema: getNameOfAllahShape,
+      outputSchema: OUTPUT_SCHEMAS.get_name_of_allah,
     },
     withLogging('get_name_of_allah', getNameOfAllahHandler),
   )
@@ -321,6 +328,7 @@ export function createMcpServer(): McpServer {
       title: FIND_VERSES_TITLE,
       description: FIND_VERSES_DESCRIPTION,
       inputSchema: findVersesShape,
+      outputSchema: OUTPUT_SCHEMAS.find_verses,
     },
     withLogging('find_verses', findVersesHandler),
   )

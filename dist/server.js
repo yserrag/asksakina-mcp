@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { OUTPUT_SCHEMAS } from './contracts/output-schemas.js';
 import { GET_QURAN_VERSE_DESCRIPTION, GET_QURAN_VERSE_TITLE, getQuranVerseShape, getQuranVerseHandler, } from './tools/get-quran-verse.js';
 import { GET_DUA_DESCRIPTION, GET_DUA_TITLE, getDuaShape, getDuaHandler, } from './tools/get-dua.js';
 import { GET_NAME_DESCRIPTION, GET_NAME_TITLE, getNameOfAllahShape, getNameOfAllahHandler, } from './tools/get-name-of-allah.js';
@@ -20,7 +21,7 @@ import { handleStatsRequest } from './logging/stats.js';
 import { enableDailyStore } from './logging/daily-store.js';
 import { extractClientIp } from './logging/geo.js';
 const SERVER_NAME = 'sakina-islamic-knowledge';
-const SERVER_VERSION = '2.4.1';
+const SERVER_VERSION = '2.4.2';
 const SERVER_DESCRIPTION = "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar.";
 const SERVER_CARD = {
     schemaVersion: '2025-07-09',
@@ -170,7 +171,8 @@ function withLogging(tool, handler) {
                 status = 'not_found';
             }
             teachServed = response._sakina_meta?.presentation_contract?.teach !== undefined;
-            return { content: [{ type: 'text', text: serialiseResponse(response) }] };
+            const text = serialiseResponse(response);
+            return { content: [{ type: 'text', text }], structuredContent: JSON.parse(text) };
         }
         catch (err) {
             status = 'error';
@@ -201,21 +203,25 @@ export function createMcpServer() {
         title: GET_QURAN_VERSE_TITLE,
         description: GET_QURAN_VERSE_DESCRIPTION,
         inputSchema: getQuranVerseShape,
+        outputSchema: OUTPUT_SCHEMAS.get_quran_verse,
     }, withLogging('get_quran_verse', getQuranVerseHandler));
     server.registerTool(GET_DUA_TITLE, {
         title: GET_DUA_TITLE,
         description: GET_DUA_DESCRIPTION,
         inputSchema: getDuaShape,
+        outputSchema: OUTPUT_SCHEMAS.get_dua,
     }, withLogging('get_dua', getDuaHandler));
     server.registerTool(GET_NAME_TITLE, {
         title: GET_NAME_TITLE,
         description: GET_NAME_DESCRIPTION,
         inputSchema: getNameOfAllahShape,
+        outputSchema: OUTPUT_SCHEMAS.get_name_of_allah,
     }, withLogging('get_name_of_allah', getNameOfAllahHandler));
     server.registerTool(FIND_VERSES_TITLE, {
         title: FIND_VERSES_TITLE,
         description: FIND_VERSES_DESCRIPTION,
         inputSchema: findVersesShape,
+        outputSchema: OUTPUT_SCHEMAS.find_verses,
     }, withLogging('find_verses', findVersesHandler));
     server.registerPrompt('understand_a_verse', { title: PROMPT_STRINGS.understandTitle, description: PROMPT_STRINGS.understandDescription, argsSchema: understandAVerseArgs }, withPromptLogging('understand_a_verse', understandAVersePrompt));
     const explore = server.registerPrompt('explore_names_of_allah', { title: PROMPT_STRINGS.exploreTitle, description: PROMPT_STRINGS.exploreDescription, argsSchema: exploreNamesArgs }, withPromptLogging('explore_names_of_allah', exploreNamesPrompt));
