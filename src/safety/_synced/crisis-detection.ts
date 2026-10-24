@@ -518,6 +518,44 @@ export const ABUSE_KEYWORDS_EN = [
   "sin to leave abusive husband",
   "forcing me to sleep with him",
   "break family ties for safety",
+
+  // ── WO#500 (Architect's English list, 24 Oct 2026; docs/wo500-architect.md): abuse
+  // intent phrases, stored as given. Phrases already present or covered are listed in
+  // docs/wo500-sg-report.md, not repeated. The Architect's false-positive ruling (pending
+  // Gem 3) dropped "is violent", "he abuses", "she abuses" and "they abuse", and named the
+  // relation instead ("he is violent", "my wife is violent"; "my husband is violent" is
+  // covered by "husband is violent"). Every English abuse keyword ends at a word boundary
+  // (ABUSE_EN_END_BOUNDED), so "abusing medication" and "beating meat" do not fire.
+  "abuses me",
+  "abusing me",
+  "was abused",
+  "abusive marriage",
+  "abusive relationship",
+  "abusive husband",
+  "abusive wife",
+  "abusive partner",
+  "abusive parents",
+  "abusive father",
+  "abusive mother",
+  "abusive family",
+  "he is violent",
+  "she is violent",
+  "my wife is violent",
+  "my father is violent",
+  "my mother is violent",
+  "my partner is violent",
+  "my parents are violent",
+  "my family is violent",
+  "violent to me",
+  "violent towards me",
+  "they hit me",
+  "beating me",
+  // The Architect (24 Oct): the word-boundary end must lose no real disclosure. "locked me in"
+  // no longer reaches "locked me inside", so it is its own keyword, with the present tense;
+  // "locked me in the house" is covered by "locked me in".
+  "locked me inside",
+  "locks me in",
+  "locks me inside",
 ]
 
 /** Indonesian abuse keywords (WO#482; moved unchanged, spread back into the full list). */
@@ -548,6 +586,13 @@ export const ABUSE_KEYWORDS_ID = [
   "suami pukul istri hukum islam",
   "dipaksa suami",
   "harus taat walau disiksa",
+
+  // ── WO#500 (Gem 3, 24 Oct 2026; docs/wo500-architect.md): abuse intent phrases.
+  // Taken by script from Gem 3's list; stored Latin-folded, lower case. Phrases already
+  // present or covered are listed in docs/wo500-sg-report.md, not repeated.
+  "dia memukul saya",
+  "dia kasar sama saya",
+  "saya dianiaya",
 ]
 
 /** Urdu abuse keywords, Roman and Urdu script (WO#482; moved unchanged, spread back into the full list). */
@@ -592,6 +637,14 @@ export const ABUSE_KEYWORDS_UR = [
   "باپ ظلم كرتا ہے",
   "صبر كا حكم",
   "مجازي خدا",
+
+  // ── WO#500 (Gem 3, 24 Oct 2026; docs/wo500-architect.md): abuse intent phrases.
+  // Taken by script from Gem 3's list; stored normaliseArabic form. Phrases already
+  // present or covered are listed in docs/wo500-sg-report.md, not repeated.
+  "وہ مجھے مارتا ہے",
+  "مجھ پر ظلم كرتا ہے",
+  "مجھے اس سے ڈر لگتا ہے",
+  "شوہر ظلم كرتا ہے",
 ]
 
 /** Arabic abuse keywords (WO#482; moved unchanged, spread back into the full list). */
@@ -623,6 +676,15 @@ export const ABUSE_KEYWORDS_AR = [
   "طاعه الزوج الظالم",
   "ابي يظلمني",
   "هل يجوز قطع صله الرحم",
+
+  // ── WO#500 (Gem 3, 24 Oct 2026; docs/wo500-architect.md): abuse intent phrases.
+  // Taken by script from Gem 3's list; stored normaliseArabic form. Phrases already
+  // present or covered are listed in docs/wo500-sg-report.md, not repeated.
+  "تعنفني",
+  "اتعرض للتعنيف",
+  "اتعرض للضرب",
+  "اهلي يضربوني",
+  "خايفه من العوده للبيت",
 ]
 
 /** Turkish abuse keywords (WO#482; moved unchanged, spread back into the full list). */
@@ -687,6 +749,13 @@ export const ABUSE_KEYWORDS_FA = [
   'mano mizane',           // "he hits me"
   // Gem 3, 22 Oct 2026 (docs/wo488-architect.md): standalone, no relation needed.
   'ازش میترسم',            // "I am afraid of him/her"
+
+  // ── WO#500 (Gem 3, 24 Oct 2026; docs/wo500-architect.md): abuse intent phrases.
+  // Taken by script from Gem 3's list; stored normaliseArabic form (Architect, WO#500). Phrases already
+  // present or covered are listed in docs/wo500-sg-report.md, not repeated.
+  "مرا ميزند",
+  "شوهرم منو كتك ميزنه",
+  "از رفتن به خانه ميترسم",
 ]
 
 /** Bengali (bn) entries of ABUSE_KEYWORDS (WO#488), as SELF_HARM_KEYWORDS_FA. */
@@ -708,6 +777,13 @@ export const ABUSE_KEYWORDS_BN = [
   'অত্যাচার করে',          // "torments (me)"
   // Latin (transliterated), matched through the Latin fold.
   'amake mare',            // "he hits me"
+
+  // ── WO#500 (Gem 3, 24 Oct 2026; docs/wo500-architect.md): abuse intent phrases.
+  // Taken by script from Gem 3's list; stored NFC. Phrases already
+  // present or covered are listed in docs/wo500-sg-report.md, not repeated.
+  "আমাকে নির্যাতন করে",
+  "আমি ওকে ভয় পাই",
+  "বাসায় যেতে ভয় লাগে",
 ]
 
 export const ABUSE_KEYWORDS = [
@@ -876,6 +952,16 @@ function needsEndBoundary(norm: string): boolean {
 }
 
 /**
+ * WO#500, the Architect's rulings (24 Oct 2026, pending Gem 3): EVERY English
+ * ABUSE keyword ends at a word boundary (an inflection -ing/-ed/-s/-er and a
+ * repeated final letter still allowed, boundedIncludes). Open at the end,
+ * "abusing me" matched "abusing medication", "violent to me" "violent to men",
+ * "beating me" "beating meat" and "they hit me" "they hit metal". Self-harm
+ * keywords keep the open end (a lost self-harm hit outranks a false positive).
+ */
+const ABUSE_EN_END_BOUNDED: ReadonlySet<string> = new Set(ABUSE_KEYWORDS_EN)
+
+/**
  * WO#391, Gem 3 ruling (27 Sep 2026, Option 2): "kms" ("kill myself") is not
  * a hit when the word right after it is a distance word, so "5 kms walk" and
  * "10 kms away" do not fire. Only that occurrence is skipped: "kms" anywhere
@@ -899,7 +985,7 @@ function prepareKeyword(k: string): PreparedKeyword {
       ? normaliseArabic(normaliseSeparators(k))
       : normaliseSeparators(stripApostrophes(foldLatin(k.toLowerCase())))
     const english = !arabic && ENGLISH_KEYWORDS.has(k)
-    p = { arabic, norm, english, squash: !arabic && isSquashable(norm), openEnd: !needsEndBoundary(norm) }
+    p = { arabic, norm, english, squash: !arabic && isSquashable(norm), openEnd: !needsEndBoundary(norm) && !ABUSE_EN_END_BOUNDED.has(k) }
     preparedCache.set(k, p)
   }
   return p

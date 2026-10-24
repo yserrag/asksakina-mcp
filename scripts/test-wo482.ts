@@ -321,7 +321,7 @@ console.log('\n=== H. Gem 3 round 2 ===')
   check(!abuseTr('xbabamdan \u00e7ok korkuyorum'), 'the relation word must start a word: "xbabamdan \u00e7ok korkuyorum" is not abuse')
   // dövmesinden and dövecek diye, in both spellings
   for (const q of ['d\u00f6vmesinden korkuyorum', 'beni d\u00f6vmesinden', 'dovmesinden', 'beni d\u00f6vecek diye korkuyorum', 'dovecek diye']) check(abuseTr(q), `"${q}": abuse regardless of relation`)
-  check(ABUSE_KEYWORDS_TR.includes('d\u00f6vmesinden') && ABUSE_KEYWORDS_TR.includes('d\u00f6vecek diye') && ABUSE_KEYWORDS.length === 216 + 6, 'both are in ABUSE_KEYWORDS_TR (full list 216, plus the 6 WO#488 fa and bn entries)')
+  check(ABUSE_KEYWORDS_TR.includes('d\u00f6vmesinden') && ABUSE_KEYWORDS_TR.includes('d\u00f6vecek diye') && ABUSE_KEYWORDS.length === 216 + 6 + 45, 'both are in ABUSE_KEYWORDS_TR (full list 216, plus the 6 WO#488 fa and bn entries and the 45 WO#500 phrases)')
   // 2. korku exceptions
   for (const q of ['korkun\u00e7', 'korkun\u00e7 bir g\u00fcn', 'korkunc', 'korkutucu', 'korkutucu bir r\u00fcya', 'beni korkuttu', 'korkutmak']) check(d(q).level === 'none', `"${q}": korku does not fire (korkun\u00e7, korkutucu and the korkut- stem)`)
   for (const q of ['korkuyorum', 'korkular\u0131m', 'korkulu']) check(d(q).level === 'soft' && d(q).matchedKeyword === 'korku', `"${q}": korku still fires`)

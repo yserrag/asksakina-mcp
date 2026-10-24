@@ -241,6 +241,33 @@ export const ABUSE_KEYWORDS_EN = [
     "sin to leave abusive husband",
     "forcing me to sleep with him",
     "break family ties for safety",
+    "abuses me",
+    "abusing me",
+    "was abused",
+    "abusive marriage",
+    "abusive relationship",
+    "abusive husband",
+    "abusive wife",
+    "abusive partner",
+    "abusive parents",
+    "abusive father",
+    "abusive mother",
+    "abusive family",
+    "he is violent",
+    "she is violent",
+    "my wife is violent",
+    "my father is violent",
+    "my mother is violent",
+    "my partner is violent",
+    "my parents are violent",
+    "my family is violent",
+    "violent to me",
+    "violent towards me",
+    "they hit me",
+    "beating me",
+    "locked me inside",
+    "locks me in",
+    "locks me inside",
 ];
 export const ABUSE_KEYWORDS_ID = [
     'dipukul', 'dilecehkan', 'diperkosa', 'takut pulang',
@@ -262,6 +289,9 @@ export const ABUSE_KEYWORDS_ID = [
     "suami pukul istri hukum islam",
     "dipaksa suami",
     "harus taat walau disiksa",
+    "dia memukul saya",
+    "dia kasar sama saya",
+    "saya dianiaya",
 ];
 export const ABUSE_KEYWORDS_UR = [
     'tashadud', 'ziadti',
@@ -294,6 +324,10 @@ export const ABUSE_KEYWORDS_UR = [
     "باپ ظلم كرتا ہے",
     "صبر كا حكم",
     "مجازي خدا",
+    "وہ مجھے مارتا ہے",
+    "مجھ پر ظلم كرتا ہے",
+    "مجھے اس سے ڈر لگتا ہے",
+    "شوہر ظلم كرتا ہے",
 ];
 export const ABUSE_KEYWORDS_AR = [
     'يضربني',
@@ -317,6 +351,11 @@ export const ABUSE_KEYWORDS_AR = [
     "طاعه الزوج الظالم",
     "ابي يظلمني",
     "هل يجوز قطع صله الرحم",
+    "تعنفني",
+    "اتعرض للتعنيف",
+    "اتعرض للضرب",
+    "اهلي يضربوني",
+    "خايفه من العوده للبيت",
 ];
 export const ABUSE_KEYWORDS_TR = [
     'bana vuruyor', 'şiddet görüyorum', 'eve gitmeye korkuyorum',
@@ -361,6 +400,9 @@ export const ABUSE_KEYWORDS_FA = [
     'به من تجاوز کرد',
     'mano mizane',
     'ازش میترسم',
+    "مرا ميزند",
+    "شوهرم منو كتك ميزنه",
+    "از رفتن به خانه ميترسم",
 ];
 export const ABUSE_KEYWORDS_BN = [
     'আমাকে মারে',
@@ -374,6 +416,9 @@ export const ABUSE_KEYWORDS_BN = [
     'গায়ে হাত তোলে',
     'অত্যাচার করে',
     'amake mare',
+    "আমাকে নির্যাতন করে",
+    "আমি ওকে ভয় পাই",
+    "বাসায় যেতে ভয় লাগে",
 ];
 export const ABUSE_KEYWORDS = [
     ...ABUSE_KEYWORDS_EN,
@@ -436,6 +481,7 @@ function prepareInput(text) {
 function needsEndBoundary(norm) {
     return norm === 'self harm' || norm.endsWith(' hits me');
 }
+const ABUSE_EN_END_BOUNDED = new Set(ABUSE_KEYWORDS_EN);
 const KEYWORD_SUPPRESS_AFTER = {
     kms: /^ (?:walk|away|run|drive|from)(?![\p{L}\p{N}])/u,
 };
@@ -449,7 +495,7 @@ function prepareKeyword(k) {
             ? normaliseArabic(normaliseSeparators(k))
             : normaliseSeparators(stripApostrophes(foldLatin(k.toLowerCase())));
         const english = !arabic && ENGLISH_KEYWORDS.has(k);
-        p = { arabic, norm, english, squash: !arabic && isSquashable(norm), openEnd: !needsEndBoundary(norm) };
+        p = { arabic, norm, english, squash: !arabic && isSquashable(norm), openEnd: !needsEndBoundary(norm) && !ABUSE_EN_END_BOUNDED.has(k) };
         preparedCache.set(k, p);
     }
     return p;

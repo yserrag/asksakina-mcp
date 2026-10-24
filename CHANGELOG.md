@@ -2,6 +2,23 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
+## 2.5.1 (unreleased)
+
+**2.5.0 was deployed to Fly but never reached npm or the registry.** The mirror's v2.5.0 commit kept the previous release.json (2.4.2, AskSakina 0aa5470c), so the mirror's publish workflow refused the tag. The new file had the same byte size and the same whole-second mtime as the old one, so rsync's quick check skipped it. 2.5.0 is not republished (the mirror tag exists); 2.5.1 carries all of it.
+
+- **Release fix:** mcp-deploy syncs the mirror with `rsync --checksum`.
+- **Release guard:** `scripts/verify-mirror-tree.mjs` runs after the sync and before anything is committed or tagged. It fails unless:
+  - release.json names this run's version (package.json) and commit (`GITHUB_SHA`);
+  - the mirror tree is byte-identical to this run's build (only .git/ and assets/ excepted).
+- Its `--self-test` (in prepublish) reproduces the incident.
+
+WO#500 (`docs/wo500-architect.md`; Gem 3's intent phrases and the Architect's rulings of 24 Oct 2026). The crisis detector is synced from the app (`src/lib/utils/crisis-detection.ts`); no MCP logic changes.
+
+- **45 new abuse-pathway keywords**: English 27 (the Architect's list, after the false-positive ruling, and "locked me inside", "locks me in", "locks me inside"), Urdu 4, Arabic 5, Indonesian 3, Bengali 3, Persian 3. Each returns `crisis_resource_only` with the abuse block before any theme. 43 more phrases on the lists were already keywords or covered.
+- **Every English abuse keyword ends at a word boundary** (an inflection and a repeated final letter still count): "abusing medication", "violent to men", "beating meat" and "they hit metal" no longer fire. Gem 3 to confirm.
+- The 2.5.0 abuse-word hold stays for the bare words ("abuse", "abusive", "violence").
+- `test:wo500`: every phrase (88), in both word orders with every 2.5.0 theme trigger; the negatives; the hold.
+
 ## 2.5.0 (unreleased)
 
 WO#495 (`docs/wo495-architect.md`; Gems 1-7, the Architect's rulings of 24 Oct 2026).

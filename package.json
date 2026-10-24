@@ -1,6 +1,6 @@
 {
   "name": "@asksakina/islamic-knowledge-mcp",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "private": false,
   "description": "Curated Islamic knowledge MCP server: Quranic verses, a curated du'a corpus, and the 99 Names of Allah. New and changed content is reviewed through AskSakina's structured specialist-AI review chain across mainstream Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali); not a substitute for a qualified scholar. Provides four lookup tools to AI agents over the Model Context Protocol.",
   "mcpName": "com.asksakina/islamic-knowledge",
@@ -21,7 +21,7 @@
     "update-geoip": "node node_modules/geoip-lite/scripts/updatedb.js",
     "prebuild": "npm run bundle-data",
     "build": "tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
-    "prepublishOnly": "npm run bundle-data && tsx scripts/wo495-learn-content.ts --check && npm run build && npm run test:tools && npm run test:analytics && npm run test:http && npm run test:ratelimit && npm run test:crisis && npm run test:teach && npm run test:wo418 && npm run test:wo423 && npm run test:wo424 && npm run test:wo430 && npm run test:wo444 && npm run test:wo454 && npm run test:wo456 && npm run test:wo478 && npm run test:wo481 && npm run test:wo482 && npm run test:wo484 && npm run test:wo485 && npm run test:wo488 && npm run test:wo489 && npm run test:wo490 && npm run test:wo494 && npm run test:wo495 && npm run test:wo496 && npm run guards",
+    "prepublishOnly": "npm run bundle-data && tsx scripts/wo495-learn-content.ts --check && npm run build && npm run test:tools && npm run test:analytics && npm run test:http && npm run test:ratelimit && npm run test:crisis && npm run test:teach && npm run test:wo418 && npm run test:wo423 && npm run test:wo424 && npm run test:wo430 && npm run test:wo444 && npm run test:wo454 && npm run test:wo456 && npm run test:wo478 && npm run test:wo481 && npm run test:wo482 && npm run test:wo484 && npm run test:wo485 && npm run test:wo488 && npm run test:wo489 && npm run test:wo490 && npm run test:wo494 && npm run test:wo495 && npm run test:wo496 && npm run test:wo500 && node scripts/verify-mirror-tree.mjs --self-test && npm run guards",
     "start": "tsx src/server.ts",
     "start:dist": "node dist/server.js",
     "test:tools": "tsx scripts/test-tools.ts",
@@ -51,7 +51,8 @@
     "test:wo490": "tsx scripts/test-wo490.ts",
     "test:wo494": "tsx scripts/test-wo494.ts",
     "test:wo495": "tsx scripts/test-wo495.ts",
-    "test:wo496": "tsx scripts/test-wo496.ts"
+    "test:wo496": "tsx scripts/test-wo496.ts",
+    "test:wo500": "tsx scripts/test-wo500.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

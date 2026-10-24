@@ -79,8 +79,10 @@ const PK = (s: number, a: number): string => {
 const ALEF = JSON.parse(readFileSync(path.join(MAIN, 'docs', 'wo495-gem2-alef.json'), 'utf-8')) as Array<{ name: string; before: string; after: string; sha256_after: string; positions_1based: number[] }>
 const formula = (name: string, seedArabic: string): string => {
   const r = ALEF.find((x) => x.name.startsWith(name)) ?? fail(`no Gem 2 alef row "${name}"`)
-  // The seed carries the bytes before the change (main) or after it (once WO#494's U+0671 change lands).
-  if (seedArabic !== r.before && seedArabic !== r.after) fail(`${name}: seed Arabic is neither Gem 2's before nor after bytes`)
+  // The seed may carry U+0671 at any of Gem 2's positions: before the change, after it, or (WO#494,
+  // whose U32 row changed position 78 of the shahada only) part-way. Folding U+0671 to U+0627 must
+  // give Gem 2's after bytes exactly; anything else means the seed moved. The output is always Gem 2's.
+  if (seedArabic.replace(/\u0671/g, '\u0627') !== r.after) fail(`${name}: seed Arabic is not Gem 2's text in any alef-wasla state`)
   if (sha(r.after) !== r.sha256_after) fail(`${name}: Gem 2's after bytes do not match their sha256`)
   return r.after
 }
