@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { fetchQuranVerse, PARKED_TRANSLATION_LOCALES } from '../data/quran.js';
 import { AVAILABLE_THEMES, matchThemes, versesForMatches } from '../data/thematic.js';
 import { distressBlockFor, evaluateDistress } from '../safety/crisis-keywords.js';
+import { citesWithheldVerse, mentionsParentHarm } from '../safety/_synced/parent-harm-rules.js';
 import { buildResponse } from '../meta/response-builder.js';
 import { audienceArg } from '../teach/audience.js';
 import { withTeach } from '../teach/attach.js';
@@ -99,13 +100,19 @@ export async function findVersesHandler(input) {
         return noResults(input.query, `No theme in the index matched the query. Try one of the available themes.`, extras);
     }
     const themes = matches.map((m) => m.theme);
+    const parentHarm = mentionsParentHarm(input.query);
+    const pool = parentHarm ? versesForMatches(matches, Number.MAX_SAFE_INTEGER) : versesForMatches(matches, limit);
+    const selected = parentHarm ? pool.filter((v) => !citesWithheldVerse(v.ref)).slice(0, limit) : pool;
+    if (parentHarm && pool.length && !selected.length) {
+        return noResults(input.query, 'The verses for the matched theme are withheld on parent harm (a parent named with harm). No substitute is given.', extras);
+    }
     if (!extras && themes.includes('grief'))
         extras = { crisis_resource: distressBlockFor('soft', locale) };
     if (!extras && themes.includes('companionship'))
         extras = { crisis_resource: distressBlockFor('soft', locale) };
-    const found = await Promise.all(versesForMatches(matches, limit).map((v) => toFoundVerse(v, themes, locale)));
+    const found = await Promise.all(selected.map((v) => toFoundVerse(v, themes, locale)));
     const withhold = Boolean(extras) || themes.includes('grief');
-    const verses = found.map((v) => withTeach(v, `verse:${v.reference}`, { audience: input.audience, locale, withhold }));
+    const verses = found.map((v) => withTeach(v, `verse:${v.reference}`, { audience: input.audience, locale, withhold, parentHarm }));
     const parked = PARKED_TRANSLATION_LOCALES[locale];
     return buildResponse({
         contentType: 'verse_collection',

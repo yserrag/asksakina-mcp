@@ -17,6 +17,7 @@ import { z } from 'zod'
 import { fetchQuranVerse, PARKED_TRANSLATION_LOCALES } from '../data/quran.js'
 import { AVAILABLE_THEMES, matchThemes, versesForMatches, type ThematicVerseEntry } from '../data/thematic.js'
 import { distressBlockFor, evaluateDistress } from '../safety/crisis-keywords.js'
+import { citesWithheldVerse, mentionsParentHarm } from '../safety/_synced/parent-harm-rules.js'
 import { buildResponse, type SakinaResponse } from '../meta/response-builder.js'
 import { audienceArg } from '../teach/audience.js'
 import { withTeach } from '../teach/attach.js'
@@ -150,20 +151,34 @@ export async function findVersesHandler(input: FindVersesInput): Promise<SakinaR
     )
   }
   const themes = matches.map((m) => m.theme)
+  // WO#503-B (Gem 3, 25 Oct 2026; docs/wo503-architect.md): on parent harm (a parent word and a harm
+  // word, the app's check, synced) the withheld verses are dropped before the response is built,
+  // whatever theme matched. A theme left with no verse returns not_found, "withheld on parent harm",
+  // with no substitute verse.
+  const parentHarm = mentionsParentHarm(input.query)
+  const pool = parentHarm ? versesForMatches(matches, Number.MAX_SAFE_INTEGER) : versesForMatches(matches, limit)
+  const selected = parentHarm ? pool.filter((v) => !citesWithheldVerse(v.ref)).slice(0, limit) : pool
+  if (parentHarm && pool.length && !selected.length) {
+    return noResults(
+      input.query,
+      'The verses for the matched theme are withheld on parent harm (a parent named with harm). No substitute is given.',
+      extras,
+    )
+  }
   // WO#488 Part C (Gem 4 and Gem 2, 22 Oct 2026): bereavement words reach grief,
   // so a grief route carries the soft support note even when no soft keyword
   // fired, as get_dua's bereaved route does (Gem 3).
   if (!extras && themes.includes('grief')) extras = { crisis_resource: distressBlockFor('soft', locale)! }
   // WO#495 (Gem 3): the companionship theme (loneliness) carries the soft support block too.
   if (!extras && themes.includes('companionship')) extras = { crisis_resource: distressBlockFor('soft', locale)! }
-  const found = await Promise.all(versesForMatches(matches, limit).map((v) => toFoundVerse(v, themes, locale)))
+  const found = await Promise.all(selected.map((v) => toFoundVerse(v, themes, locale)))
   // WO#405: teach per verse; WO#478: whenever an entry exists, audience or
   // not. WO#407 (Gem 10): nothing attaches on the grief theme or whenever a
   // support block is attached.
   const withhold = Boolean(extras) || themes.includes('grief')
   // (withholdTeach below cuts the no-teach clause under the same condition, Gem 3.)
   const verses = found.map((v) =>
-    withTeach(v, `verse:${v.reference}` as `verse:${number}:${number}`, { audience: input.audience, locale, withhold }),
+    withTeach(v, `verse:${v.reference}` as `verse:${number}:${number}`, { audience: input.audience, locale, withhold, parentHarm }),
   )
   const parked = PARKED_TRANSLATION_LOCALES[locale]
 

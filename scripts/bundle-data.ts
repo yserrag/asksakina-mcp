@@ -16,6 +16,7 @@
  *   - `mcp-server/src/safety/_synced/crisis-detection.ts`
  *   - `mcp-server/src/safety/_synced/arabic-normalise.ts`
  *   - `mcp-server/src/safety/_synced/crisis-normalise.ts` (WO#391)
+ *   - `mcp-server/src/safety/_synced/parent-harm-rules.ts` (WO#503-B)
  *
  * Why synced TS files (not just keyword JSON): the main app's
  * `detectCrisis` is the canonical safety contract — Gem 3 + Gem 5
@@ -319,6 +320,12 @@ async function syncSafetyFiles() {
   await copySyncedTypeScript(
     'src/lib/utils/crisis-normalise.ts',
     path.join(OUT_SYNCED_DIR, 'crisis-normalise.ts'),
+    [],
+  )
+  // WO#503-B: the parent-harm check and the one withheld list (no imports), read by find_verses and get_dua.
+  await copySyncedTypeScript(
+    'src/lib/ai/parent-harm-rules.ts',
+    path.join(OUT_SYNCED_DIR, 'parent-harm-rules.ts'),
     [],
   )
   await copySyncedTypeScript(

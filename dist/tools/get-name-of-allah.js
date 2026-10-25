@@ -3,6 +3,7 @@ import { findNameByString, getNameByNumber, servesEnglishFallback, } from '../da
 import { buildResponse } from '../meta/response-builder.js';
 import { ENGLISH_FALLBACK_GUARD, nameEnglishNote } from '../contracts/english-fallback.js';
 import { distressBlockFor, evaluateDistress } from '../safety/crisis-keywords.js';
+import { mentionsParentHarm } from '../safety/_synced/parent-harm-rules.js';
 import { audienceArg } from '../teach/audience.js';
 import { withTeach } from '../teach/attach.js';
 export const getNameOfAllahShape = {
@@ -71,6 +72,7 @@ export async function getNameOfAllahHandler(input) {
         content: withTeach(englishNote ? { ...record, translation_note: englishNote } : record, `name:${record.number}`, {
             audience: input.audience,
             locale,
+            parentHarm: mentionsParentHarm(input.name ?? ''),
             withhold: Boolean(extras),
         }),
         extras,

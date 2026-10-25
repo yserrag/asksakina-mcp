@@ -1028,7 +1028,8 @@ async function testFastTrackLabels() {
       ? pass('D00091 labelled 25:74 from word 2 (Gem 2, WO#377; released by the WO#413 title ruling)')
       : fail('D00091 label', JSON.stringify({ origin: d91.origin, ref: d91.quran_ref })),
   )
-  for (const [ctx, title] of [['morning', 'Morning Dua/ Athkar (Recite Seven Times)'], ['evening', 'Evening Dua/ Athkar (Recite Seven Times)']] as const) {
+  // WO#497: the titles are read from the bundle ("Morning adhkar (seven times): Allah sufficeth me")
+  for (const [ctx, title] of (['morning', 'evening'] as const).map((c) => [c, bundled.find((x) => x.category === `${c}-adhkar` && x.quran_ref === '9:129')!.name] as const)) {
     // WO#478 (review fix 2): the 9:129 record is the 12th of morning-adhkar
     // and the 11th of evening-adhkar, reached by context through paging
     // (offset 10, limit 10), as an agent would.

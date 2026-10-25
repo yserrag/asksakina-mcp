@@ -116,14 +116,16 @@ check(queryDuasByContext('grave').resolvedCategory === null, '"grave" alone stil
 check(queryDuasByContext('lost my job').resolvedCategory === 'work-success', '"lost my job" (no parent) unchanged -> work-success')
 
 // ── 5. parity with the app's lists ──────────────────────────────────────────
-const app = readFileSync(path.resolve(HERE, '..', '..', 'src', 'data', 'duas', 'parent-grief.ts'), 'utf-8')
+// WO#503-B: PARENT_WORDS moved to the shared parent-harm rules (src/lib/ai/parent-harm-rules.ts, which
+// parent-grief.ts re-exports); the other lists stay in parent-grief.ts. Both files are read.
+const app = readFileSync(path.resolve(HERE, '..', '..', 'src', 'data', 'duas', 'parent-grief.ts'), 'utf-8') + '\n' + readFileSync(path.resolve(HERE, '..', '..', 'src', 'lib', 'ai', 'parent-harm-rules.ts'), 'utf-8')
 const arr = (name: string) => {
   const m = new RegExp(`export const ${name}: readonly string\\[\\] = \\[([\\s\\S]*?)\\]`).exec(app)
   return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : null
 }
 for (const [name, mine] of [['PARENT_WORDS', PARENT_WORDS], ['DEATH_WORDS', DEATH_WORDS], ['MISS_WORDS', MISS_WORDS]] as const) {
   const theirs = arr(name)
-  check(!!theirs && JSON.stringify(theirs) === JSON.stringify(mine), `${name} equals the app's (src/data/duas/parent-grief.ts)`, { mine, theirs })
+  check(!!theirs && JSON.stringify(theirs) === JSON.stringify(mine), `${name} equals the app's (src/data/duas/parent-grief.ts, or parent-harm-rules.ts for PARENT_WORDS)`, { mine, theirs })
 }
 
 console.log(`\nWO#430 parent grief routing: ${passes} passed, ${failures} failed`)

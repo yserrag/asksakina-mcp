@@ -1,6 +1,18 @@
 import { getNameByNumber } from '../data/names.js';
 import { REVERT_NOTES } from '../contracts/learn-content.js';
 import { TEACH_ENTRIES } from './entries.js';
+export const TEACH_WITHHELD_ON_PARENT_HARM = [
+    { key: 'name:5', field: 'context' },
+];
+export const TEACH_WITHHOLDS_PARKED = [
+    { key: 'verse:1:5', field: 'key_word.gloss', why: 'key_word.gloss is a required string on the teach block wire (TeachBlockWire); dropping it is a schema change for Gem 10' },
+];
+function withheldOnParentHarm(key, block) {
+    if (!TEACH_WITHHELD_ON_PARENT_HARM.some((w) => w.key === key && w.field === 'context'))
+        return block;
+    const { context: _context, context_block: _contextBlock, ...rest } = block;
+    return rest;
+}
 function relatedWire(ref) {
     switch (ref.kind) {
         case 'verse': {
@@ -81,7 +93,7 @@ export function withTeach(record, key, opts) {
     const related = (entry?.related?.refs ?? []).map(relatedWire).filter((r) => r !== null);
     return {
         ...record,
-        ...(entry ? { teach: teachWire(key, entry, opts.audience ?? 'unknown') } : {}),
+        ...(entry ? { teach: opts.parentHarm ? withheldOnParentHarm(key, teachWire(key, entry, opts.audience ?? 'unknown')) : teachWire(key, entry, opts.audience ?? 'unknown') } : {}),
         ...(related.length ? { related } : {}),
         ...(note ? { audience_note: note } : {}),
     };

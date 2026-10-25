@@ -19,6 +19,7 @@ import {
 } from '../data/duas.js'
 import { BEREAVED_GENDER_NOTE } from '../data/bereaved-duas.js'
 import { ABUSE_SAFE_DUAS } from '../data/abuse-safe-duas.js'
+import { citesWithheldVerse, mentionsParentHarm } from '../safety/_synced/parent-harm-rules.js'
 import {
   distressBlockFor,
   evaluateDistress,
@@ -160,7 +161,26 @@ export async function getDuaHandler(
     })
   }
 
-  const result = queryDuasByContext(input.context)
+  const matched = queryDuasByContext(input.context)
+  // WO#503-B (Gem 3, 25 Oct 2026; docs/wo503-architect.md): on parent harm a du'a citing a withheld
+  // verse (parent-harm-rules.ts, synced) is dropped; a category left with none returns not_found,
+  // "withheld on parent harm", with no substitute.
+  const parentHarm = mentionsParentHarm(input.context)
+  const result = parentHarm ? { ...matched, duas: matched.duas.filter((d) => !citesWithheldVerse((d as { quran_ref?: string }).quran_ref) && !citesWithheldVerse(d.source)) } : matched
+  if (parentHarm && result.resolvedCategory && matched.duas.length && !result.duas.length) {
+    return buildResponse({
+      contentType: 'not_found',
+      content: {
+        requested: { context: input.context },
+        context: result.resolvedCategory,
+        matched_by: result.matchedBy,
+        duas: [],
+        total_results: 0,
+        reason: "The du'as for this context are withheld on parent harm (a parent named with harm). No substitute is given.",
+      },
+      extras,
+    })
+  }
 
   if (result.resolvedCategory === BEREAVED_CONTEXT) {
     // WO#386 item D: every bereaved route carries at least the soft
@@ -219,7 +239,7 @@ export async function getDuaHandler(
   // entry exists, audience or not. WO#407 (Gem 10): nothing attaches on
   // grief routes or under any support block.
   const withhold = Boolean(extras?.crisis_resource) || GRIEF_CONTEXTS.has(result.resolvedCategory)
-  const duas = shown.map((d, i) => withTeach(d, `dua:${shownIds[i]}`, { audience: input.audience, locale: input.locale, withhold }))
+  const duas = shown.map((d, i) => withTeach(d, `dua:${shownIds[i]}`, { audience: input.audience, locale: input.locale, withhold, parentHarm }))
   const contractOverride = contractOverrideFor(shown)
   // WO#385: each distinct per-record directive in this response is also
   // stated once in CRITICAL_RULES; WO#418 B1 scopes the ungraded one.

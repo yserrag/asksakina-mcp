@@ -16,6 +16,7 @@ import {
 import { buildResponse, type SakinaResponse } from '../meta/response-builder.js'
 import { ENGLISH_FALLBACK_GUARD, nameEnglishNote } from '../contracts/english-fallback.js'
 import { distressBlockFor, evaluateDistress } from '../safety/crisis-keywords.js'
+import { mentionsParentHarm } from '../safety/_synced/parent-harm-rules.js'
 import { audienceArg } from '../teach/audience.js'
 import { withTeach } from '../teach/attach.js'
 
@@ -111,6 +112,8 @@ export async function getNameOfAllahHandler(
     content: withTeach(englishNote ? { ...record, translation_note: englishNote } : record, `name:${record.number}`, {
       audience: input.audience,
       locale,
+      // WO#503-C: the only text this tool takes is `name`; the parent-harm check runs on it.
+      parentHarm: mentionsParentHarm(input.name ?? ''),
       withhold: Boolean(extras),
     }),
     extras,

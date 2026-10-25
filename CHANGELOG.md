@@ -2,7 +2,23 @@
 
 All notable changes to `@asksakina/islamic-knowledge-mcp` are documented here.
 
-## 2.5.1 (unreleased)
+## 2.6.0 (prepared, not published; WO#504)
+
+**What npm serves today is 2.5.1** (checked 25 Oct 2026 with `npm view`; its tarball was unpacked and compared). This release carries everything merged to the MCP since, and nothing is published until the Architect says so. Release record: `docs/wo504-mcp-release-2.6.0.md`.
+
+- **The crisis detector, synced from the app (`src/lib/utils/crisis-detection.ts`): 535 new abuse-pathway keywords, 515 English and 20 in seven locales** (267 → 802 abuse keywords in all). Each returns `crisis_resource_only` with the abuse block before any theme, on find_verses and get_dua.
+  - WO#502 (Gem 3): 61 "<parent> <harm>" pairs for mum, mom, mother, dad, father, stepdad, stepmum and parents (hits, hurts, slaps, kicks, chokes, burns, threatens, locks me in; "parents beat me"), plus 20 parent-worded phrases in ur, pa, tr, ar, id, bn and fa (Gem 2 confirmed). Gem 10 PASS, W10-1 to W10-5 (`docs/wo502-gem10.md`).
+  - WO#503 (Gem 3): "<parent> is cruel to me", 8.
+  - WO#503-B (Gem 3): 48 harm phrases for the 8 parents, 327 new pairs.
+  - WO#503-C (Gem 3): 32 adjective forms, "<parent> is violent / abusive (to me)".
+  - WO#504 (Gem 3, thread 10): 78 sibling, extended-family and in-law strings stored as relative plus harm (reply 2, 72 new), and 18 generic first-person and relational strings stored as given (reply 1, 15 new: "i am being abused", "he abused me", "my abuser", "my husband is abusive", "domestic abuse" and the rest). Known false positives on Gem 3's own negatives, accepted by the Architect (WO#504 SG report): "my sister beats me at games", "my cousin beats me at chess", "domestic violence statistics" (fires on "domestic violence", the WO#500 keyword, which stays as it is).
+- **Parent harm (WO#503-B, Gem 3; Gem 10 PASS W10-1 to W10-6, `docs/wo503b-gem10.md`):** the app's check (a parent word and a harm word in the query) and its withheld list are synced (`src/safety/_synced/parent-harm-rules.ts`). On a parent-harm query find_verses drops 17:23, 17:24, 31:14, 31:15, 46:15 and 66:6 and get_dua drops a du'a citing one (two in the corpus, both 46:15); a theme or category left with nothing returns `not_found`, "withheld on parent harm", with no substitute.
+- **Teach on parent harm (WO#503-C, Gem 3; W10-7 addendum):** the As-Salam (name:5) context and its `context_block` are withheld; the record and the rest of the block are served. Parked: the 1:5 key-word gloss (a required wire field); no `context` input on get_name_of_allah or get_quran_verse, so the check has no text there.
+- **Du'a titles (WO#497, Gem 1; PR #576):** 428 of 440 records' `name` fields are the tidied titles. 48 byte-identity calls change, all get_dua (`content.duas[].title` and the general-supplication directive line), per the WO#497 SG report. For Gem 10's egress pass: `docs/wo504-gem10-mcp-payload.md` (3 parts).
+- **Already in 2.5.1, not in this release** (measured on the unpacked tarball): the D00043 wording and `audioFile` removal (WO#409-H) and the WO#410 withdrawals (no D00290, no D00297).
+- Tests in `prepublishOnly`: `test:wo503b` (30), and the WO#482 count test moved by script.
+
+## 2.5.1 (published; the heading said "unreleased" until WO#504: npm's `latest` is 2.5.1)
 
 **2.5.0 was deployed to Fly but never reached npm or the registry.** The mirror's v2.5.0 commit kept the previous release.json (2.4.2, AskSakina 0aa5470c), so the mirror's publish workflow refused the tag. The new file had the same byte size and the same whole-second mtime as the old one, so rsync's quick check skipped it. 2.5.0 is not republished (the mirror tag exists); 2.5.1 carries all of it.
 

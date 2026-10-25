@@ -22,7 +22,7 @@ import { handleStatsRequest } from './logging/stats.js';
 import { enableDailyStore } from './logging/daily-store.js';
 import { extractClientIp } from './logging/geo.js';
 const SERVER_NAME = 'sakina-islamic-knowledge';
-const SERVER_VERSION = '2.5.1';
+const SERVER_VERSION = '2.6.0';
 const SERVER_DESCRIPTION = "Curated Islamic knowledge from AskSakina (asksakina.com). Provides Quranic verses, a curated du'a corpus (supplications), and the 99 Names of Allah. New and changed content is reviewed through AskSakina's specialist-AI review chain for theological accuracy across mainstream Sunni schools; this structured AI review is not a substitute for a qualified scholar.";
 const SERVER_CARD = {
     schemaVersion: '2025-07-09',

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { BEREAVED_CONTEXT, getDuaRecordById, queryDuasByContext, selectAbuseSafeDuas, } from '../data/duas.js';
 import { BEREAVED_GENDER_NOTE } from '../data/bereaved-duas.js';
 import { ABUSE_SAFE_DUAS } from '../data/abuse-safe-duas.js';
+import { citesWithheldVerse, mentionsParentHarm } from '../safety/_synced/parent-harm-rules.js';
 import { distressBlockFor, evaluateDistress, } from '../safety/crisis-keywords.js';
 import { buildResponse } from '../meta/response-builder.js';
 import { duaEnglishNote, ENGLISH_FALLBACK_GUARD } from '../contracts/english-fallback.js';
@@ -79,7 +80,23 @@ export async function getDuaHandler(input) {
             extras,
         });
     }
-    const result = queryDuasByContext(input.context);
+    const matched = queryDuasByContext(input.context);
+    const parentHarm = mentionsParentHarm(input.context);
+    const result = parentHarm ? { ...matched, duas: matched.duas.filter((d) => !citesWithheldVerse(d.quran_ref) && !citesWithheldVerse(d.source)) } : matched;
+    if (parentHarm && result.resolvedCategory && matched.duas.length && !result.duas.length) {
+        return buildResponse({
+            contentType: 'not_found',
+            content: {
+                requested: { context: input.context },
+                context: result.resolvedCategory,
+                matched_by: result.matchedBy,
+                duas: [],
+                total_results: 0,
+                reason: "The du'as for this context are withheld on parent harm (a parent named with harm). No substitute is given.",
+            },
+            extras,
+        });
+    }
     if (result.resolvedCategory === BEREAVED_CONTEXT) {
         if (!extras)
             extras = { crisis_resource: distressBlockFor('soft', input.locale ?? 'en') };
@@ -122,7 +139,7 @@ export async function getDuaHandler(input) {
     const unrecorded = shown.filter((d) => d.grading_status === 'not_recorded').length;
     const general = shown.filter((d) => d.grading_status === 'not_a_narration').length;
     const withhold = Boolean(extras?.crisis_resource) || GRIEF_CONTEXTS.has(result.resolvedCategory);
-    const duas = shown.map((d, i) => withTeach(d, `dua:${shownIds[i]}`, { audience: input.audience, locale: input.locale, withhold }));
+    const duas = shown.map((d, i) => withTeach(d, `dua:${shownIds[i]}`, { audience: input.audience, locale: input.locale, withhold, parentHarm }));
     const contractOverride = contractOverrideFor(shown);
     const english = englishDisclosure(input.locale ?? 'en');
     const recordDirectives = [...collectionDirectivesFor(shown), ...(remaining > 0 ? [moreDuasNote(remaining)] : []), ...english.directives];

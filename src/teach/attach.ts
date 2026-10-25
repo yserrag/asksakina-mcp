@@ -36,6 +36,33 @@ export interface AttachOptions {
   locale?: string
   /** Grief route or support block: attach nothing (Gem 10, WO#407). */
   withhold?: boolean
+  /**
+   * WO#503-C (Gem 3, 25 Oct 2026; docs/wo503-architect.md section 7): the request names a
+   * parent with harm (parent-harm-rules.ts). A field listed in TEACH_WITHHELD_ON_PARENT_HARM
+   * is dropped from the teach block; the record and the rest of the block are served.
+   */
+  parentHarm?: boolean
+}
+
+/**
+ * Teach fields withheld on parent harm, by record id and field (Gem 3, WO#503-C item 2).
+ * Only a field the wire schema makes optional can be dropped: `context` (and its
+ * `context_block`, present exactly when `context` is) can; `key_word.gloss` is a required
+ * string, so the 1:5 gloss is parked (TEACH_WITHHOLDS_PARKED), not dropped.
+ */
+export const TEACH_WITHHELD_ON_PARENT_HARM: readonly { key: TeachKey; field: 'context' }[] = [
+  { key: 'name:5', field: 'context' },
+]
+/** Ruled, but not cleanly droppable under the wire schema; flagged in docs/wo503b-gem10.md (W10-7). */
+export const TEACH_WITHHOLDS_PARKED: readonly { key: TeachKey; field: string; why: string }[] = [
+  { key: 'verse:1:5', field: 'key_word.gloss', why: 'key_word.gloss is a required string on the teach block wire (TeachBlockWire); dropping it is a schema change for Gem 10' },
+]
+
+/** The block with the fields withheld on parent harm removed (WO#503-C). */
+function withheldOnParentHarm(key: TeachKey, block: TeachBlockWire): TeachBlockWire {
+  if (!TEACH_WITHHELD_ON_PARENT_HARM.some((w) => w.key === key && w.field === 'context')) return block
+  const { context: _context, context_block: _contextBlock, ...rest } = block
+  return rest
 }
 
 function relatedWire(ref: RelatedRef): RelatedRefWire | null {
@@ -142,7 +169,7 @@ export function withTeach<T extends object>(record: T, key: TeachKey, opts: Atta
   const related = (entry?.related?.refs ?? []).map(relatedWire).filter((r): r is RelatedRefWire => r !== null)
   return {
     ...record,
-    ...(entry ? { teach: teachWire(key, entry, opts.audience ?? 'unknown') } : {}),
+    ...(entry ? { teach: opts.parentHarm ? withheldOnParentHarm(key, teachWire(key, entry, opts.audience ?? 'unknown')) : teachWire(key, entry, opts.audience ?? 'unknown') } : {}),
     ...(related.length ? { related } : {}),
     ...(note ? { audience_note: note } : {}),
   }

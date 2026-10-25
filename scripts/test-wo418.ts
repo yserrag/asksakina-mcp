@@ -119,7 +119,7 @@ async function main() {
     const s = r._sakina_meta.llm_directives.CRITICAL_RULES.find((x) => x.startsWith(gem4.UNGRADED_SCOPE_HEAD)) ?? ''
     // WO#424: morning and evening now have no ungraded record, so no scoped
     // directive at all; where one is present it must not name Ayat al-Kursi
-    check(!s.includes('Ayat Al Kursi'), `E: ${ctx} scoped directive (${s ? 'present' : 'absent'}) does not name Ayat al-Kursi`, s.slice(0, 120))
+    check(!/ayat al[- ]kursi/i.test(s), `E: ${ctx} scoped directive (${s ? 'present' : 'absent'}) does not name Ayat al-Kursi`, s.slice(0, 120))
   }
 
   // WO#420: D00317 (3:194) and D00271 (13:28) now carry the whole verse; they
